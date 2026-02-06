@@ -208,6 +208,14 @@
             color: #aaa;
         }
 
+        #library-upload-status {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #aaa;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
         #library-list {
             margin-top: 10px;
             background: #0f3460;
@@ -672,6 +680,7 @@
         
         <input type="file" id="file-input" accept=".json">
         <input type="file" id="publish-file-input" accept=".json">
+        <input type="file" id="library-upload-input" accept=".json">
         <input type="file" id="image-input" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp">
     </div>
 
@@ -833,9 +842,11 @@
             <div class="modal-buttons">
                 <button class="btn" id="btn-library-up">Arriba</button>
                 <button class="btn" id="btn-library-refresh">Actualizar</button>
+                <button class="btn" id="btn-library-upload" title="Subir un JSON a esta carpeta">Subir nuevo archivo</button>
                 <button class="btn" id="btn-library-close">Cerrar</button>
             </div>
             <div id="library-status"></div>
+            <div id="library-upload-status"></div>
             <div id="library-list"></div>
         </div>
     </div>
@@ -1024,6 +1035,7 @@
                 document.getElementById('btn-library-close').addEventListener('click', () => this.hideLibraryModal());
                 document.getElementById('btn-library-refresh').addEventListener('click', () => this.refreshLibrary());
                 document.getElementById('btn-library-up').addEventListener('click', () => this.libraryNavigateUp());
+                document.getElementById('btn-library-upload').addEventListener('click', () => this.pickLibraryUploadFile());
                 document.getElementById('library-prefix').addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') this.refreshLibrary();
                 });
@@ -1032,6 +1044,7 @@
                 // File input
                 document.getElementById('file-input').addEventListener('change', (e) => this.importProject(e));
                 document.getElementById('publish-file-input').addEventListener('change', (e) => this.onPublishFileSelected(e));
+                document.getElementById('library-upload-input').addEventListener('change', (e) => this.onLibraryUploadSelected(e));
                 document.getElementById('image-input').addEventListener('change', (e) => this.loadImageFile(e));
 
                 // Deck (lámina informativa)
@@ -2847,6 +2860,9 @@
                 input.value = this.libraryPrefix || '';
                 input.focus();
 
+                const uploadStatus = document.getElementById('library-upload-status');
+                if (uploadStatus) uploadStatus.textContent = '';
+
                 this.refreshLibrary();
             }
 
@@ -2894,7 +2910,11 @@
                 }
 
                 if (!response.ok || !data || !data.ok) {
-                    status.textContent = `❌ Error al listar biblioteca: ${(data && data.error) || response.status}`;
+                    const err = (data && data.error) || response.status;
+                    const hint = err === 'BlobListFailed'
+                        ? ' (Tip: configura BLOB_READ_WRITE_TOKEN en Vercel: Storage → Blob)'
+                        : '';
+                    status.textContent = `❌ Error al listar biblioteca: ${err}${hint}`;
                     return;
                 }
 
@@ -3004,6 +3024,120 @@
                     if (!id) return;
                     this.insertStickerById(id);
                 }
+            }
+
+            pickLibraryUploadFile() {
+                const input = document.getElementById('library-upload-input');
+                if (!input) return;
+                input.value = '';
+                input.click();
+            }
+
+            onLibraryUploadSelected(e) {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+
+                const uploadStatus = document.getElementById('library-upload-status');
+                if (uploadStatus) uploadStatus.textContent = 'Leyendo archivo...';
+
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    let data;
+                    try {
+                        data = JSON.parse(String(event.target.result || ''));
+                    } catch (error) {
+                        if (uploadStatus) uploadStatus.textContent = '❌ JSON inválido (no se pudo parsear).';
+                        return;
+                    }
+
+                    if (!data || typeof data !== 'object' || !Array.isArray(data.elements)) {
+                        if (uploadStatus) uploadStatus.textContent = '❌ El JSON no parece un proyecto válido (falta "elements").';
+                        return;
+                    }
+
+                    const elements = data.elements || [];
+                    const camera = (data.camera && typeof data.camera === 'object')
+                        ? data.camera
+                        : { x: 0, y: 0, zoom: 1 };
+
+                    // Rechazar imágenes: la biblioteca está pensada para stickers vectoriales/animados.
+                    if (this.hasImagesInElements(elements)) {
+                        if (uploadStatus) uploadStatus.textContent = '❌ Este JSON contiene imágenes (image/imageSrc). Elimina imágenes para publicarlo como sticker.';
+                        return;
+                    }
+
+                    const total = this.countElementsRecursive(elements);
+                    if (total > 2000) {
+                        if (uploadStatus) uploadStatus.textContent = `❌ Proyecto demasiado grande (máx 2000 elementos, actual: ${total}).`;
+                        return;
+                    }
+
+                    const baseName = String(file.name || '').replace(/\.json$/i, '').trim();
+                    const jsonName = (typeof data.name === 'string' && data.name.trim()) ? data.name.trim() : '';
+                    const name = jsonName || baseName || 'sticker';
+
+                    const prefixInput = document.getElementById('library-prefix');
+                    const folder = (prefixInput ? String(prefixInput.value || '') : '')
+                        .trim()
+                        .replace(/^\/+/, '')
+                        .replace(/\/+$/, '');
+
+                    const payload = {
+                        name,
+                        folder,
+                        elements,
+                        camera,
+                        tags: []
+                    };
+
+                    if (uploadStatus) uploadStatus.textContent = 'Subiendo a biblioteca...';
+
+                    let response;
+                    let resJson;
+                    try {
+                        response = await fetch('/api/publish', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        resJson = await response.json();
+                    } catch (error) {
+                        if (uploadStatus) uploadStatus.textContent = `❌ Error de red al publicar: ${error}`;
+                        return;
+                    }
+
+                    if (!response.ok || !resJson || !resJson.ok) {
+                        const err = (resJson && resJson.error) || response.status;
+                        const hint = err === 'BlobWriteFailed' ? '\nTip: configura BLOB_READ_WRITE_TOKEN en Vercel (Storage → Blob).' : '';
+                        if (uploadStatus) uploadStatus.textContent = `❌ Error al publicar: ${err}${hint}`;
+                        return;
+                    }
+
+                    const stickerUrl = String(resJson.previewUrl || '').replace('mode=preview', 'mode=sticker');
+                    const deckUrl = `${window.location.origin}/?mode=deck&id=${encodeURIComponent(resJson.id)}`;
+
+                    // Intentar copiar el link sticker automáticamente.
+                    try {
+                        if (stickerUrl) await navigator.clipboard.writeText(stickerUrl);
+                    } catch {
+                        // Ignorar
+                    }
+
+                    if (uploadStatus) {
+                        uploadStatus.textContent =
+                            `✅ Publicado\n` +
+                            `ID: ${resJson.id}\n` +
+                            `Sticker: ${stickerUrl || resJson.previewUrl}\n` +
+                            `Deck: ${deckUrl}\n` +
+                            `JSON: ${resJson.jsonUrl}`;
+                    }
+
+                    this.refreshLibrary();
+                };
+                reader.readAsText(file);
+
+                // Permitir re-seleccionar el mismo archivo.
+                e.target.value = '';
             }
 
             walkElements(elements, visitor) {
