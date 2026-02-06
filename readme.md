@@ -111,19 +111,61 @@ Parámetros soportados:
 * Auto: `./project.json` (si existe y es JSON real).
 
 ## 🔌 API Pública Para Agentes IA (Links Compartibles)
-Objetivo: que una IA publique un JSON (sin imágenes) y obtenga un link corto al visor.
+Objetivo: que una IA (o humano) publique un JSON (sin imágenes) y obtenga links para:
+* Previsualizar el diagrama como “sticker” (solo animación, sin UI).
+* Consumir el JSON publicado desde cualquier plataforma (promptchats, dashboards, etc).
+
+### ✅ ¿Dónde se guardan los proyectos?
+* **Guardar:** `localStorage` del navegador (solo en ese dispositivo/navegador). No genera links.
+* **Exportar:** descarga un archivo `*.json` local.
+* **Publicar (API):** sube el JSON a una biblioteca pública (carpetas virtuales) y devuelve links compartibles.
+
+### ⚙️ Requisitos en Vercel (para que funcione la biblioteca + publish)
+Debes habilitar Vercel Blob y configurar variables de entorno:
+* `BLOB_READ_WRITE_TOKEN` (obligatorio): habilita `POST /api/publish` y el listado/lectura estable vía API.
+* `PUBLISH_KEY` (opcional): si lo defines, `POST /api/publish` requiere `x-publish-key` o `?key=...`.
+
+Importante:
+* Si NO defines `PUBLISH_KEY`, el publish queda abierto (ideal para prototipar, pero se puede abusar).
+* Después de agregar variables en Vercel, haz un redeploy.
 
 Endpoints:
-* `POST /api/publish` publica un proyecto (JSON) en Vercel Blob y devuelve `previewUrl`.
+* `POST /api/publish` publica un proyecto (JSON) en Vercel Blob y devuelve `previewUrl` y `jsonUrl`.
 * `GET /api/project?id=...` devuelve el JSON publicado.
-* `GET /api/library?prefix=...&mode=folded|expanded` lista la biblioteca por carpetas.
+* `GET /api/library?prefix=...&mode=folded|expanded&limit=...` lista la biblioteca por carpetas.
 
-Requisitos en Vercel (Environment Variables):
-* `BLOB_READ_WRITE_TOKEN` (obligatorio para publicar).
-* `PUBLISH_KEY` (opcional): si se define, se requiere header `x-publish-key` o query `?key=...`.
+Notas:
+* CORS está habilitado (`*`) para facilitar consumo desde plataformas de IA.
+* El publish **rechaza imágenes** (`type: "image"` / `imageSrc`) para mantener stickers vectoriales/animados.
+* Límites anti-abuso: máximo ~200KB por proyecto y máximo 2000 elementos (contando grupos de forma recursiva).
 
-Nota: el endpoint de publish **rechaza imágenes** (elementos tipo `image` / `imageSrc`) para mantenerlo como “sticker” vectorial.
+### 🧪 Ejemplo de publicación (curl)
+```bash
+curl -sS -X POST "https://TU-DOMINIO.vercel.app/api/publish" \
+  -H "content-type: application/json" \
+  -d '{"name":"metro-demo","folder":"metro/linea-1","elements":[],"camera":{"x":0,"y":0,"zoom":1}}'
+```
 
+Respuesta (ejemplo):
+* `previewUrl`: `https://TU-DOMINIO.vercel.app/?mode=sticker&id=metro/linea-1/xxxx`
+* `jsonUrl`: `https://TU-DOMINIO.vercel.app/api/project?id=metro/linea-1/xxxx`
+
+### 👁️ Links de visualización
+* Ver sticker: `/?mode=sticker&id=CARPETA/ID`
+* Ver preview: `/?mode=preview&id=CARPETA/ID` (equivalente)
+* Cargar por URL externa: `/?mode=sticker&project=https://ejemplo.com/ruta.json`
+* Cargar JSON embebido: `/?mode=sticker&data={...json...}` (usar URL encoding si es largo)
+* Auto-carga opcional: `./project.json` (si existe en la misma carpeta y es JSON real)
+
+---
+
+## 📚 Biblioteca (Stickers reutilizables dentro del editor)
+El editor incluye:
+* Botón **Publicar**: publica el proyecto actual y muestra links (preview + JSON).
+* Botón **Biblioteca**: navega por carpetas (`prefix`) y permite **Insertar** stickers publicados.
+
+Inserción:
+* Un sticker se inserta como **1 solo elemento tipo `group`** para poder moverlo como objeto único.
 
 
 
