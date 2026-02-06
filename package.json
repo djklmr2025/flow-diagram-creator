@@ -1,0 +1,8 @@
+{
+  "name": "flow-diagram-creator",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@vercel/blob": "*"
+  }
+}

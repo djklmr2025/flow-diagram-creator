@@ -85,13 +85,44 @@ Este sistema es el primer paso hacia una comunicación humana aumentada. Estamos
 ### 🖥️ Modo Visualizador (IA-Endpoint)
 El sistema ahora soporta una **Vista de Resultado Final**. Mediante parámetros de URL, el motor de renderizado puede ocultar las herramientas de edición para transformarse en un widget interactivo de consulta. 
 
-* **Uso:** `index.html?mode=preview`
+* **Uso:** `index.html?mode=preview` (o `mode=sticker`)
 * **Finalidad:** Integración en dashboards futuristas, visualización de rutas en tiempo real y despliegue de micro-animaciones generadas por IA.
 
 ---
 Mensaje para claude:
 "Claude, añade una función para que el sistema busque un archivo llamado project.json en la misma carpeta al iniciar, o que acepte un JSON directamente desde la URL. Así la IA puede 'inyectar' el diseño sin que el humano toque ningún botón."
 
+---
+
+## 📌 Persistencia: ¿Dónde se guardan los proyectos?
+* **Guardar:** se guarda en `localStorage` del navegador (solo en ese dispositivo/navegador).
+* **Exportar:** descarga un archivo `*.json` local (ej. en Descargas).
+
+## 🧩 Modo Sticker (Solo Animación)
+En `mode=preview` / `mode=sticker`:
+* Se ocultan barras/paneles/overlays.
+* Fondo transparente y grid desactivado.
+* Modo **solo lectura**: pan con click izquierdo y zoom con rueda/teclas.
+
+Parámetros soportados:
+* `?data=...` JSON embebido.
+* `?project=...` URL externa a JSON.
+* `?id=...` ID publicado (ver API abajo).
+* Auto: `./project.json` (si existe y es JSON real).
+
+## 🔌 API Pública Para Agentes IA (Links Compartibles)
+Objetivo: que una IA publique un JSON (sin imágenes) y obtenga un link corto al visor.
+
+Endpoints:
+* `POST /api/publish` publica un proyecto (JSON) en Vercel Blob y devuelve `previewUrl`.
+* `GET /api/project?id=...` devuelve el JSON publicado.
+* `GET /api/library?prefix=...&mode=folded|expanded` lista la biblioteca por carpetas.
+
+Requisitos en Vercel (Environment Variables):
+* `BLOB_READ_WRITE_TOKEN` (obligatorio para publicar).
+* `PUBLISH_KEY` (opcional): si se define, se requiere header `x-publish-key` o query `?key=...`.
+
+Nota: el endpoint de publish **rechaza imágenes** (elementos tipo `image` / `imageSrc`) para mantenerlo como “sticker” vectorial.
 
 
 

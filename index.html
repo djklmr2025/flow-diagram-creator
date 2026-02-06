@@ -186,6 +186,58 @@
             display: none;
         }
 
+        #publish-result {
+            margin-top: 12px;
+            padding: 10px;
+            background: #0f3460;
+            border-radius: 8px;
+            font-size: 12px;
+            word-break: break-all;
+            display: none;
+        }
+
+        #library-status {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        #library-list {
+            margin-top: 10px;
+            background: #0f3460;
+            border-radius: 8px;
+            max-height: 55vh;
+            overflow-y: auto;
+        }
+
+        .library-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .library-row:last-child {
+            border-bottom: none;
+        }
+
+        .library-name {
+            flex: 1;
+            margin-right: 10px;
+            font-size: 13px;
+        }
+
+        .library-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn.small {
+            padding: 6px 10px;
+            font-size: 12px;
+        }
+
         .modal {
             position: fixed;
             top: 0;
@@ -420,6 +472,12 @@
         <button class="btn" id="btn-export" title="Exportar JSON">
             <span>⬇️</span> Exportar
         </button>
+        <button class="btn" id="btn-publish" title="Publicar Sticker (Link IA)">
+            <span>🔗</span> Publicar
+        </button>
+        <button class="btn" id="btn-library" title="Biblioteca de Stickers">
+            <span>📚</span> Biblioteca
+        </button>
         
         <input type="file" id="file-input" accept=".json">
         <input type="file" id="image-input" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp">
@@ -522,6 +580,35 @@
         </div>
     </div>
 
+    <!-- Modal para Publicar -->
+    <div id="publish-modal" class="modal">
+        <div class="modal-content">
+            <h2>Publicar Sticker</h2>
+            <input type="text" id="publish-name" placeholder="Nombre (opcional)">
+            <input type="text" id="publish-folder" placeholder="Carpeta (ej: metro/linea-1) (opcional)">
+            <div class="modal-buttons">
+                <button class="btn" id="btn-cancel-publish">Cancelar</button>
+                <button class="btn" id="btn-confirm-publish">Publicar</button>
+            </div>
+            <div id="publish-result"></div>
+        </div>
+    </div>
+
+    <!-- Modal Biblioteca -->
+    <div id="library-modal" class="modal">
+        <div class="modal-content">
+            <h2>Biblioteca</h2>
+            <input type="text" id="library-prefix" placeholder="Carpeta (ej: metro/linea-1) (vacío = raíz)">
+            <div class="modal-buttons">
+                <button class="btn" id="btn-library-up">Arriba</button>
+                <button class="btn" id="btn-library-refresh">Actualizar</button>
+                <button class="btn" id="btn-library-close">Cerrar</button>
+            </div>
+            <div id="library-status"></div>
+            <div id="library-list"></div>
+        </div>
+    </div>
+
     <script>
         // ==================== SISTEMA MODULAR ====================
         // Arquitectura base que permite agregar módulos sin romper el núcleo
@@ -558,6 +645,14 @@
                 this.contextMenuElement = null;
                 this.loadedImages = {}; // Cache de imágenes cargadas
                 this.autoClosePathDistance = 15; // Distancia para auto-cerrar paths
+
+                // Modo visor (IA/preview): sin edición, sin grid y con fondo transparente.
+                this.readOnly = false;
+                this.showGrid = true;
+                this.backgroundColor = '#1a1a2e'; // null => transparente
+
+                // Navegación de biblioteca
+                this.libraryPrefix = '';
                 
                 // Módulos (permite expandir funcionalidad)
                 this.modules = {};
@@ -574,11 +669,27 @@
                 
                 // Seleccionar herramienta por defecto
                 document.getElementById('btn-select').classList.add('active');
+                
+                // NUEVO: Cargar JSON desde parámetros de URL (si existen)
+                this.loadFromURLParameter();
             }
             
             resizeCanvas() {
                 this.canvas.width = window.innerWidth;
-                this.canvas.height = window.innerHeight - 60 - 30; // toolbar + statusbar
+                
+                const toolbar = document.getElementById('toolbar');
+                const statusBar = document.getElementById('status-bar');
+                const toolbarHeight = toolbar ? toolbar.offsetHeight : 0;
+                const statusHeight = statusBar ? statusBar.offsetHeight : 0;
+                
+                this.canvas.height = Math.max(0, window.innerHeight - toolbarHeight - statusHeight);
+                
+                // Mantener el contenedor del canvas alineado con el layout real (toolbar/status-bar)
+                const container = document.getElementById('canvas-container');
+                if (container) {
+                    container.style.top = `${toolbarHeight}px`;
+                    container.style.bottom = `${statusHeight}px`;
+                }
             }
             
             setupEventListeners() {
@@ -642,10 +753,25 @@
                 document.getElementById('btn-save').addEventListener('click', () => this.showSaveModal());
                 document.getElementById('btn-load').addEventListener('click', () => this.loadProject());
                 document.getElementById('btn-export').addEventListener('click', () => this.exportProject());
+                document.getElementById('btn-publish').addEventListener('click', () => this.showPublishModal());
+                document.getElementById('btn-library').addEventListener('click', () => this.showLibraryModal());
                 
                 // Modal de guardado
                 document.getElementById('btn-cancel-save').addEventListener('click', () => this.hideSaveModal());
                 document.getElementById('btn-confirm-save').addEventListener('click', () => this.saveProject());
+
+                // Modal de publicación
+                document.getElementById('btn-cancel-publish').addEventListener('click', () => this.hidePublishModal());
+                document.getElementById('btn-confirm-publish').addEventListener('click', () => this.publishSticker());
+
+                // Modal biblioteca
+                document.getElementById('btn-library-close').addEventListener('click', () => this.hideLibraryModal());
+                document.getElementById('btn-library-refresh').addEventListener('click', () => this.refreshLibrary());
+                document.getElementById('btn-library-up').addEventListener('click', () => this.libraryNavigateUp());
+                document.getElementById('library-prefix').addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') this.refreshLibrary();
+                });
+                document.getElementById('library-list').addEventListener('click', (e) => this.onLibraryClick(e));
                 
                 // File input
                 document.getElementById('file-input').addEventListener('change', (e) => this.importProject(e));
@@ -694,6 +820,12 @@
             }
             
             setTool(tool) {
+                if (this.readOnly) {
+                    // En modo visor no permitimos cambiar herramientas.
+                    this.tool = 'select';
+                    return;
+                }
+
                 this.tool = tool;
                 
                 // Actualizar UI
@@ -737,6 +869,19 @@
                 const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
                 const worldPos = this.screenToWorld(mouseX, mouseY);
+
+                // Modo visor: solo pan/zoom (sin selección, sin edición, sin menú contextual)
+                if (this.readOnly) {
+                    // Pan con click izquierdo o rueda (o espacio si se mantiene compatibilidad)
+                    if (e.button === 0 || e.button === 1 || this.spacePressed) {
+                        e.preventDefault();
+                        this.isPanning = true;
+                        this.dragStart = { x: mouseX, y: mouseY };
+                        document.getElementById('canvas-container').classList.add('grabbing');
+                        this.canvas.style.cursor = 'grabbing';
+                    }
+                    return;
+                }
                 
                 // Menú contextual con botón derecho
                 if (e.button === 2) {
@@ -835,6 +980,12 @@
                     this.dragStart = { x: mouseX, y: mouseY };
                     return;
                 }
+
+                // Modo visor: no hay hover/handles; solo cursor de "grab"
+                if (this.readOnly) {
+                    this.canvas.style.cursor = 'grab';
+                    return;
+                }
                 
                 // Redimensionar elemento
                 if (this.resizingElement) {
@@ -867,20 +1018,7 @@
                     
                     this.selectedElements.forEach(elem => {
                         if (!elem.locked) {
-                            if (elem.type === 'line') {
-                                elem.x += dx;
-                                elem.y += dy;
-                                elem.endX += dx;
-                                elem.endY += dy;
-                            } else if (elem.type === 'path' && elem.points) {
-                                elem.points.forEach(point => {
-                                    point.x += dx;
-                                    point.y += dy;
-                                });
-                            } else {
-                                elem.x += dx;
-                                elem.y += dy;
-                            }
+                            this.offsetElement(elem, dx, dy);
                         }
                     });
                     
@@ -952,11 +1090,13 @@
                 }
                 
                 this.isDragging = false;
-                this.canvas.style.cursor = 'default';
+                this.canvas.style.cursor = this.readOnly ? 'grab' : 'default';
                 this.updateStatusBar();
             }
             
             onClick(e) {
+                if (this.readOnly) return;
+
                 const rect = this.canvas.getBoundingClientRect();
                 const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
@@ -992,6 +1132,26 @@
             }
             
             onKeyDown(e) {
+                if (this.readOnly) {
+                    // En modo visor solo permitimos zoom (y evitamos crear/modificar elementos).
+                    switch (e.key) {
+                        case '+':
+                        case '=':
+                            e.preventDefault();
+                            this.zoomIn();
+                            break;
+                        case '-':
+                            e.preventDefault();
+                            this.zoomOut();
+                            break;
+                        case '0':
+                            e.preventDefault();
+                            this.resetZoom();
+                            break;
+                    }
+                    return;
+                }
+
                 // Detectar espacio para pan
                 if (e.code === 'Space' && !this.spacePressed) {
                     this.spacePressed = true;
@@ -1066,6 +1226,8 @@
             }
             
             onKeyUp(e) {
+                if (this.readOnly) return;
+
                 if (e.code === 'Space') {
                     this.spacePressed = false;
                     document.getElementById('canvas-container').classList.remove('pan-mode');
@@ -1201,15 +1363,17 @@
                 const duplicates = [];
                 this.selectedElements.forEach(elem => {
                     const duplicate = JSON.parse(JSON.stringify(elem));
-                    duplicate.id = Date.now() + Math.random();
-                    duplicate.x += 20;
-                    duplicate.y += 20;
+                    const idMap = this.assignNewIdsRecursive(duplicate);
                     
-                    // Si es imagen, copiar referencia
-                    if (elem.type === 'image' && this.loadedImages[elem.id]) {
-                        this.loadedImages[duplicate.id] = this.loadedImages[elem.id];
-                        duplicate.imageData = this.loadedImages[elem.id];
-                    }
+                    // Copiar referencias de imágenes (si aplica)
+                    idMap.forEach((newId, oldId) => {
+                        if (this.loadedImages[oldId]) {
+                            this.loadedImages[newId] = this.loadedImages[oldId];
+                        }
+                    });
+                    
+                    // Mover ligeramente para evitar overlap
+                    this.offsetElement(duplicate, 20, 20);
                     
                     duplicates.push(duplicate);
                 });
@@ -1440,6 +1604,17 @@
                 for (let i = this.elements.length - 1; i >= 0; i--) {
                     const elem = this.elements[i];
                     
+                    if (elem.type === 'group' && typeof elem.x === 'number' && typeof elem.y === 'number' &&
+                        typeof elem.width === 'number' && typeof elem.height === 'number') {
+                        const x1 = Math.min(elem.x, elem.x + elem.width);
+                        const x2 = Math.max(elem.x, elem.x + elem.width);
+                        const y1 = Math.min(elem.y, elem.y + elem.height);
+                        const y2 = Math.max(elem.y, elem.y + elem.height);
+                        if (x >= x1 && x <= x2 && y >= y1 && y <= y2) {
+                            return elem;
+                        }
+                    }
+
                     if (elem.type === 'image' || elem.type === 'rectangle') {
                         if (x >= elem.x && x <= elem.x + elem.width &&
                             y >= elem.y && y <= elem.y + elem.height) {
@@ -1533,8 +1708,13 @@
             
             render() {
                 // Limpiar canvas
-                this.ctx.fillStyle = '#1a1a2e';
-                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                if (this.backgroundColor) {
+                    this.ctx.fillStyle = this.backgroundColor;
+                    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                } else {
+                    // Fondo transparente (tipo sticker)
+                    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                }
                 
                 // Aplicar transformación de cámara
                 this.ctx.save();
@@ -1542,7 +1722,9 @@
                 this.ctx.scale(this.camera.zoom, this.camera.zoom);
                 
                 // Dibujar grid (opcional)
-                this.drawGrid();
+                if (this.showGrid) {
+                    this.drawGrid();
+                }
                 
                 // Dibujar elementos
                 this.elements.forEach(elem => this.drawElement(elem));
@@ -1609,19 +1791,21 @@
                     this.ctx.globalAlpha = 1;
                 }
                 
-                // Dibujar selecciones
-                this.selectedElements.forEach(elem => this.drawSelection(elem));
-                
-                // Dibujar handles de redimensionamiento
-                this.selectedElements.forEach(elem => this.drawResizeHandles(elem));
-                
-                // Dibujar hover
-                if (this.hoveredElement && !this.selectedElements.includes(this.hoveredElement)) {
-                    this.ctx.strokeStyle = '#ffffff';
-                    this.ctx.lineWidth = 2 / this.camera.zoom;
-                    this.ctx.setLineDash([5 / this.camera.zoom, 5 / this.camera.zoom]);
-                    this.drawElementOutline(this.hoveredElement);
-                    this.ctx.setLineDash([]);
+                if (!this.readOnly) {
+                    // Dibujar selecciones
+                    this.selectedElements.forEach(elem => this.drawSelection(elem));
+                    
+                    // Dibujar handles de redimensionamiento
+                    this.selectedElements.forEach(elem => this.drawResizeHandles(elem));
+                    
+                    // Dibujar hover
+                    if (this.hoveredElement && !this.selectedElements.includes(this.hoveredElement)) {
+                        this.ctx.strokeStyle = '#ffffff';
+                        this.ctx.lineWidth = 2 / this.camera.zoom;
+                        this.ctx.setLineDash([5 / this.camera.zoom, 5 / this.camera.zoom]);
+                        this.drawElementOutline(this.hoveredElement);
+                        this.ctx.setLineDash([]);
+                    }
                 }
                 
                 this.ctx.restore();
@@ -1653,7 +1837,30 @@
             }
             
             drawElement(elem) {
-                if (elem.type === 'image') {
+                if (elem.type === 'group' && Array.isArray(elem.elements)) {
+                    // Dibujar elementos dentro del grupo
+                    elem.elements.forEach(child => this.drawElement(child));
+
+                    // Dibujar nombre si existe
+                    if (elem.name) {
+                        this.ctx.fillStyle = '#ffffff';
+                        this.ctx.font = `${12 / this.camera.zoom}px Arial`;
+                        const textX = elem.x || 0;
+                        const textY = elem.y || 0;
+                        this.ctx.fillText(elem.name, textX, textY - 10 / this.camera.zoom);
+                    }
+
+                    // Indicador de bloqueado
+                    if (elem.locked) {
+                        this.ctx.fillStyle = '#ff9800';
+                        this.ctx.font = `${14 / this.camera.zoom}px Arial`;
+                        const lockX = elem.x || 0;
+                        const lockY = elem.y || 0;
+                        this.ctx.fillText('🔒', lockX, lockY);
+                    }
+                    return;
+
+                } else if (elem.type === 'image') {
                     // Dibujar imagen
                     let img = elem.imageData;
                     
@@ -1882,7 +2089,7 @@
             }
             
             drawElementOutline(elem) {
-                if (elem.type === 'rectangle') {
+                if (elem.type === 'rectangle' || elem.type === 'group') {
                     this.ctx.strokeRect(elem.x - 5 / this.camera.zoom, 
                                        elem.y - 5 / this.camera.zoom, 
                                        elem.width + 10 / this.camera.zoom, 
@@ -1901,7 +2108,7 @@
                     this.ctx.moveTo(elem.x, elem.y);
                     this.ctx.lineTo(elem.endX, elem.endY);
                     this.ctx.stroke();
-                } else if (elem.type === 'path' && elem.points && elem.points.length > 1) {
+                } else if ((elem.type === 'path' || elem.type === 'polygon') && elem.points && elem.points.length > 1) {
                     this.ctx.beginPath();
                     this.ctx.moveTo(elem.points[0].x, elem.points[0].y);
                     for (let i = 1; i < elem.points.length; i++) {
@@ -1945,19 +2152,57 @@
                 let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
                 
                 group.elements.forEach(elem => {
-                    if (elem.type === 'rectangle' || elem.type === 'circle') {
-                        minX = Math.min(minX, elem.x);
-                        minY = Math.min(minY, elem.y);
-                        maxX = Math.max(maxX, elem.x + elem.width);
-                        maxY = Math.max(maxY, elem.y + elem.height);
-                    } else if (elem.type === 'line') {
+                    if (!elem || typeof elem !== 'object') return;
+
+                    if (elem.type === 'line') {
                         minX = Math.min(minX, elem.x, elem.endX);
                         minY = Math.min(minY, elem.y, elem.endY);
                         maxX = Math.max(maxX, elem.x, elem.endX);
                         maxY = Math.max(maxY, elem.y, elem.endY);
+                        return;
+                    }
+
+                    if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points)) {
+                        elem.points.forEach(p => {
+                            minX = Math.min(minX, p.x);
+                            minY = Math.min(minY, p.y);
+                            maxX = Math.max(maxX, p.x);
+                            maxY = Math.max(maxY, p.y);
+                        });
+                        return;
+                    }
+
+                    if (elem.type === 'group' && Array.isArray(elem.elements)) {
+                        const bounds = this.getElementsBounds(elem.elements);
+                        if (bounds) {
+                            minX = Math.min(minX, bounds.minX);
+                            minY = Math.min(minY, bounds.minY);
+                            maxX = Math.max(maxX, bounds.maxX);
+                            maxY = Math.max(maxY, bounds.maxY);
+                        }
+                        return;
+                    }
+
+                    if (typeof elem.x === 'number' && typeof elem.y === 'number' &&
+                        typeof elem.width === 'number' && typeof elem.height === 'number') {
+                        const x1 = Math.min(elem.x, elem.x + elem.width);
+                        const x2 = Math.max(elem.x, elem.x + elem.width);
+                        const y1 = Math.min(elem.y, elem.y + elem.height);
+                        const y2 = Math.max(elem.y, elem.y + elem.height);
+                        minX = Math.min(minX, x1);
+                        minY = Math.min(minY, y1);
+                        maxX = Math.max(maxX, x2);
+                        maxY = Math.max(maxY, y2);
                     }
                 });
                 
+                if (!Number.isFinite(minX)) {
+                    minX = 0;
+                    minY = 0;
+                    maxX = 0;
+                    maxY = 0;
+                }
+
                 group.x = minX;
                 group.y = minY;
                 group.width = maxX - minX;
@@ -2013,9 +2258,16 @@
                 const pasted = JSON.parse(JSON.stringify(this.clipboard));
                 
                 pasted.forEach(elem => {
-                    elem.id = Date.now() + Math.random();
-                    elem.x += 20;
-                    elem.y += 20;
+                    const idMap = this.assignNewIdsRecursive(elem);
+                    
+                    // Copiar referencias de imágenes (si aplica)
+                    idMap.forEach((newId, oldId) => {
+                        if (this.loadedImages[oldId]) {
+                            this.loadedImages[newId] = this.loadedImages[oldId];
+                        }
+                    });
+                    
+                    this.offsetElement(elem, 20, 20);
                 });
                 
                 this.elements.push(...pasted);
@@ -2111,30 +2363,495 @@
                 this.hideSaveModal();
                 document.getElementById('project-name').value = '';
             }
-            
-            loadProject() {
-                const projects = JSON.parse(localStorage.getItem('flow-diagrams') || '[]');
-                
-                if (projects.length === 0) {
-                    alert('No hay proyectos guardados');
+
+            showPublishModal() {
+                const modal = document.getElementById('publish-modal');
+                const result = document.getElementById('publish-result');
+                modal.classList.add('show');
+                document.getElementById('publish-name').value = '';
+                document.getElementById('publish-folder').value = '';
+                document.getElementById('publish-name').focus();
+                result.style.display = 'none';
+                result.textContent = '';
+            }
+
+            hidePublishModal() {
+                document.getElementById('publish-modal').classList.remove('show');
+            }
+
+            async publishSticker() {
+                const result = document.getElementById('publish-result');
+                result.style.display = 'block';
+                result.textContent = 'Publicando...';
+
+                // Este flujo es para "stickers" vectoriales: no permitir imágenes (ni siquiera dentro de grupos).
+                const hasImages = this.hasImagesInElements(this.elements);
+
+                if (hasImages) {
+                    result.textContent = '❌ No se puede publicar como sticker: elimina las imágenes (image/imageSrc) y vuelve a intentar.';
                     return;
                 }
-                
-                let list = 'Proyectos guardados:\n\n';
-                projects.forEach((p, i) => {
-                    list += `${i + 1}. ${p.name} (${new Date(p.date).toLocaleString()})\n`;
-                });
-                
-                const index = prompt(list + '\nIngresa el número del proyecto a cargar:');
-                
-                if (index && index > 0 && index <= projects.length) {
-                    const project = projects[index - 1];
-                    this.elements = project.elements;
-                    this.camera = project.camera || { x: 0, y: 0, zoom: 1 };
-                    this.selectedElements = [];
-                    this.saveHistory();
-                    this.updateZoomIndicator();
+
+                const totalElements = this.countElementsRecursive(this.elements);
+                if (totalElements > 2000) {
+                    result.textContent = `❌ Proyecto demasiado grande para publicar como sticker (máx 2000 elementos, actual: ${totalElements}).`;
+                    return;
                 }
+
+                const name = (document.getElementById('publish-name').value || '').trim();
+                const folder = (document.getElementById('publish-folder').value || '').trim();
+
+                const payload = {
+                    name,
+                    folder,
+                    elements: this.elements,
+                    camera: this.camera,
+                    tags: []
+                };
+
+                let response;
+                let data;
+                try {
+                    response = await fetch('/api/publish', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    data = await response.json();
+                } catch (error) {
+                    result.textContent = `❌ Error de red al publicar: ${error}`;
+                    return;
+                }
+
+                if (!response.ok || !data || !data.ok) {
+                    const details = data && data.details ? `\n${JSON.stringify(data.details)}` : '';
+                    result.textContent = `❌ Error al publicar: ${(data && data.error) || response.status}${details}`;
+                    return;
+                }
+
+                // Intentar copiar el link de preview automáticamente (si el navegador lo permite)
+                try {
+                    await navigator.clipboard.writeText(data.previewUrl);
+                } catch {
+                    // Ignorar: algunos navegadores/browsers bloquean clipboard.
+                }
+
+                result.innerHTML = `
+                    <div><strong>Preview (modo sticker):</strong></div>
+                    <input type="text" readonly value="${data.previewUrl}">
+                    <div style="margin-top: 10px;"><strong>JSON:</strong></div>
+                    <input type="text" readonly value="${data.jsonUrl}">
+                    <div style="margin-top: 10px;">Tip: el link de preview se intentó copiar al portapapeles.</div>
+                `;
+            }
+
+            showLibraryModal() {
+                const modal = document.getElementById('library-modal');
+                modal.classList.add('show');
+
+                const input = document.getElementById('library-prefix');
+                input.value = this.libraryPrefix || '';
+                input.focus();
+
+                this.refreshLibrary();
+            }
+
+            hideLibraryModal() {
+                document.getElementById('library-modal').classList.remove('show');
+            }
+
+            libraryNavigateUp() {
+                const input = document.getElementById('library-prefix');
+                const current = (input.value || '')
+                    .trim()
+                    .replace(/^\/+/, '')
+                    .replace(/\/+$/, '');
+
+                if (!current) return;
+
+                const parts = current.split('/').filter(Boolean);
+                parts.pop();
+                input.value = parts.join('/');
+                this.refreshLibrary();
+            }
+
+            async refreshLibrary() {
+                const input = document.getElementById('library-prefix');
+                const prefix = (input.value || '')
+                    .trim()
+                    .replace(/^\/+/, '')
+                    .replace(/\/+$/, '');
+
+                this.libraryPrefix = prefix;
+
+                const status = document.getElementById('library-status');
+                const listEl = document.getElementById('library-list');
+                status.textContent = 'Cargando biblioteca...';
+                listEl.innerHTML = '';
+
+                let response;
+                let data;
+                try {
+                    response = await fetch(`/api/library?prefix=${encodeURIComponent(prefix)}&mode=folded&limit=200`);
+                    data = await response.json();
+                } catch (error) {
+                    status.textContent = `❌ Error de red: ${error}`;
+                    return;
+                }
+
+                if (!response.ok || !data || !data.ok) {
+                    status.textContent = `❌ Error al listar biblioteca: ${(data && data.error) || response.status}`;
+                    return;
+                }
+
+                const currentPrefix = (data.prefix || '').replace(/\/+$/, '');
+                status.textContent = currentPrefix ? `Carpeta: /${currentPrefix}` : 'Carpeta: /';
+
+                const folders = Array.isArray(data.folders) ? data.folders.slice() : [];
+                const blobs = Array.isArray(data.blobs) ? data.blobs.slice() : [];
+
+                folders.sort((a, b) => String(a).localeCompare(String(b)));
+                blobs.sort((a, b) => String(a.pathname).localeCompare(String(b.pathname)));
+
+                const addRow = ({ name, type, path, id, actions }) => {
+                    const row = document.createElement('div');
+                    row.className = 'library-row';
+                    row.dataset.type = type;
+                    if (path) row.dataset.path = path;
+                    if (id) row.dataset.id = id;
+
+                    const nameEl = document.createElement('div');
+                    nameEl.className = 'library-name';
+                    nameEl.textContent = name;
+
+                    const actionsEl = document.createElement('div');
+                    actionsEl.className = 'library-actions';
+
+                    actions.forEach(({ label, action }) => {
+                        const btn = document.createElement('button');
+                        btn.className = 'btn small';
+                        btn.textContent = label;
+                        btn.dataset.action = action;
+                        actionsEl.appendChild(btn);
+                    });
+
+                    row.appendChild(nameEl);
+                    row.appendChild(actionsEl);
+                    listEl.appendChild(row);
+                };
+
+                const displayName = (fullPath) => {
+                    const p = String(fullPath || '').replace(/\/+$/, '');
+                    if (!currentPrefix) return p;
+                    if (p === currentPrefix) return p.split('/').pop() || p;
+                    if (p.startsWith(currentPrefix + '/')) {
+                        return p.slice(currentPrefix.length + 1) || p;
+                    }
+                    return p;
+                };
+
+                folders.forEach((folderPath) => {
+                    const clean = String(folderPath || '').replace(/\/+$/, '');
+                    if (!clean) return;
+                    addRow({
+                        name: `📁 ${displayName(clean)}`,
+                        type: 'folder',
+                        path: clean,
+                        actions: [{ label: 'Abrir', action: 'open-folder' }],
+                    });
+                });
+
+                blobs.forEach((blob) => {
+                    if (!blob || !blob.pathname) return;
+                    const stickerId = String(blob.pathname);
+                    addRow({
+                        name: `✨ ${displayName(stickerId)}`,
+                        type: 'sticker',
+                        id: stickerId,
+                        actions: [
+                            { label: 'Insertar', action: 'insert' },
+                            { label: 'Ver', action: 'preview' },
+                        ],
+                    });
+                });
+
+                if (folders.length === 0 && blobs.length === 0) {
+                    status.textContent += ' (vacío)';
+                }
+            }
+
+            onLibraryClick(e) {
+                const btn = e.target.closest('button[data-action]');
+                if (!btn) return;
+
+                const row = btn.closest('.library-row');
+                if (!row) return;
+
+                const action = btn.dataset.action;
+                const type = row.dataset.type;
+
+                if (action === 'open-folder' && type === 'folder') {
+                    const path = row.dataset.path || '';
+                    document.getElementById('library-prefix').value = path;
+                    this.refreshLibrary();
+                    return;
+                }
+
+                if (action === 'preview' && type === 'sticker') {
+                    const id = row.dataset.id;
+                    if (!id) return;
+                    const url = `${window.location.origin}/?mode=sticker&id=${encodeURIComponent(id)}`;
+                    window.open(url, '_blank', 'noopener');
+                    return;
+                }
+
+                if (action === 'insert' && type === 'sticker') {
+                    const id = row.dataset.id;
+                    if (!id) return;
+                    this.insertStickerById(id);
+                }
+            }
+
+            walkElements(elements, visitor) {
+                const stack = Array.isArray(elements) ? elements.slice() : [];
+                while (stack.length) {
+                    const elem = stack.pop();
+                    if (!elem || typeof elem !== 'object') continue;
+
+                    // Si el visitor devuelve false, detenemos el recorrido.
+                    if (visitor(elem) === false) return;
+
+                    if (elem.type === 'group' && Array.isArray(elem.elements)) {
+                        for (let i = elem.elements.length - 1; i >= 0; i--) {
+                            stack.push(elem.elements[i]);
+                        }
+                    }
+                }
+            }
+
+            hasImagesInElements(elements) {
+                let found = false;
+                this.walkElements(elements, (elem) => {
+                    if (elem.type === 'image' || typeof elem.imageSrc === 'string' || elem.imageData != null) {
+                        found = true;
+                        return false;
+                    }
+                    return true;
+                });
+                return found;
+            }
+
+            countElementsRecursive(elements) {
+                let count = 0;
+                this.walkElements(elements, () => {
+                    count++;
+                    return true;
+                });
+                return count;
+            }
+
+            flattenGroupElements(elements) {
+                const out = [];
+                (elements || []).forEach((elem) => {
+                    if (!elem || typeof elem !== 'object') return;
+                    if (elem.type === 'group' && Array.isArray(elem.elements)) {
+                        out.push(...this.flattenGroupElements(elem.elements));
+                    } else {
+                        out.push(elem);
+                    }
+                });
+                return out;
+            }
+
+            getElementsBounds(elements) {
+                let minX = Infinity;
+                let minY = Infinity;
+                let maxX = -Infinity;
+                let maxY = -Infinity;
+
+                const addPoint = (x, y) => {
+                    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, x);
+                    maxY = Math.max(maxY, y);
+                };
+
+                (elements || []).forEach((elem) => {
+                    if (!elem || typeof elem !== 'object') return;
+
+                    if (elem.type === 'group' && Array.isArray(elem.elements)) {
+                        const bounds = this.getElementsBounds(elem.elements);
+                        if (bounds) {
+                            addPoint(bounds.minX, bounds.minY);
+                            addPoint(bounds.maxX, bounds.maxY);
+                        } else if (typeof elem.x === 'number' && typeof elem.y === 'number' &&
+                                   typeof elem.width === 'number' && typeof elem.height === 'number') {
+                            addPoint(elem.x, elem.y);
+                            addPoint(elem.x + elem.width, elem.y + elem.height);
+                        }
+                        return;
+                    }
+
+                    if (elem.type === 'line') {
+                        addPoint(elem.x, elem.y);
+                        addPoint(elem.endX, elem.endY);
+                        return;
+                    }
+
+                    if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points)) {
+                        elem.points.forEach((p) => addPoint(p.x, p.y));
+                        return;
+                    }
+
+                    if (typeof elem.x === 'number' && typeof elem.y === 'number') {
+                        if (typeof elem.width === 'number' && typeof elem.height === 'number') {
+                            addPoint(elem.x, elem.y);
+                            addPoint(elem.x + elem.width, elem.y + elem.height);
+                        } else {
+                            addPoint(elem.x, elem.y);
+                        }
+                    }
+                });
+
+                if (!Number.isFinite(minX)) return null;
+                return { minX, minY, maxX, maxY };
+            }
+
+            offsetElement(elem, dx, dy) {
+                if (!elem || typeof elem !== 'object') return;
+
+                if (elem.type === 'group' && Array.isArray(elem.elements)) {
+                    if (typeof elem.x === 'number') elem.x += dx;
+                    if (typeof elem.y === 'number') elem.y += dy;
+                    elem.elements.forEach((child) => this.offsetElement(child, dx, dy));
+                    return;
+                }
+
+                if (elem.type === 'line') {
+                    elem.x += dx;
+                    elem.y += dy;
+                    elem.endX += dx;
+                    elem.endY += dy;
+                    return;
+                }
+
+                if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points)) {
+                    elem.points.forEach((p) => {
+                        p.x += dx;
+                        p.y += dy;
+                    });
+                    return;
+                }
+
+                if (typeof elem.x === 'number') elem.x += dx;
+                if (typeof elem.y === 'number') elem.y += dy;
+            }
+
+            assignNewIdsRecursive(elem, idMap) {
+                const map = idMap || new Map();
+                if (!elem || typeof elem !== 'object') return map;
+
+                const oldId = elem.id;
+                const newId = Date.now() + Math.random();
+                elem.id = newId;
+                if (oldId != null) map.set(oldId, newId);
+
+                if (elem.type === 'group' && Array.isArray(elem.elements)) {
+                    elem.elements.forEach((child) => this.assignNewIdsRecursive(child, map));
+                }
+
+                return map;
+            }
+
+            async insertStickerById(id) {
+                const status = document.getElementById('library-status');
+                status.textContent = `Insertando: ${id}...`;
+
+                let response;
+                let project;
+                try {
+                    response = await fetch(`/api/project?id=${encodeURIComponent(id)}`);
+                    project = await response.json();
+                } catch (error) {
+                    status.textContent = `❌ Error de red al cargar sticker: ${error}`;
+                    return;
+                }
+
+                if (!response.ok) {
+                    status.textContent = `❌ No se pudo cargar el sticker (${response.status})`;
+                    return;
+                }
+
+                const rawElements = Array.isArray(project.elements) ? project.elements : [];
+                const cloned = JSON.parse(JSON.stringify(rawElements));
+
+                // Rechazar imágenes para mantenerlo como "sticker" vectorial.
+                if (this.hasImagesInElements(cloned)) {
+                    status.textContent = '❌ Sticker contiene imágenes (no soportado para inserción tipo sticker).';
+                    return;
+                }
+
+                if (cloned.length === 0) {
+                    status.textContent = '⚠️ Sticker vacío';
+                    return;
+                }
+
+                const groupName =
+                    (project && typeof project.name === 'string' && project.name.trim())
+                        ? project.name.trim()
+                        : (String(id).split('/').filter(Boolean).pop() || String(id));
+
+                const group = {
+                    id: Date.now() + Math.random(),
+                    type: 'group',
+                    elements: cloned,
+                    locked: false,
+                    active: true,
+                    connectionStatus: 'none',
+                    fillColor: '#0f3460',
+                    strokeColor: '#e94560',
+                    name: groupName,
+                    stickerSourceId: id
+                };
+
+                // Renombrar IDs para evitar colisiones (incluye hijos).
+                this.assignNewIdsRecursive(group);
+
+                // Colocar el sticker centrado en el viewport actual.
+                const bounds = this.getElementsBounds(group.elements);
+                if (bounds) {
+                    group.x = bounds.minX;
+                    group.y = bounds.minY;
+                    group.width = bounds.maxX - bounds.minX;
+                    group.height = bounds.maxY - bounds.minY;
+
+                    const centerStickerX = (bounds.minX + bounds.maxX) / 2;
+                    const centerStickerY = (bounds.minY + bounds.maxY) / 2;
+                    const centerView = this.screenToWorld(this.canvas.width / 2, this.canvas.height / 2);
+                    const dx = centerView.x - centerStickerX;
+                    const dy = centerView.y - centerStickerY;
+                    this.offsetElement(group, dx, dy);
+                } else {
+                    group.x = 0;
+                    group.y = 0;
+                    group.width = 0;
+                    group.height = 0;
+                }
+
+                this.elements.push(group);
+                this.selectedElements = [group];
+                this.saveHistory();
+                this.updatePropertiesPanel();
+                this.updateStatusBar();
+
+                const innerCount = this.countElementsRecursive(group.elements);
+                status.textContent = `✅ Insertado: ${id} (1 grupo, ${innerCount} elementos)`;
+            }
+            
+            loadProject() {
+                // Activar el input de archivo para cargar JSON
+                document.getElementById('file-input').click();
             }
             
             loadFromLocalStorage() {
@@ -2147,6 +2864,121 @@
                 }
                 
                 this.saveHistory();
+                this.updateZoomIndicator();
+            }
+            
+            loadFromURLParameter() {
+                const urlParams = new URLSearchParams(window.location.search);
+
+                // 1) JSON embebido en parámetro (?data=...)
+                const jsonData = urlParams.get('data');
+                if (jsonData) {
+                    let data;
+                    try {
+                        // URLSearchParams ya decodifica, pero dejamos fallback por compatibilidad.
+                        data = JSON.parse(jsonData);
+                    } catch (error) {
+                        try {
+                            data = JSON.parse(decodeURIComponent(jsonData));
+                        } catch (error2) {
+                            console.error('❌ Error al parsear JSON desde URL:', error2);
+                            return;
+                        }
+                    }
+                    
+                    this.elements = data.elements || [];
+                    this.camera = data.camera || { x: 0, y: 0, zoom: 1 };
+                    this.selectedElements = [];
+                    this.saveHistory();
+                    this.updateZoomIndicator();
+                    console.log('✅ Proyecto cargado desde parámetro data');
+                    return;
+                }
+
+                // 2) Cargar por ID publicado (?id=...)
+                const projectId = urlParams.get('id');
+                if (projectId) {
+                    fetch(`/api/project?id=${encodeURIComponent(projectId)}`)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            this.elements = data.elements || [];
+                            this.camera = data.camera || { x: 0, y: 0, zoom: 1 };
+                            this.selectedElements = [];
+                            this.saveHistory();
+                            this.updateZoomIndicator();
+                            console.log('✅ Proyecto cargado desde ID');
+                        })
+                        .catch(error => {
+                            console.error('❌ Error al cargar proyecto desde ID:', error);
+                        });
+                    return;
+                }
+
+                // 3) Cargar desde URL externa (?project=...)
+                const projectUrl = urlParams.get('project');
+                if (projectUrl) {
+                    fetch(projectUrl)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            this.elements = data.elements || [];
+                            this.camera = data.camera || { x: 0, y: 0, zoom: 1 };
+                            this.selectedElements = [];
+                            this.saveHistory();
+                            this.updateZoomIndicator();
+                            console.log('✅ Proyecto cargado desde URL');
+                        })
+                        .catch(error => {
+                            console.error('❌ Error al cargar proyecto desde URL:', error);
+                        });
+                    return;
+                }
+
+                // 4) Auto-carga opcional: buscar ./project.json (misma carpeta)
+                fetch('./project.json', { cache: 'no-store' })
+                    .then(async response => {
+                        if (response.status === 404) return null;
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+
+                        // En despliegues tipo SPA, un rewrite puede devolver HTML con status 200.
+                        // Si no parece JSON, lo ignoramos silenciosamente.
+                        const contentType = (response.headers.get('content-type') || '').toLowerCase();
+                        if (contentType.includes('text/html')) return null;
+
+                        if (contentType.includes('json')) {
+                            return response.json();
+                        }
+
+                        const text = await response.text();
+                        try {
+                            return JSON.parse(text);
+                        } catch {
+                            return null;
+                        }
+                    })
+                    .then(data => {
+                        if (!data) return;
+                        this.elements = data.elements || [];
+                        this.camera = data.camera || { x: 0, y: 0, zoom: 1 };
+                        this.selectedElements = [];
+                        this.saveHistory();
+                        this.updateZoomIndicator();
+                        console.log('✅ Proyecto cargado desde project.json');
+                    })
+                    .catch(error => {
+                        console.error('❌ Error al cargar project.json:', error);
+                    });
             }
             
             newProject() {
@@ -2191,6 +3023,7 @@
                         this.camera = data.camera || { x: 0, y: 0, zoom: 1 };
                         this.selectedElements = [];
                         this.saveHistory();
+                        this.updateZoomIndicator();
                         alert('Proyecto importado exitosamente');
                     } catch (error) {
                         alert('Error al importar proyecto');
@@ -2292,6 +3125,56 @@
         console.log('   Espacio = Pan (mover canvas) | Ctrl+C/V = Copiar/Pegar');
         console.log('   Doble clic en elemento = Activar/Desactivar animación');
         console.log('   Botón derecho = Menú contextual de capas');
+        
+        // ==================== MODO PREVIEW PARA IA ====================
+        
+        function applyPreviewMode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const mode = urlParams.get('mode');
+            const isPreview = mode === 'preview' || mode === 'sticker';
+            
+            if (isPreview) {
+                // Ocultar toolbar
+                document.getElementById('toolbar').style.display = 'none';
+                
+                // Ocultar panel de propiedades
+                document.getElementById('properties-panel').style.display = 'none';
+                
+                // Ocultar barra de estado
+                document.getElementById('status-bar').style.display = 'none';
+
+                // Ocultar overlays (solo diagrama)
+                document.getElementById('zoom-indicator').style.display = 'none';
+                document.getElementById('context-menu').style.display = 'none';
+                document.getElementById('close-path-hint').style.display = 'none';
+                
+                // Ajustar canvas al 100% de la pantalla
+                const container = document.getElementById('canvas-container');
+                container.style.top = '0';
+                container.style.bottom = '0';
+                container.style.background = 'transparent';
+                
+                // Fondo transparente (tipo sticker)
+                document.documentElement.style.background = 'transparent';
+                document.body.style.background = 'transparent';
+                
+                // Deshabilitar interacciones de edición (solo navegación)
+                system.readOnly = true;
+                system.tool = 'select';
+                system.showGrid = false;
+                system.backgroundColor = null;
+                system.selectedElements = [];
+                system.canvas.style.cursor = 'grab';
+                
+                // Recalcular tamaño del canvas con el layout nuevo
+                system.resizeCanvas();
+                
+                console.log('🚀 MODO PREVIEW ACTIVADO: Vista tipo sticker (solo animación)');
+            }
+        }
+        
+        // Ejecutar al cargar la página
+        window.addEventListener('load', applyPreviewMode);
     </script>
 </body>
 </html>
