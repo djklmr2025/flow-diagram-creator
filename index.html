@@ -196,6 +196,12 @@
             display: none;
         }
 
+        #publish-file-status {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #aaa;
+        }
+
         #library-status {
             margin-top: 10px;
             font-size: 12px;
@@ -665,6 +671,7 @@
         </button>
         
         <input type="file" id="file-input" accept=".json">
+        <input type="file" id="publish-file-input" accept=".json">
         <input type="file" id="image-input" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp">
     </div>
 
@@ -805,6 +812,11 @@
             <h2>Publicar Sticker</h2>
             <input type="text" id="publish-name" placeholder="Nombre (opcional)">
             <input type="text" id="publish-folder" placeholder="Carpeta (ej: metro/linea-1) (opcional)">
+            <div class="modal-buttons" style="justify-content: flex-start;">
+                <button class="btn small" id="btn-pick-publish-file" title="Publicar desde un archivo JSON">Subir JSON…</button>
+                <button class="btn small" id="btn-clear-publish-file" title="Volver a publicar el canvas actual" style="display:none;">Usar Canvas</button>
+            </div>
+            <div id="publish-file-status"></div>
             <div class="modal-buttons">
                 <button class="btn" id="btn-cancel-publish">Cancelar</button>
                 <button class="btn" id="btn-confirm-publish">Publicar</button>
@@ -875,6 +887,10 @@
                 this.deckLayout = 'horizontal'; // 'horizontal' | 'vertical'
                 this.activeControlPointId = null;
                 this._deckResizing = false;
+
+                // Publicación desde archivo
+                this.publishFileProject = null;
+                this.publishFileName = '';
 
                 // Navegación de biblioteca
                 this.libraryPrefix = '';
@@ -1001,6 +1017,8 @@
                 // Modal de publicación
                 document.getElementById('btn-cancel-publish').addEventListener('click', () => this.hidePublishModal());
                 document.getElementById('btn-confirm-publish').addEventListener('click', () => this.publishSticker());
+                document.getElementById('btn-pick-publish-file').addEventListener('click', () => this.pickPublishFile());
+                document.getElementById('btn-clear-publish-file').addEventListener('click', () => this.clearPublishFile());
 
                 // Modal biblioteca
                 document.getElementById('btn-library-close').addEventListener('click', () => this.hideLibraryModal());
@@ -1013,6 +1031,7 @@
                 
                 // File input
                 document.getElementById('file-input').addEventListener('change', (e) => this.importProject(e));
+                document.getElementById('publish-file-input').addEventListener('change', (e) => this.onPublishFileSelected(e));
                 document.getElementById('image-input').addEventListener('change', (e) => this.loadImageFile(e));
 
                 // Deck (lámina informativa)
@@ -2659,10 +2678,84 @@
                 document.getElementById('publish-name').focus();
                 result.style.display = 'none';
                 result.textContent = '';
+
+                // Reset estado de publicación desde archivo
+                this.publishFileProject = null;
+                this.publishFileName = '';
+                this.updatePublishFileUI();
             }
 
             hidePublishModal() {
                 document.getElementById('publish-modal').classList.remove('show');
+            }
+
+            updatePublishFileUI(messageOverride) {
+                const status = document.getElementById('publish-file-status');
+                const btnClear = document.getElementById('btn-clear-publish-file');
+                if (!status || !btnClear) return;
+
+                if (messageOverride) {
+                    status.textContent = messageOverride;
+                    btnClear.style.display = this.publishFileProject ? 'inline-flex' : 'none';
+                    return;
+                }
+
+                if (this.publishFileProject) {
+                    status.textContent = `Fuente: Archivo JSON (${this.publishFileName || 'seleccionado'})`;
+                    btnClear.style.display = 'inline-flex';
+                } else {
+                    status.textContent = 'Fuente: Canvas actual';
+                    btnClear.style.display = 'none';
+                }
+            }
+
+            pickPublishFile() {
+                document.getElementById('publish-file-input').click();
+            }
+
+            clearPublishFile() {
+                this.publishFileProject = null;
+                this.publishFileName = '';
+                this.updatePublishFileUI();
+            }
+
+            onPublishFileSelected(e) {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+
+                this.publishFileName = file.name || '';
+                this.updatePublishFileUI('Leyendo archivo...');
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    let data;
+                    try {
+                        data = JSON.parse(String(event.target.result || ''));
+                    } catch (error) {
+                        this.publishFileProject = null;
+                        this.updatePublishFileUI('❌ JSON inválido (no se pudo parsear).');
+                        return;
+                    }
+
+                    if (!data || typeof data !== 'object' || !Array.isArray(data.elements)) {
+                        this.publishFileProject = null;
+                        this.updatePublishFileUI('❌ El JSON no parece un proyecto válido (falta "elements").');
+                        return;
+                    }
+
+                    this.publishFileProject = data;
+                    this.updatePublishFileUI();
+
+                    // Auto-sugerir nombre si el usuario aún no puso uno.
+                    const nameInput = document.getElementById('publish-name');
+                    if (nameInput && !String(nameInput.value || '').trim()) {
+                        const fromJson = (typeof data.name === 'string' && data.name.trim()) ? data.name.trim() : '';
+                        const base = String(this.publishFileName || '').replace(/\.json$/i, '').trim();
+                        nameInput.value = fromJson || base || '';
+                    }
+                };
+                reader.readAsText(file);
+                e.target.value = '';
             }
 
             async publishSticker() {
@@ -2670,28 +2763,39 @@
                 result.style.display = 'block';
                 result.textContent = 'Publicando...';
 
+                const sourceElements = this.publishFileProject ? this.publishFileProject.elements : this.elements;
+                const sourceCamera = this.publishFileProject
+                    ? (this.publishFileProject.camera || { x: 0, y: 0, zoom: 1 })
+                    : this.camera;
+
                 // Este flujo es para "stickers" vectoriales: no permitir imágenes (ni siquiera dentro de grupos).
-                const hasImages = this.hasImagesInElements(this.elements);
+                const hasImages = this.hasImagesInElements(sourceElements);
 
                 if (hasImages) {
                     result.textContent = '❌ No se puede publicar como sticker: elimina las imágenes (image/imageSrc) y vuelve a intentar.';
                     return;
                 }
 
-                const totalElements = this.countElementsRecursive(this.elements);
+                const totalElements = this.countElementsRecursive(sourceElements);
                 if (totalElements > 2000) {
                     result.textContent = `❌ Proyecto demasiado grande para publicar como sticker (máx 2000 elementos, actual: ${totalElements}).`;
                     return;
                 }
 
-                const name = (document.getElementById('publish-name').value || '').trim();
+                const nameInput = (document.getElementById('publish-name').value || '').trim();
+                const fileNameBase = String(this.publishFileName || '').replace(/\.json$/i, '').trim();
+                const defaultName =
+                    (this.publishFileProject && typeof this.publishFileProject.name === 'string' && this.publishFileProject.name.trim())
+                        ? this.publishFileProject.name.trim()
+                        : '';
+                const name = nameInput || defaultName || fileNameBase;
                 const folder = (document.getElementById('publish-folder').value || '').trim();
 
                 const payload = {
                     name,
                     folder,
-                    elements: this.elements,
-                    camera: this.camera,
+                    elements: sourceElements,
+                    camera: sourceCamera,
                     tags: []
                 };
 
@@ -2722,9 +2826,13 @@
                     // Ignorar: algunos navegadores/browsers bloquean clipboard.
                 }
 
+                const deckUrl = `${window.location.origin}/?mode=deck&id=${encodeURIComponent(data.id)}`;
+
                 result.innerHTML = `
                     <div><strong>Preview (modo sticker):</strong></div>
                     <input type="text" readonly value="${data.previewUrl}">
+                    <div style="margin-top: 10px;"><strong>Deck (modo lámina):</strong></div>
+                    <input type="text" readonly value="${deckUrl}">
                     <div style="margin-top: 10px;"><strong>JSON:</strong></div>
                     <input type="text" readonly value="${data.jsonUrl}">
                     <div style="margin-top: 10px;">Tip: el link de preview se intentó copiar al portapapeles.</div>
