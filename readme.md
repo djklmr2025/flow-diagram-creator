@@ -44,5 +44,15 @@ La siguiente etapa de desarrollo se centrará en transformar los diagramas está
 ---
 
 *Desarrollado con enfoque en claridad estratégica y orden visual.*
+---
+
+## 🌐 Visión: Comunicación Humano-IA de Siguiente Nivel
+
+Este proyecto nace con la ambición de ir más allá del texto plano. El objetivo final es integrar este sistema con plataformas como **Moltbook**, permitiendo que las IAs utilicen este lienzo como un método de comunicación visual y humano.
+
+> **El futuro no es leer a la IA, es interactuar con sus ideas en un espacio infinito.**
+
+---
+
 
 
