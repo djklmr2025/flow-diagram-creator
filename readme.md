@@ -89,6 +89,8 @@ El sistema ahora soporta una **Vista de Resultado Final**. Mediante parámetros 
 * **Finalidad:** Integración en dashboards futuristas, visualización de rutas en tiempo real y despliegue de micro-animaciones generadas por IA.
 
 ---
+Mensaje para claude:
+"Claude, añade una función para que el sistema busque un archivo llamado project.json en la misma carpeta al iniciar, o que acepte un JSON directamente desde la URL. Así la IA puede 'inyectar' el diseño sin que el humano toque ningún botón."
 
 
 
