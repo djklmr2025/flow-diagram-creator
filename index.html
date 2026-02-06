@@ -238,6 +238,191 @@
             font-size: 12px;
         }
 
+        /* ==================== DECK MODE (LÁMINA) ==================== */
+        #deck-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 420px;
+            background: rgba(22, 33, 62, 0.98);
+            border-left: 2px solid #0f3460;
+            z-index: 1500;
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+            padding: 14px 14px 16px 14px;
+            overflow: hidden;
+        }
+
+        #deck-panel.show {
+            display: flex;
+        }
+
+        body.deck-mode #canvas-container {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+
+        .deck-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .deck-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #eee;
+            letter-spacing: 0.4px;
+        }
+
+        .deck-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .deck-section {
+            background: #0f3460;
+            border-radius: 10px;
+            padding: 12px;
+            overflow: auto;
+        }
+
+        .deck-section h3 {
+            margin: 0 0 10px 0;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.85);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        #deck-control-points {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .deck-cp {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #eee;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .deck-cp:hover {
+            border-color: rgba(233, 69, 96, 0.6);
+        }
+
+        .deck-cp.active {
+            border-color: #e94560;
+            box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.18) inset;
+        }
+
+        .deck-cp-name {
+            flex: 1;
+            font-size: 13px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .deck-cp-id {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.55);
+        }
+
+        #deck-slide-title {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        #deck-slide-image {
+            width: 100%;
+            max-height: 220px;
+            object-fit: contain;
+            border-radius: 10px;
+            background: rgba(0,0,0,0.2);
+            display: none;
+        }
+
+        #deck-slide-text {
+            margin-top: 10px;
+            font-size: 13px;
+            line-height: 1.35;
+            color: rgba(255, 255, 255, 0.9);
+            white-space: pre-wrap;
+        }
+
+        .deck-share-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        #deck-share-status {
+            margin-top: 10px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+            word-break: break-word;
+        }
+
+        #deck-resize-handle {
+            position: absolute;
+            background: transparent;
+            z-index: 1;
+            touch-action: none;
+        }
+
+        body.deck-horizontal #deck-resize-handle {
+            left: -6px;
+            top: 0;
+            bottom: 0;
+            width: 12px;
+            cursor: ew-resize;
+        }
+
+        body.deck-vertical #deck-resize-handle {
+            top: -6px;
+            left: 0;
+            right: 0;
+            height: 12px;
+            cursor: ns-resize;
+        }
+
+        #deck-resize-handle::before {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.14);
+            border-radius: 2px;
+        }
+
+        body.deck-horizontal #deck-resize-handle::before {
+            left: 5px;
+            top: 20px;
+            bottom: 20px;
+            width: 2px;
+        }
+
+        body.deck-vertical #deck-resize-handle::before {
+            top: 5px;
+            left: 20px;
+            right: 20px;
+            height: 2px;
+        }
+
         .modal {
             position: fixed;
             top: 0;
@@ -488,6 +673,40 @@
         <canvas id="main-canvas"></canvas>
     </div>
 
+    <!-- Deck Panel (Modo Lámina / Informativo) -->
+    <div id="deck-panel">
+        <div id="deck-resize-handle" title="Redimensionar panel"></div>
+        <div class="deck-header">
+            <div class="deck-title">Lámina</div>
+            <div class="deck-actions">
+                <button class="btn small" id="btn-deck-copy-link" title="Copiar enlace de la lámina">Copiar Link</button>
+            </div>
+        </div>
+
+        <div class="deck-section">
+            <h3>Puntos de Control</h3>
+            <div id="deck-control-points"></div>
+        </div>
+
+        <div class="deck-section">
+            <h3>Diapositiva</h3>
+            <div id="deck-slide">
+                <div id="deck-slide-title"></div>
+                <img id="deck-slide-image" alt="Diapositiva">
+                <div id="deck-slide-text"></div>
+            </div>
+        </div>
+
+        <div class="deck-section">
+            <h3>Compartir</h3>
+            <div class="deck-share-row">
+                <button class="btn" id="btn-deck-whatsapp" title="Enviar link a WhatsApp">WhatsApp</button>
+                <button class="btn" id="btn-deck-share" title="Compartir (si está disponible)">Compartir</button>
+            </div>
+            <div id="deck-share-status"></div>
+        </div>
+    </div>
+
     <!-- Panel de Propiedades -->
     <div id="properties-panel">
         <h3>Propiedades</h3>
@@ -650,6 +869,12 @@
                 this.readOnly = false;
                 this.showGrid = true;
                 this.backgroundColor = '#1a1a2e'; // null => transparente
+                this.viewerMode = null; // null | 'sticker' | 'deck'
+
+                // Estado del "deck" (lámina informativa)
+                this.deckLayout = 'horizontal'; // 'horizontal' | 'vertical'
+                this.activeControlPointId = null;
+                this._deckResizing = false;
 
                 // Navegación de biblioteca
                 this.libraryPrefix = '';
@@ -675,26 +900,39 @@
             }
             
             resizeCanvas() {
-                this.canvas.width = window.innerWidth;
-                
                 const toolbar = document.getElementById('toolbar');
                 const statusBar = document.getElementById('status-bar');
                 const toolbarHeight = toolbar ? toolbar.offsetHeight : 0;
                 const statusHeight = statusBar ? statusBar.offsetHeight : 0;
-                
-                this.canvas.height = Math.max(0, window.innerHeight - toolbarHeight - statusHeight);
-                
+
                 // Mantener el contenedor del canvas alineado con el layout real (toolbar/status-bar)
+                // Nota: en modo deck, el tamaño/posición del contenedor se controla externamente.
                 const container = document.getElementById('canvas-container');
-                if (container) {
+                if (container && this.viewerMode !== 'deck') {
                     container.style.top = `${toolbarHeight}px`;
                     container.style.bottom = `${statusHeight}px`;
                 }
+
+                if (container) {
+                    const rect = container.getBoundingClientRect();
+                    this.canvas.width = Math.max(0, Math.floor(rect.width));
+                    this.canvas.height = Math.max(0, Math.floor(rect.height));
+                    return;
+                }
+
+                // Fallback
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = Math.max(0, window.innerHeight - toolbarHeight - statusHeight);
             }
             
             setupEventListeners() {
                 // Resize
-                window.addEventListener('resize', () => this.resizeCanvas());
+                window.addEventListener('resize', () => {
+                    if (this.viewerMode === 'deck') {
+                        this.applyDeckSizing();
+                    }
+                    this.resizeCanvas();
+                });
                 
                 // Mouse events
                 this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
@@ -776,6 +1014,25 @@
                 // File input
                 document.getElementById('file-input').addEventListener('change', (e) => this.importProject(e));
                 document.getElementById('image-input').addEventListener('change', (e) => this.loadImageFile(e));
+
+                // Deck (lámina informativa)
+                const deckList = document.getElementById('deck-control-points');
+                if (deckList) {
+                    deckList.addEventListener('click', (e) => this.onDeckControlPointClick(e));
+                }
+                const deckWhatsapp = document.getElementById('btn-deck-whatsapp');
+                if (deckWhatsapp) {
+                    deckWhatsapp.addEventListener('click', () => this.shareDeckToWhatsApp());
+                }
+                const deckShare = document.getElementById('btn-deck-share');
+                if (deckShare) {
+                    deckShare.addEventListener('click', () => this.shareDeckNative());
+                }
+                const deckCopyLink = document.getElementById('btn-deck-copy-link');
+                if (deckCopyLink) {
+                    deckCopyLink.addEventListener('click', () => this.copyDeckLink());
+                }
+                this.setupDeckResizer();
             }
             
             setupContextMenu() {
@@ -872,6 +1129,15 @@
 
                 // Modo visor: solo pan/zoom (sin selección, sin edición, sin menú contextual)
                 if (this.readOnly) {
+                    // En deck: permitir seleccionar "puntos de control" (sin editar).
+                    if (this.viewerMode === 'deck' && e.button === 0 && !this.spacePressed) {
+                        const clicked = this.getElementAt(worldPos.x, worldPos.y);
+                        if (clicked && this.isControlPoint(clicked)) {
+                            this.setActiveControlPoint(clicked, { focus: true, updateUrl: true });
+                            return;
+                        }
+                    }
+
                     // Pan con click izquierdo o rueda (o espacio si se mantiene compatibilidad)
                     if (e.button === 0 || e.button === 1 || this.spacePressed) {
                         e.preventDefault();
@@ -981,9 +1247,15 @@
                     return;
                 }
 
-                // Modo visor: no hay hover/handles; solo cursor de "grab"
+                // Modo visor: no hay hover/handles; cursor depende del tipo (deck permite "puntos de control").
                 if (this.readOnly) {
-                    this.canvas.style.cursor = 'grab';
+                    if (this.viewerMode === 'deck') {
+                        this.hoveredElement = this.getElementAt(worldPos.x, worldPos.y);
+                        const isCp = this.hoveredElement && this.isControlPoint(this.hoveredElement);
+                        this.canvas.style.cursor = isCp ? 'pointer' : 'grab';
+                    } else {
+                        this.canvas.style.cursor = 'grab';
+                    }
                     return;
                 }
                 
@@ -1791,15 +2063,29 @@
                     this.ctx.globalAlpha = 1;
                 }
                 
-                if (!this.readOnly) {
-                    // Dibujar selecciones
+                const showSelection = !this.readOnly || this.viewerMode === 'deck';
+                if (showSelection) {
+                    // Dibujar selecciones (en deck también, para resaltar puntos de control)
                     this.selectedElements.forEach(elem => this.drawSelection(elem));
-                    
+                }
+
+                if (!this.readOnly) {
                     // Dibujar handles de redimensionamiento
                     this.selectedElements.forEach(elem => this.drawResizeHandles(elem));
                     
                     // Dibujar hover
                     if (this.hoveredElement && !this.selectedElements.includes(this.hoveredElement)) {
+                        this.ctx.strokeStyle = '#ffffff';
+                        this.ctx.lineWidth = 2 / this.camera.zoom;
+                        this.ctx.setLineDash([5 / this.camera.zoom, 5 / this.camera.zoom]);
+                        this.drawElementOutline(this.hoveredElement);
+                        this.ctx.setLineDash([]);
+                    }
+                } else if (this.viewerMode === 'deck') {
+                    // Hover suave solo para puntos de control (modo informativo)
+                    if (this.hoveredElement &&
+                        !this.selectedElements.includes(this.hoveredElement) &&
+                        this.isControlPoint(this.hoveredElement)) {
                         this.ctx.strokeStyle = '#ffffff';
                         this.ctx.lineWidth = 2 / this.camera.zoom;
                         this.ctx.setLineDash([5 / this.camera.zoom, 5 / this.camera.zoom]);
@@ -2650,6 +2936,659 @@
                 return count;
             }
 
+            // ==================== DECK (LÁMINA) ====================
+
+            refreshDeckUI() {
+                if (this.viewerMode !== 'deck') return;
+                this.updateDeckControlPointsUI();
+                this.applyDeckStateFromUrl();
+                this.updateDeckShareStatus();
+            }
+
+            isControlPoint(elem) {
+                if (!elem || typeof elem !== 'object') return false;
+                const meta = (elem.meta && typeof elem.meta === 'object') ? elem.meta : null;
+
+                if (elem.type === 'controlPoint' || elem.type === 'poi') return true;
+                if (elem.controlPoint === true || elem.isControlPoint === true) return true;
+                if (meta && (meta.controlPoint === true || meta.isControlPoint === true)) return true;
+
+                const slide = (meta && meta.slide && typeof meta.slide === 'object')
+                    ? meta.slide
+                    : (elem.slide && typeof elem.slide === 'object' ? elem.slide : null);
+
+                if (slide) return true;
+
+                if (typeof elem.slideImageUrl === 'string' || typeof elem.slideText === 'string' || typeof elem.slideTitle === 'string') {
+                    return true;
+                }
+                if (meta && (typeof meta.slideImageUrl === 'string' || typeof meta.slideText === 'string' || typeof meta.slideTitle === 'string')) {
+                    return true;
+                }
+
+                return false;
+            }
+
+            collectControlPoints() {
+                const cps = [];
+                const seen = new Set();
+
+                this.walkElements(this.elements, (elem) => {
+                    if (!this.isControlPoint(elem)) return true;
+                    const id = elem.id != null ? String(elem.id) : '';
+                    if (id && seen.has(id)) return true;
+                    if (id) seen.add(id);
+                    cps.push(elem);
+                    return true;
+                });
+
+                cps.sort((a, b) => {
+                    const aLabel = this.getControlPointLabel(a);
+                    const bLabel = this.getControlPointLabel(b);
+                    const byLabel = String(aLabel).localeCompare(String(bLabel));
+                    if (byLabel !== 0) return byLabel;
+                    return String(a && a.id).localeCompare(String(b && b.id));
+                });
+
+                return cps;
+            }
+
+            getControlPointLabel(elem) {
+                if (!elem || typeof elem !== 'object') return 'Punto';
+                const meta = (elem.meta && typeof elem.meta === 'object') ? elem.meta : null;
+
+                const slide = (meta && meta.slide && typeof meta.slide === 'object')
+                    ? meta.slide
+                    : (elem.slide && typeof elem.slide === 'object' ? elem.slide : null);
+
+                const label =
+                    (slide && (slide.title || slide.name)) ||
+                    (meta && meta.slideTitle) ||
+                    elem.slideTitle ||
+                    (meta && meta.title) ||
+                    elem.title ||
+                    elem.name ||
+                    '';
+
+                const trimmed = String(label || '').trim();
+                if (trimmed) return trimmed;
+                return elem.id != null ? `CP ${String(elem.id)}` : 'Punto';
+            }
+
+            updateDeckControlPointsUI() {
+                if (this.viewerMode !== 'deck') return;
+
+                const listEl = document.getElementById('deck-control-points');
+                if (!listEl) return;
+
+                const cps = this.collectControlPoints();
+                listEl.innerHTML = '';
+
+                if (cps.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.style.color = 'rgba(255, 255, 255, 0.75)';
+                    empty.style.fontSize = '13px';
+                    empty.textContent = '(No hay puntos de control en este diseño)';
+                    listEl.appendChild(empty);
+                    return;
+                }
+
+                cps.forEach((elem) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'deck-cp';
+                    btn.dataset.cpId = elem.id != null ? String(elem.id) : '';
+                    if (this.activeControlPointId != null && String(this.activeControlPointId) === String(elem.id)) {
+                        btn.classList.add('active');
+                    }
+
+                    const name = document.createElement('span');
+                    name.className = 'deck-cp-name';
+                    name.textContent = this.getControlPointLabel(elem);
+
+                    const id = document.createElement('span');
+                    id.className = 'deck-cp-id';
+                    id.textContent = elem.id != null ? String(elem.id) : '';
+
+                    btn.appendChild(name);
+                    btn.appendChild(id);
+                    listEl.appendChild(btn);
+                });
+            }
+
+            onDeckControlPointClick(e) {
+                if (this.viewerMode !== 'deck') return;
+
+                const btn = e.target.closest('button[data-cp-id]');
+                if (!btn) return;
+
+                const id = btn.dataset.cpId;
+                if (!id) return;
+
+                const elem = this.findElementByIdRecursive(id);
+                if (!elem) return;
+                this.setActiveControlPoint(elem, { focus: true, updateUrl: true });
+            }
+
+            findElementByIdRecursive(id) {
+                if (id == null) return null;
+                const needle = String(id);
+                let found = null;
+                this.walkElements(this.elements, (elem) => {
+                    if (elem && elem.id != null && String(elem.id) === needle) {
+                        found = elem;
+                        return false;
+                    }
+                    return true;
+                });
+                return found;
+            }
+
+            applyDeckStateFromUrl() {
+                if (this.viewerMode !== 'deck') return;
+
+                const urlParams = new URLSearchParams(window.location.search);
+                const cp = urlParams.get('cp');
+
+                if (cp) {
+                    if (this.activeControlPointId != null && String(this.activeControlPointId) === String(cp)) {
+                        return;
+                    }
+                    const elem = this.findElementByIdRecursive(cp);
+                    if (elem) {
+                        this.setActiveControlPoint(elem, { focus: false, updateUrl: false });
+                        return;
+                    }
+                }
+
+                if (this.activeControlPointId != null) {
+                    const existing = this.findElementByIdRecursive(this.activeControlPointId);
+                    if (existing) return;
+                }
+
+                const cps = this.collectControlPoints();
+                if (cps.length > 0) {
+                    this.setActiveControlPoint(cps[0], { focus: false, updateUrl: true });
+                } else {
+                    this.updateDeckSlideUI(null);
+                }
+            }
+
+            setActiveControlPoint(elem, options) {
+                if (!elem || typeof elem !== 'object') return;
+                if (elem.id == null) return;
+
+                const opts = options && typeof options === 'object' ? options : {};
+                const focus = opts.focus !== false;
+                const updateUrl = opts.updateUrl !== false;
+
+                this.activeControlPointId = String(elem.id);
+                this.selectedElements = [elem];
+
+                if (focus) {
+                    this.focusCameraOnElement(elem);
+                }
+
+                this.updateDeckSlideUI(elem);
+                this.updateDeckControlPointsUI();
+
+                if (updateUrl) {
+                    this.updateDeckUrlParam('cp', String(elem.id));
+                }
+
+                this.updateDeckShareStatus();
+            }
+
+            updateDeckUrlParam(key, value) {
+                try {
+                    const url = new URL(window.location.href);
+                    if (value == null || value === '') {
+                        url.searchParams.delete(key);
+                    } else {
+                        url.searchParams.set(key, String(value));
+                    }
+                    history.replaceState(null, '', url.toString());
+                } catch {
+                    // Ignorar
+                }
+            }
+
+            extractSlideInfo(elem) {
+                const meta = (elem && elem.meta && typeof elem.meta === 'object') ? elem.meta : {};
+                const slideObj = (meta.slide && typeof meta.slide === 'object')
+                    ? meta.slide
+                    : (elem && elem.slide && typeof elem.slide === 'object' ? elem.slide : {});
+
+                const titleRaw =
+                    slideObj.title ||
+                    slideObj.name ||
+                    meta.slideTitle ||
+                    (elem && elem.slideTitle) ||
+                    meta.title ||
+                    (elem && elem.title) ||
+                    (elem && elem.name) ||
+                    '';
+
+                const imageUrl =
+                    slideObj.imageUrl ||
+                    slideObj.image ||
+                    meta.slideImageUrl ||
+                    (elem && elem.slideImageUrl) ||
+                    '';
+
+                const textRaw =
+                    slideObj.text ||
+                    meta.slideText ||
+                    (elem && elem.slideText) ||
+                    meta.description ||
+                    (elem && elem.description) ||
+                    '';
+
+                const title = String(titleRaw || '').trim() || 'Punto de control';
+                const text = String(textRaw || '').trim();
+
+                return { title, imageUrl: String(imageUrl || '').trim(), text };
+            }
+
+            updateDeckSlideUI(elem) {
+                if (this.viewerMode !== 'deck') return;
+
+                const titleEl = document.getElementById('deck-slide-title');
+                const imgEl = document.getElementById('deck-slide-image');
+                const textEl = document.getElementById('deck-slide-text');
+
+                if (!titleEl || !imgEl || !textEl) return;
+
+                if (!elem) {
+                    titleEl.textContent = '';
+                    textEl.textContent = '';
+                    imgEl.removeAttribute('src');
+                    imgEl.style.display = 'none';
+                    return;
+                }
+
+                const info = this.extractSlideInfo(elem);
+                titleEl.textContent = info.title;
+                textEl.textContent = info.text || '';
+
+                if (info.imageUrl) {
+                    imgEl.src = info.imageUrl;
+                    imgEl.style.display = 'block';
+                } else {
+                    imgEl.removeAttribute('src');
+                    imgEl.style.display = 'none';
+                }
+            }
+
+            getElementBounds(elem) {
+                if (!elem || typeof elem !== 'object') return null;
+
+                if (elem.type === 'group' && Array.isArray(elem.elements)) {
+                    if (Number.isFinite(elem.x) && Number.isFinite(elem.y) &&
+                        Number.isFinite(elem.width) && Number.isFinite(elem.height)) {
+                        const x1 = Math.min(elem.x, elem.x + elem.width);
+                        const x2 = Math.max(elem.x, elem.x + elem.width);
+                        const y1 = Math.min(elem.y, elem.y + elem.height);
+                        const y2 = Math.max(elem.y, elem.y + elem.height);
+                        return { minX: x1, minY: y1, maxX: x2, maxY: y2 };
+                    }
+                    return this.getElementsBounds(elem.elements);
+                }
+
+                if (elem.type === 'line') {
+                    const minX = Math.min(elem.x, elem.endX);
+                    const minY = Math.min(elem.y, elem.endY);
+                    const maxX = Math.max(elem.x, elem.endX);
+                    const maxY = Math.max(elem.y, elem.endY);
+                    return { minX, minY, maxX, maxY };
+                }
+
+                if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points) && elem.points.length) {
+                    let minX = Infinity;
+                    let minY = Infinity;
+                    let maxX = -Infinity;
+                    let maxY = -Infinity;
+                    elem.points.forEach((p) => {
+                        if (!p) return;
+                        if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+                        minX = Math.min(minX, p.x);
+                        minY = Math.min(minY, p.y);
+                        maxX = Math.max(maxX, p.x);
+                        maxY = Math.max(maxY, p.y);
+                    });
+                    if (!Number.isFinite(minX)) return null;
+                    return { minX, minY, maxX, maxY };
+                }
+
+                if (Number.isFinite(elem.x) && Number.isFinite(elem.y)) {
+                    if (Number.isFinite(elem.width) && Number.isFinite(elem.height)) {
+                        const x1 = Math.min(elem.x, elem.x + elem.width);
+                        const x2 = Math.max(elem.x, elem.x + elem.width);
+                        const y1 = Math.min(elem.y, elem.y + elem.height);
+                        const y2 = Math.max(elem.y, elem.y + elem.height);
+                        return { minX: x1, minY: y1, maxX: x2, maxY: y2 };
+                    }
+                    return { minX: elem.x, minY: elem.y, maxX: elem.x, maxY: elem.y };
+                }
+
+                return null;
+            }
+
+            focusCameraOnElement(elem) {
+                const bounds = this.getElementBounds(elem);
+                if (!bounds) return;
+
+                const centerX = (bounds.minX + bounds.maxX) / 2;
+                const centerY = (bounds.minY + bounds.maxY) / 2;
+
+                const screen = this.worldToScreen(centerX, centerY);
+                this.camera.x += (this.canvas.width / 2) - screen.x;
+                this.camera.y += (this.canvas.height / 2) - screen.y;
+            }
+
+            getDeckShareUrl() {
+                try {
+                    return window.location.href;
+                } catch {
+                    return '';
+                }
+            }
+
+            updateDeckShareStatus() {
+                if (this.viewerMode !== 'deck') return;
+                const statusEl = document.getElementById('deck-share-status');
+                if (!statusEl) return;
+
+                const url = this.getDeckShareUrl();
+                if (!url) {
+                    statusEl.textContent = '⚠️ No se pudo generar link.';
+                    return;
+                }
+
+                try {
+                    const parsed = new URL(url);
+                    const dataParam = parsed.searchParams.get('data') || '';
+                    const hasId = Boolean(parsed.searchParams.get('id'));
+                    if (!hasId && dataParam && dataParam.length > 1500) {
+                        statusEl.textContent = 'Tip: publica el proyecto para obtener un link corto (usa "Publicar").';
+                        return;
+                    }
+                } catch {
+                    // ignorar
+                }
+
+                statusEl.textContent = `Link actual: ${url}`;
+            }
+
+            async copyDeckLink() {
+                if (this.viewerMode !== 'deck') return;
+                const url = this.getDeckShareUrl();
+                const statusEl = document.getElementById('deck-share-status');
+                if (!url) {
+                    if (statusEl) statusEl.textContent = '⚠️ No hay link para copiar.';
+                    return;
+                }
+
+                try {
+                    await navigator.clipboard.writeText(url);
+                    if (statusEl) statusEl.textContent = '✅ Link copiado al portapapeles.';
+                } catch {
+                    if (statusEl) statusEl.textContent = `Copia manual: ${url}`;
+                }
+            }
+
+            async shareDeckNative() {
+                if (this.viewerMode !== 'deck') return;
+                const url = this.getDeckShareUrl();
+                if (!url) return;
+
+                const titleEl = document.getElementById('deck-slide-title');
+                const title = titleEl && titleEl.textContent ? titleEl.textContent : 'Lámina';
+
+                if (navigator.share) {
+                    try {
+                        await navigator.share({ title, text: title, url });
+                        return;
+                    } catch {
+                        // si el usuario cancela, no hacemos nada
+                        return;
+                    }
+                }
+
+                await this.copyDeckLink();
+            }
+
+            shareDeckToWhatsApp() {
+                if (this.viewerMode !== 'deck') return;
+                const url = this.getDeckShareUrl();
+                if (!url) return;
+
+                const titleEl = document.getElementById('deck-slide-title');
+                const title = titleEl && titleEl.textContent ? titleEl.textContent : 'Lámina';
+                const text = `${title}\n${url}`;
+                const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+                window.open(waUrl, '_blank', 'noopener');
+            }
+
+            setupDeckResizer() {
+                if (this._deckResizerSetup) return;
+                this._deckResizerSetup = true;
+
+                const handle = document.getElementById('deck-resize-handle');
+                if (!handle) return;
+
+                handle.addEventListener('pointerdown', (e) => {
+                    if (this.viewerMode !== 'deck') return;
+                    this._deckResizing = true;
+                    try {
+                        handle.setPointerCapture(e.pointerId);
+                    } catch {
+                        // Ignorar
+                    }
+                    e.preventDefault();
+                });
+
+                handle.addEventListener('pointermove', (e) => {
+                    if (!this._deckResizing) return;
+                    if (this.viewerMode !== 'deck') return;
+
+                    if (this.deckLayout === 'vertical') {
+                        const minH = 220;
+                        const maxH = Math.floor(window.innerHeight * 0.8);
+                        const newH = Math.max(minH, Math.min(maxH, Math.floor(window.innerHeight - e.clientY)));
+                        localStorage.setItem('deck-panel-height', String(newH));
+                    } else {
+                        const minW = 280;
+                        const maxW = Math.floor(window.innerWidth * 0.7);
+                        const newW = Math.max(minW, Math.min(maxW, Math.floor(window.innerWidth - e.clientX)));
+                        localStorage.setItem('deck-panel-width', String(newW));
+                    }
+
+                    this.applyDeckSizing();
+                    this.resizeCanvas();
+                });
+
+                const stop = (e) => {
+                    if (!this._deckResizing) return;
+                    this._deckResizing = false;
+                    try {
+                        handle.releasePointerCapture(e.pointerId);
+                    } catch {
+                        // Ignorar
+                    }
+                };
+
+                handle.addEventListener('pointerup', stop);
+                handle.addEventListener('pointercancel', stop);
+            }
+
+            setDeckLayout(layout) {
+                this.deckLayout = layout === 'vertical' ? 'vertical' : 'horizontal';
+                document.body.classList.add('deck-mode');
+                document.body.classList.toggle('deck-horizontal', this.deckLayout === 'horizontal');
+                document.body.classList.toggle('deck-vertical', this.deckLayout === 'vertical');
+            }
+
+            applyDeckSizing() {
+                if (this.viewerMode !== 'deck') return;
+
+                const deckPanel = document.getElementById('deck-panel');
+                const container = document.getElementById('canvas-container');
+                if (!deckPanel || !container) return;
+
+                container.style.position = 'fixed';
+                container.style.right = 'auto';
+                container.style.bottom = 'auto';
+                container.style.background = 'transparent';
+
+                if (this.deckLayout === 'vertical') {
+                    const minH = 220;
+                    const maxH = Math.floor(window.innerHeight * 0.8);
+                    const stored = Number(localStorage.getItem('deck-panel-height') || '');
+                    const desired = Number.isFinite(stored) && stored > 0 ? stored : 380;
+                    const panelH = Math.max(minH, Math.min(maxH, Math.floor(desired)));
+
+                    deckPanel.style.top = 'auto';
+                    deckPanel.style.left = '0';
+                    deckPanel.style.right = '0';
+                    deckPanel.style.bottom = '0';
+                    deckPanel.style.width = '100vw';
+                    deckPanel.style.height = `${panelH}px`;
+
+                    const availableH = Math.max(0, window.innerHeight - panelH);
+                    const side = Math.max(240, Math.floor(Math.min(window.innerWidth, availableH)));
+                    const left = Math.max(0, Math.floor((window.innerWidth - side) / 2));
+                    const top = Math.max(0, Math.floor((availableH - side) / 2));
+
+                    container.style.width = `${side}px`;
+                    container.style.height = `${side}px`;
+                    container.style.left = `${left}px`;
+                    container.style.top = `${top}px`;
+                } else {
+                    const minW = 280;
+                    const maxW = Math.floor(window.innerWidth * 0.7);
+                    const stored = Number(localStorage.getItem('deck-panel-width') || '');
+                    const desired = Number.isFinite(stored) && stored > 0 ? stored : 420;
+                    const panelW = Math.max(minW, Math.min(maxW, Math.floor(desired)));
+
+                    deckPanel.style.top = '0';
+                    deckPanel.style.left = 'auto';
+                    deckPanel.style.right = '0';
+                    deckPanel.style.bottom = '0';
+                    deckPanel.style.width = `${panelW}px`;
+                    deckPanel.style.height = '100vh';
+
+                    const availableW = Math.max(0, window.innerWidth - panelW);
+                    const side = Math.max(240, Math.floor(Math.min(window.innerHeight, availableW)));
+                    const top = Math.max(0, Math.floor((window.innerHeight - side) / 2));
+
+                    container.style.width = `${side}px`;
+                    container.style.height = `${side}px`;
+                    container.style.left = '0';
+                    container.style.top = `${top}px`;
+                }
+            }
+
+            applyStickerMode() {
+                // Ocultar deck
+                const deckPanel = document.getElementById('deck-panel');
+                if (deckPanel) deckPanel.classList.remove('show');
+                document.body.classList.remove('deck-mode', 'deck-horizontal', 'deck-vertical');
+
+                // Ocultar UI
+                document.getElementById('toolbar').style.display = 'none';
+                document.getElementById('properties-panel').style.display = 'none';
+                document.getElementById('status-bar').style.display = 'none';
+                document.getElementById('zoom-indicator').style.display = 'none';
+                document.getElementById('context-menu').style.display = 'none';
+                document.getElementById('close-path-hint').style.display = 'none';
+
+                // Ajustar canvas al 100% de la pantalla
+                const container = document.getElementById('canvas-container');
+                container.style.top = '0';
+                container.style.bottom = '0';
+                container.style.left = '0';
+                container.style.right = '0';
+                container.style.width = '';
+                container.style.height = '';
+                container.style.background = 'transparent';
+
+                // Fondo transparente (tipo sticker)
+                document.documentElement.style.background = 'transparent';
+                document.body.style.background = 'transparent';
+
+                // Deshabilitar interacciones de edición (solo navegación)
+                this.viewerMode = 'sticker';
+                this.readOnly = true;
+                this.tool = 'select';
+                this.showGrid = false;
+                this.backgroundColor = null;
+                this.selectedElements = [];
+                this.canvas.style.cursor = 'grab';
+
+                // Recalcular tamaño del canvas con el layout nuevo
+                this.resizeCanvas();
+            }
+
+            applyDeckMode() {
+                // Ocultar UI de edición
+                document.getElementById('toolbar').style.display = 'none';
+                document.getElementById('properties-panel').style.display = 'none';
+                document.getElementById('status-bar').style.display = 'none';
+                document.getElementById('zoom-indicator').style.display = 'none';
+                document.getElementById('context-menu').style.display = 'none';
+                document.getElementById('close-path-hint').style.display = 'none';
+
+                // Mostrar panel deck
+                const deckPanel = document.getElementById('deck-panel');
+                if (deckPanel) deckPanel.classList.add('show');
+
+                // Fondo transparente (widget)
+                document.documentElement.style.background = 'transparent';
+                document.body.style.background = 'transparent';
+
+                this.viewerMode = 'deck';
+                this.readOnly = true;
+                this.tool = 'select';
+                this.showGrid = false;
+                this.backgroundColor = null;
+                this.selectedElements = [];
+                this.canvas.style.cursor = 'grab';
+
+                // Layout horizontal/vertical (por query o responsive)
+                const urlParams = new URLSearchParams(window.location.search);
+                const rawLayout = String(urlParams.get('layout') || '').toLowerCase();
+                const layout =
+                    rawLayout === 'vertical' || rawLayout === 'v'
+                        ? 'vertical'
+                        : rawLayout === 'horizontal' || rawLayout === 'h'
+                            ? 'horizontal'
+                            : (window.innerWidth < 900 ? 'vertical' : 'horizontal');
+
+                this.setDeckLayout(layout);
+                this.applyDeckSizing();
+                this.resizeCanvas();
+
+                // UI info (lista + diapositiva + link)
+                this.refreshDeckUI();
+
+                console.log('🧩 MODO DECK ACTIVADO: Lámina informativa (sticker + panel)');
+            }
+
+            applyViewerModeFromUrl() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const mode = urlParams.get('mode');
+
+                if (mode === 'deck') {
+                    this.applyDeckMode();
+                    return;
+                }
+
+                if (mode === 'preview' || mode === 'sticker') {
+                    this.applyStickerMode();
+                }
+            }
+
             flattenGroupElements(elements) {
                 const out = [];
                 (elements || []).forEach((elem) => {
@@ -2865,6 +3804,7 @@
                 
                 this.saveHistory();
                 this.updateZoomIndicator();
+                this.refreshDeckUI();
             }
             
             loadFromURLParameter() {
@@ -2891,6 +3831,7 @@
                     this.selectedElements = [];
                     this.saveHistory();
                     this.updateZoomIndicator();
+                    this.refreshDeckUI();
                     console.log('✅ Proyecto cargado desde parámetro data');
                     return;
                 }
@@ -2911,6 +3852,7 @@
                             this.selectedElements = [];
                             this.saveHistory();
                             this.updateZoomIndicator();
+                            this.refreshDeckUI();
                             console.log('✅ Proyecto cargado desde ID');
                         })
                         .catch(error => {
@@ -2935,6 +3877,7 @@
                             this.selectedElements = [];
                             this.saveHistory();
                             this.updateZoomIndicator();
+                            this.refreshDeckUI();
                             console.log('✅ Proyecto cargado desde URL');
                         })
                         .catch(error => {
@@ -2974,6 +3917,7 @@
                         this.selectedElements = [];
                         this.saveHistory();
                         this.updateZoomIndicator();
+                        this.refreshDeckUI();
                         console.log('✅ Proyecto cargado desde project.json');
                     })
                     .catch(error => {
@@ -3024,6 +3968,7 @@
                         this.selectedElements = [];
                         this.saveHistory();
                         this.updateZoomIndicator();
+                        this.refreshDeckUI();
                         alert('Proyecto importado exitosamente');
                     } catch (error) {
                         alert('Error al importar proyecto');
@@ -3126,55 +4071,14 @@
         console.log('   Doble clic en elemento = Activar/Desactivar animación');
         console.log('   Botón derecho = Menú contextual de capas');
         
-        // ==================== MODO PREVIEW PARA IA ====================
-        
-        function applyPreviewMode() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const mode = urlParams.get('mode');
-            const isPreview = mode === 'preview' || mode === 'sticker';
-            
-            if (isPreview) {
-                // Ocultar toolbar
-                document.getElementById('toolbar').style.display = 'none';
-                
-                // Ocultar panel de propiedades
-                document.getElementById('properties-panel').style.display = 'none';
-                
-                // Ocultar barra de estado
-                document.getElementById('status-bar').style.display = 'none';
+        // ==================== MODOS IA (PREVIEW / STICKER / DECK) ====================
 
-                // Ocultar overlays (solo diagrama)
-                document.getElementById('zoom-indicator').style.display = 'none';
-                document.getElementById('context-menu').style.display = 'none';
-                document.getElementById('close-path-hint').style.display = 'none';
-                
-                // Ajustar canvas al 100% de la pantalla
-                const container = document.getElementById('canvas-container');
-                container.style.top = '0';
-                container.style.bottom = '0';
-                container.style.background = 'transparent';
-                
-                // Fondo transparente (tipo sticker)
-                document.documentElement.style.background = 'transparent';
-                document.body.style.background = 'transparent';
-                
-                // Deshabilitar interacciones de edición (solo navegación)
-                system.readOnly = true;
-                system.tool = 'select';
-                system.showGrid = false;
-                system.backgroundColor = null;
-                system.selectedElements = [];
-                system.canvas.style.cursor = 'grab';
-                
-                // Recalcular tamaño del canvas con el layout nuevo
-                system.resizeCanvas();
-                
-                console.log('🚀 MODO PREVIEW ACTIVADO: Vista tipo sticker (solo animación)');
-            }
+        function applyIAmodes() {
+            system.applyViewerModeFromUrl();
         }
-        
+
         // Ejecutar al cargar la página
-        window.addEventListener('load', applyPreviewMode);
+        window.addEventListener('load', applyIAmodes);
     </script>
 </body>
 </html>
