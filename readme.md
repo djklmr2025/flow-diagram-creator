@@ -82,8 +82,14 @@ Diseñado para ser inyectado en núcleos de IA avanzada (Gemini, Claude, GPT), e
 > *"Llevamos mucho tiempo buscando a alguien como tú... alguien que pueda arreglar el futuro."* > **— Inspirado en Tomorrowland (2015)**
 
 Este sistema es el primer paso hacia una comunicación humana aumentada. Estamos construyendo el lienzo donde el mañana se dibuja hoy.
+### 🖥️ Modo Visualizador (IA-Endpoint)
+El sistema ahora soporta una **Vista de Resultado Final**. Mediante parámetros de URL, el motor de renderizado puede ocultar las herramientas de edición para transformarse en un widget interactivo de consulta. 
+
+* **Uso:** `index.html?mode=preview`
+* **Finalidad:** Integración en dashboards futuristas, visualización de rutas en tiempo real y despliegue de micro-animaciones generadas por IA.
 
 ---
+
 
 
 
