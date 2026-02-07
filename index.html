@@ -1466,6 +1466,34 @@
                     return;
                 }
 
+                // No capturar atajos cuando el usuario está escribiendo en inputs/textarea/select
+                // o cuando hay un modal abierto (para permitir pegar llaves/paths sin abrir herramientas).
+                const target = e.target;
+                const tag = target && target.tagName ? target.tagName.toLowerCase() : '';
+                const isFormField =
+                    tag === 'input' ||
+                    tag === 'textarea' ||
+                    tag === 'select' ||
+                    (target && target.isContentEditable);
+
+                const anyModalOpen = Boolean(document.querySelector('.modal.show'));
+                if (isFormField || anyModalOpen) {
+                    // Permitir cerrar modales con Escape.
+                    if (anyModalOpen && e.key === 'Escape') {
+                        const publishModal = document.getElementById('publish-modal');
+                        if (publishModal && publishModal.classList.contains('show')) this.hidePublishModal();
+
+                        const libraryModal = document.getElementById('library-modal');
+                        if (libraryModal && libraryModal.classList.contains('show')) this.hideLibraryModal();
+
+                        const saveModal = document.getElementById('save-modal');
+                        if (saveModal && saveModal.classList.contains('show')) this.hideSaveModal();
+
+                        e.preventDefault();
+                    }
+                    return;
+                }
+
                 // Detectar espacio para pan
                 if (e.code === 'Space' && !this.spacePressed) {
                     this.spacePressed = true;
