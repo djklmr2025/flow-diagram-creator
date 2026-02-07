@@ -143,8 +143,9 @@ Notas:
 ### 🧪 Ejemplo de publicación (curl)
 ```bash
 curl -sS -X POST "https://TU-DOMINIO.vercel.app/api/publish" \
-  -H "x-publish-key: TU_PUBLISH_KEY" \
   -H "content-type: application/json" \
+  # Opcional (solo si configuraste PUBLISH_KEY en Vercel):
+  # -H "x-publish-key: TU_PUBLISH_KEY" \
   -d '{"name":"metro-demo","folder":"metro/linea-1","elements":[],"camera":{"x":0,"y":0,"zoom":1}}'
 ```
 
@@ -168,6 +169,5 @@ El editor incluye:
 
 Inserción:
 * Un sticker se inserta como **1 solo elemento tipo `group`** para poder moverlo como objeto único.
-
 
 
