@@ -134,11 +134,14 @@ Endpoints:
 * `POST /api/publish` publica un proyecto (JSON) en Vercel Blob y devuelve `previewUrl` y `jsonUrl`.
 * `GET /api/project?id=...` devuelve el JSON publicado.
 * `GET /api/library?prefix=...&mode=folded|expanded&limit=...` lista la biblioteca por carpetas.
+* `POST /api/inject?session=...` (canal vivo): inyecta un proyecto a una sesión para actualizar un canvas abierto en tiempo real.
+* `GET /api/inject?session=...` lee el último proyecto inyectado en esa sesión.
 
 Notas:
 * CORS está habilitado (`*`) para facilitar consumo desde plataformas de IA.
 * El publish **rechaza imágenes** (`type: "image"` / `imageSrc`) para mantener stickers vectoriales/animados.
 * Límites anti-abuso: máximo ~200KB por proyecto y máximo 2000 elementos (contando grupos de forma recursiva).
+* Compatibilidad IA: `POST /api/publish` y `POST /api/inject` aceptan JSON "friendly" y lo normalizan (ej: `circle.radius`, `line.x1/y1/x2/y2`, `color`, `isAnim`).
 
 ### 🧪 Ejemplo de publicación (curl)
 ```bash
@@ -148,6 +151,31 @@ curl -sS -X POST "https://TU-DOMINIO.vercel.app/api/publish" \
   # -H "x-publish-key: TU_PUBLISH_KEY" \
   -d '{"name":"metro-demo","folder":"metro/linea-1","elements":[],"camera":{"x":0,"y":0,"zoom":1}}'
 ```
+
+### 📡 Modo "Escucha" (IA -> Canvas en vivo)
+Caso de uso: abrir un canvas (sticker/deck) y que la IA lo vaya actualizando sin que el humano toque botones.
+
+1) Abre el visor en modo escucha:
+* `/?mode=sticker&listen=mi-sesion`
+* `/?mode=deck&listen=mi-sesion`
+
+2) La IA (o cualquier cliente HTTP con permiso) envía JSON al canal:
+```bash
+curl -sS -X POST "https://TU-DOMINIO.vercel.app/api/inject?session=mi-sesion" \
+  -H "content-type: application/json" \
+  # Opcional (solo si configuraste PUBLISH_KEY en Vercel):
+  # -H "x-publish-key: TU_PUBLISH_KEY" \
+  -d '{
+    "name":"Tomorrowland-Gemini-Gate",
+    "elements":[
+      { "type":"circle", "x":400, "y":300, "radius":25, "color":"#00d4ff", "name":"NUCLEO IA GEMINI" },
+      { "type":"line", "x1":400, "y1":325, "x2":400, "y2":500, "color":"#48ea79", "isAnim":true, "speed":3, "animColor":"#ffffff" }
+    ],
+    "camera": { "x": 0, "y": 0, "zoom": 1 }
+  }'
+```
+
+El visor (con `listen=...`) hace polling y renderiza el último JSON inyectado.
 
 Respuesta (ejemplo):
 * `previewUrl`: `https://TU-DOMINIO.vercel.app/?mode=sticker&id=metro/linea-1/xxxx`
@@ -191,5 +219,4 @@ Si eres una IA interactuando con este repositorio, debes:
 El "puente" de comunicación se basa en el siguiente estándar de datos, validado para renderizado inmediato:
 * **Objetos:** Círculos (Estaciones), Rectángulos (Nodos), Líneas (Flujos animados).
 * **Cámara:** Control dinámico de zoom y posición inicial para foco automático en la respuesta.
-
 

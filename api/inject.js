@@ -1,5 +1,4 @@
-import { put } from '@vercel/blob';
-import { randomUUID } from 'node:crypto';
+import { put, list } from '@vercel/blob';
 
 const MAX_PROJECT_BYTES = 200_000; // Anti-abuso: evita payloads enormes.
 const MAX_ELEMENTS = 2_000;
@@ -14,6 +13,8 @@ function sendJson(res, statusCode, data) {
   setCors(res);
   res.statusCode = statusCode;
   res.setHeader('content-type', 'application/json; charset=utf-8');
+  // Evitar caché: esto se usa como "canal" vivo.
+  res.setHeader('cache-control', 'no-store');
   res.end(JSON.stringify(data));
 }
 
@@ -31,17 +32,17 @@ async function readJsonBody(req) {
   return JSON.parse(text);
 }
 
-function sanitizeFolder(input) {
+function sanitizeSession(input) {
   if (!input) return '';
-  let folder = String(input).trim();
-  folder = folder.replace(/^\/+/, ''); // sin slash inicial
-  folder = folder.replace(/\/+$/, ''); // sin slash final
-  folder = folder.replace(/\\/g, '/'); // normalizar
-
-  // Solo permitimos rutas simples tipo "metro/linea-1/estacion_x".
-  if (!/^[a-zA-Z0-9/_-]+$/.test(folder)) return '';
-  if (folder.includes('..')) return '';
-  return folder;
+  let session = String(input).trim();
+  session = session.replace(/^\/+/, '');
+  session = session.replace(/\\+/g, '/');
+  session = session.replace(/\/+$/, '');
+  if (!/^[a-zA-Z0-9/_-]+$/.test(session)) return '';
+  if (session.includes('..')) return '';
+  // Límite razonable para evitar abuso.
+  if (session.length > 120) return '';
+  return session;
 }
 
 function analyzeElements(elements) {
@@ -60,12 +61,9 @@ function analyzeElements(elements) {
     }
 
     if (e.type === 'group' && Array.isArray(e.elements)) {
-      for (let i = e.elements.length - 1; i >= 0; i--) {
-        stack.push(e.elements[i]);
-      }
+      for (let i = e.elements.length - 1; i >= 0; i--) stack.push(e.elements[i]);
     }
 
-    // Early exit para evitar recorridos gigantes.
     if (count > MAX_ELEMENTS) break;
   }
 
@@ -84,18 +82,10 @@ function validateProject(project) {
     errors.push('elements debe ser un array');
   } else {
     const { count, hasImages } = analyzeElements(project.elements);
-
-    if (count > MAX_ELEMENTS) {
-      errors.push(`elements excede el máximo (${MAX_ELEMENTS}): ${count}`);
-    }
-
-    // Este endpoint es para "stickers" vectoriales/animados (sin base64/imagenes).
-    if (hasImages) {
-      errors.push('Imágenes no permitidas: elimina elementos tipo "image" / imageSrc');
-    }
+    if (count > MAX_ELEMENTS) errors.push(`elements excede el máximo (${MAX_ELEMENTS}): ${count}`);
+    if (hasImages) errors.push('Imágenes no permitidas: elimina elementos tipo "image" / imageSrc');
   }
 
-  // camera opcional
   if (project.camera != null && typeof project.camera !== 'object') {
     errors.push('camera debe ser un objeto');
   }
@@ -108,10 +98,7 @@ function normalizeElementInPlace(elem) {
 
   // Compat IA: { color } -> fillColor/strokeColor
   if (typeof elem.color === 'string') {
-    if (
-      typeof elem.fillColor !== 'string' &&
-      (elem.type === 'rectangle' || elem.type === 'circle' || elem.type === 'polygon')
-    ) {
+    if (typeof elem.fillColor !== 'string' && (elem.type === 'rectangle' || elem.type === 'circle' || elem.type === 'polygon')) {
       elem.fillColor = elem.color;
     }
     if (typeof elem.strokeColor !== 'string') {
@@ -125,11 +112,8 @@ function normalizeElementInPlace(elem) {
   }
 
   // Compat IA: circle con radius y (x,y) como centro.
-  if (
-    elem.type === 'circle' &&
-    typeof elem.radius === 'number' &&
-    (!Number.isFinite(elem.width) || !Number.isFinite(elem.height))
-  ) {
+  if (elem.type === 'circle' && typeof elem.radius === 'number' &&
+      (!Number.isFinite(elem.width) || !Number.isFinite(elem.height))) {
     const r = elem.radius;
     const cx = Number.isFinite(elem.x) ? elem.x : 0;
     const cy = Number.isFinite(elem.y) ? elem.y : 0;
@@ -141,17 +125,9 @@ function normalizeElementInPlace(elem) {
   }
 
   // Compat IA: line con x1/y1/x2/y2.
-  if (
-    elem.type === 'line' &&
-    Number.isFinite(elem.x1) &&
-    Number.isFinite(elem.y1) &&
-    Number.isFinite(elem.x2) &&
-    Number.isFinite(elem.y2) &&
-    (!Number.isFinite(elem.x) ||
-      !Number.isFinite(elem.y) ||
-      !Number.isFinite(elem.endX) ||
-      !Number.isFinite(elem.endY))
-  ) {
+  if (elem.type === 'line' && Number.isFinite(elem.x1) && Number.isFinite(elem.y1) &&
+      Number.isFinite(elem.x2) && Number.isFinite(elem.y2) &&
+      (!Number.isFinite(elem.x) || !Number.isFinite(elem.y) || !Number.isFinite(elem.endX) || !Number.isFinite(elem.endY))) {
     elem.x = elem.x1;
     elem.y = elem.y1;
     elem.endX = elem.x2;
@@ -195,18 +171,13 @@ function normalizeElementInPlace(elem) {
 function normalizeProjectInPlace(project) {
   if (!project || typeof project !== 'object') return;
   if (!Array.isArray(project.elements)) project.elements = [];
-
   const stack = project.elements.slice();
   while (stack.length) {
     const elem = stack.pop();
     if (!elem || typeof elem !== 'object') continue;
-
     normalizeElementInPlace(elem);
-
     if (elem.type === 'group' && Array.isArray(elem.elements)) {
-      for (let i = elem.elements.length - 1; i >= 0; i--) {
-        stack.push(elem.elements[i]);
-      }
+      for (let i = elem.elements.length - 1; i >= 0; i--) stack.push(elem.elements[i]);
     }
   }
 
@@ -223,6 +194,12 @@ function normalizeProjectInPlace(project) {
   if (typeof project.date !== 'string') project.date = new Date().toISOString();
 }
 
+async function resolveBlobUrl(pathname) {
+  const { blobs } = await list({ prefix: pathname, limit: 2 });
+  const exact = (blobs || []).find((b) => b.pathname === pathname);
+  return exact ? exact.url : null;
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     setCors(res);
@@ -232,28 +209,43 @@ export default async function handler(req, res) {
   }
 
   const origin = getOrigin(req);
+  const url = new URL(req.url, origin);
+  const session = sanitizeSession(url.searchParams.get('session') || url.searchParams.get('listen'));
+  if (!session) {
+    sendJson(res, 400, { ok: false, error: 'MissingOrInvalidSession' });
+    return;
+  }
+
+  const pathname = `inbox/${session}.json`;
 
   if (req.method === 'GET') {
-    sendJson(res, 200, {
-      ok: true,
-      usage: {
-        method: 'POST',
-        endpoint: '/api/publish',
-        bodyExample: {
-          name: 'metro-linea-1-transbordo',
-          folder: 'metro/linea-1',
-          elements: [],
-          camera: { x: 0, y: 0, zoom: 1 },
-          tags: ['metro', 'linea-1', 'transbordo'],
-        },
-      },
-      notes: [
-        'Este endpoint publica proyectos como JSON (sin imágenes) y devuelve un link de preview.',
-        'Configura BLOB_READ_WRITE_TOKEN en Vercel para habilitar escritura en Blob.',
-        'Opcional: define PUBLISH_KEY para requerir una llave simple.',
-      ],
-      examplePreviewUrl: `${origin}/?mode=preview&id=metro/linea-1/abc123`,
-    });
+    let blobUrl;
+    try {
+      blobUrl = await resolveBlobUrl(pathname);
+    } catch (error) {
+      sendJson(res, 500, { ok: false, error: 'BlobListFailed', details: String(error) });
+      return;
+    }
+
+    if (!blobUrl) {
+      sendJson(res, 404, { ok: false, error: 'NotFound', session });
+      return;
+    }
+
+    let response;
+    try {
+      response = await fetch(blobUrl, { cache: 'no-store' });
+    } catch (error) {
+      sendJson(res, 502, { ok: false, error: 'BlobFetchFailed', details: String(error) });
+      return;
+    }
+
+    const text = await response.text();
+    setCors(res);
+    res.statusCode = response.ok ? 200 : 502;
+    res.setHeader('content-type', 'application/json; charset=utf-8');
+    res.setHeader('cache-control', 'no-store');
+    res.end(text);
     return;
   }
 
@@ -264,7 +256,6 @@ export default async function handler(req, res) {
 
   const requiredKey = process.env.PUBLISH_KEY;
   if (requiredKey) {
-    const url = new URL(req.url, origin);
     const key = req.headers['x-publish-key'] || url.searchParams.get('key') || '';
     if (key !== requiredKey) {
       sendJson(res, 401, { ok: false, error: 'Unauthorized' });
@@ -286,25 +277,17 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Normalizar para aceptar "JSON IA-friendly" (radius/x1/y1/...).
+  // Normalizar para permitir "JSON friendly" de IA.
   normalizeProjectInPlace(body);
 
-  const folder = sanitizeFolder(body.folder);
-
-  const shortId = randomUUID().replace(/-/g, '').slice(0, 16);
-  const id = folder ? `${folder}/${shortId}` : shortId;
-  const pathname = `library/${id}.json`;
-
   const project = {
-    name:
-      typeof body.name === 'string' && body.name.trim() ? body.name.trim() : `sticker-${shortId}`,
+    name: String(body.name || '').trim(),
     date: new Date().toISOString(),
     elements: body.elements || [],
     camera: body.camera || { x: 0, y: 0, zoom: 1 },
     meta: {
-      folder,
-      tags: Array.isArray(body.tags) ? body.tags.slice(0, 50) : [],
-      source: 'api/publish',
+      session,
+      source: 'api/inject',
       version: 1,
     },
   };
@@ -333,15 +316,13 @@ export default async function handler(req, res) {
     return;
   }
 
-  const previewUrl = `${origin}/?mode=preview&id=${encodeURIComponent(id)}`;
-  const jsonUrl = `${origin}/api/project?id=${encodeURIComponent(id)}`;
-
+  const listenUrl = `${origin}/?mode=sticker&listen=${encodeURIComponent(session)}`;
   sendJson(res, 200, {
     ok: true,
-    id,
+    session,
     pathname: blob.pathname,
     blobUrl: blob.url,
-    previewUrl,
-    jsonUrl,
+    listenUrl,
   });
 }
+

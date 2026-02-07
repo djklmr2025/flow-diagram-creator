@@ -477,6 +477,21 @@
             color: #eee;
         }
 
+        .modal-content textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #0f3460;
+            border: 1px solid #1a1a2e;
+            border-radius: 5px;
+            color: #eee;
+            min-height: 140px;
+            resize: vertical;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
         .modal-hint {
             font-size: 12px;
             opacity: 0.85;
@@ -833,8 +848,16 @@
             <div class="modal-buttons" style="justify-content: flex-start;">
                 <button class="btn small" id="btn-pick-publish-file" title="Publicar desde un archivo JSON">Subir JSON…</button>
                 <button class="btn small" id="btn-clear-publish-file" title="Volver a publicar el canvas actual" style="display:none;">Usar Canvas</button>
+                <button class="btn small" id="btn-toggle-paste-json" title="Pegar JSON (desde chat/IA)">Pegar JSON…</button>
             </div>
             <div id="publish-file-status"></div>
+            <div id="publish-paste-box" style="display:none; margin-top: 10px;">
+                <textarea id="publish-json-text" placeholder="Pega aquí el JSON del sticker (IA-friendly también funciona)."></textarea>
+                <div class="modal-buttons" style="justify-content: flex-start;">
+                    <button class="btn small" id="btn-use-pasted-json">Usar JSON pegado</button>
+                    <button class="btn small" id="btn-clear-pasted-json">Limpiar</button>
+                </div>
+            </div>
             <div class="modal-buttons">
                 <button class="btn" id="btn-cancel-publish">Cancelar</button>
                 <button class="btn" id="btn-confirm-publish">Publicar</button>
@@ -914,6 +937,11 @@
 
                 // Navegación de biblioteca
                 this.libraryPrefix = '';
+
+                // "Canal" vivo (IA -> Canvas): polling por sesión (?listen=...)
+                this.listenSession = null;
+                this.listenTimer = null;
+                this.listenLastDate = null;
                 
                 // Módulos (permite expandir funcionalidad)
                 this.modules = {};
@@ -1039,6 +1067,9 @@
                 document.getElementById('btn-confirm-publish').addEventListener('click', () => this.publishSticker());
                 document.getElementById('btn-pick-publish-file').addEventListener('click', () => this.pickPublishFile());
                 document.getElementById('btn-clear-publish-file').addEventListener('click', () => this.clearPublishFile());
+                document.getElementById('btn-toggle-paste-json').addEventListener('click', () => this.togglePublishPasteBox());
+                document.getElementById('btn-use-pasted-json').addEventListener('click', () => this.usePastedPublishJson());
+                document.getElementById('btn-clear-pasted-json').addEventListener('click', () => this.clearPastedPublishJson());
                 this.setupPublishKey();
 
                 // Modal biblioteca
@@ -2349,10 +2380,12 @@
                 const particleSize = 4;
                 
                 // Actualizar offset de animación
+                const rawSpeed = Number(elem.speed);
+                const step = Number.isFinite(rawSpeed) ? Math.min(Math.max(Math.abs(rawSpeed), 0.25), 50) : 2;
                 if (elem.flowDirection === 'right') {
-                    elem.animOffset = (elem.animOffset + 2) % (dashLength + gapLength);
+                    elem.animOffset = (elem.animOffset + step) % (dashLength + gapLength);
                 } else {
-                    elem.animOffset = (elem.animOffset - 2) % (dashLength + gapLength);
+                    elem.animOffset = (elem.animOffset - step) % (dashLength + gapLength);
                     if (elem.animOffset < 0) elem.animOffset += (dashLength + gapLength);
                 }
                 
@@ -2762,6 +2795,12 @@
                 this.publishFileProject = null;
                 this.publishFileName = '';
                 this.updatePublishFileUI();
+
+                // Reset "pegar JSON"
+                const pasteBox = document.getElementById('publish-paste-box');
+                if (pasteBox) pasteBox.style.display = 'none';
+                const pasteText = document.getElementById('publish-json-text');
+                if (pasteText) pasteText.value = '';
             }
 
             hidePublishModal() {
@@ -2822,6 +2861,8 @@
                         return;
                     }
 
+                    // Normalizar para aceptar JSON "IA-friendly" (radius/x1/y1/...).
+                    this.normalizeProjectInPlace(data);
                     this.publishFileProject = data;
                     this.updatePublishFileUI();
 
@@ -2837,6 +2878,57 @@
                 e.target.value = '';
             }
 
+            togglePublishPasteBox() {
+                const box = document.getElementById('publish-paste-box');
+                if (!box) return;
+                box.style.display = box.style.display === 'none' ? 'block' : 'none';
+                if (box.style.display !== 'none') {
+                    const t = document.getElementById('publish-json-text');
+                    if (t) t.focus();
+                }
+            }
+
+            clearPastedPublishJson() {
+                const t = document.getElementById('publish-json-text');
+                if (t) t.value = '';
+            }
+
+            usePastedPublishJson() {
+                const t = document.getElementById('publish-json-text');
+                if (!t) return;
+                const raw = String(t.value || '').trim();
+                if (!raw) {
+                    this.updatePublishFileUI('❌ Pega un JSON primero.');
+                    return;
+                }
+
+                let data;
+                try {
+                    data = JSON.parse(raw);
+                } catch (error) {
+                    this.publishFileProject = null;
+                    this.updatePublishFileUI('❌ JSON inválido (no se pudo parsear).');
+                    return;
+                }
+
+                if (!data || typeof data !== 'object' || !Array.isArray(data.elements)) {
+                    this.publishFileProject = null;
+                    this.updatePublishFileUI('❌ El JSON no parece un proyecto válido (falta "elements").');
+                    return;
+                }
+
+                this.normalizeProjectInPlace(data);
+                this.publishFileProject = data;
+                this.publishFileName = 'pegado';
+                this.updatePublishFileUI('Fuente: JSON pegado');
+
+                const nameInput = document.getElementById('publish-name');
+                if (nameInput && !String(nameInput.value || '').trim()) {
+                    const fromJson = (typeof data.name === 'string' && data.name.trim()) ? data.name.trim() : '';
+                    nameInput.value = fromJson || '';
+                }
+            }
+
             async publishSticker() {
                 const result = document.getElementById('publish-result');
                 result.style.display = 'block';
@@ -2846,6 +2938,11 @@
                 const sourceCamera = this.publishFileProject
                     ? (this.publishFileProject.camera || { x: 0, y: 0, zoom: 1 })
                     : this.camera;
+
+                // Normalizar por si el proyecto viene de un JSON "friendly".
+                if (this.publishFileProject) {
+                    this.normalizeProjectInPlace(this.publishFileProject);
+                }
 
                 // Este flujo es para "stickers" vectoriales: no permitir imágenes (ni siquiera dentro de grupos).
                 const hasImages = this.hasImagesInElements(sourceElements);
@@ -3129,6 +3226,8 @@
                         return;
                     }
 
+                    // Normalizar para aceptar JSON "IA-friendly".
+                    this.normalizeProjectInPlace(data);
                     const elements = data.elements || [];
                     const camera = (data.camera && typeof data.camera === 'object')
                         ? data.camera
@@ -3250,6 +3349,103 @@
                     return true;
                 });
                 return found;
+            }
+
+            normalizeProjectInPlace(project) {
+                if (!project || typeof project !== 'object') return;
+                if (!Array.isArray(project.elements)) project.elements = [];
+
+                const normalizeElement = (elem) => {
+                    if (!elem || typeof elem !== 'object') return;
+
+                    // Compat IA: { color } -> fillColor/strokeColor
+                    if (typeof elem.color === 'string') {
+                        if (typeof elem.fillColor !== 'string' &&
+                            (elem.type === 'rectangle' || elem.type === 'circle' || elem.type === 'polygon')) {
+                            elem.fillColor = elem.color;
+                        }
+                        if (typeof elem.strokeColor !== 'string') elem.strokeColor = elem.color;
+                    }
+
+                    // Compat IA: { isAnim } -> { active }
+                    if (typeof elem.isAnim === 'boolean' && typeof elem.active !== 'boolean') {
+                        elem.active = elem.isAnim;
+                    }
+
+                    // Compat IA: circle con radius y (x,y) como centro.
+                    if (elem.type === 'circle' && typeof elem.radius === 'number' &&
+                        (!Number.isFinite(elem.width) || !Number.isFinite(elem.height))) {
+                        const r = elem.radius;
+                        const cx = Number.isFinite(elem.x) ? elem.x : 0;
+                        const cy = Number.isFinite(elem.y) ? elem.y : 0;
+                        elem.x = cx - r;
+                        elem.y = cy - r;
+                        elem.width = r * 2;
+                        elem.height = r * 2;
+                        delete elem.radius;
+                    }
+
+                    // Compat IA: line con x1/y1/x2/y2.
+                    if (elem.type === 'line' && Number.isFinite(elem.x1) && Number.isFinite(elem.y1) &&
+                        Number.isFinite(elem.x2) && Number.isFinite(elem.y2) &&
+                        (!Number.isFinite(elem.x) || !Number.isFinite(elem.y) ||
+                         !Number.isFinite(elem.endX) || !Number.isFinite(elem.endY))) {
+                        elem.x = elem.x1;
+                        elem.y = elem.y1;
+                        elem.endX = elem.x2;
+                        elem.endY = elem.y2;
+                        delete elem.x1;
+                        delete elem.y1;
+                        delete elem.x2;
+                        delete elem.y2;
+                    }
+
+                    // Defaults mínimos para el engine.
+                    if (elem.type === 'line') {
+                        if (!Number.isFinite(elem.x)) elem.x = 0;
+                        if (!Number.isFinite(elem.y)) elem.y = 0;
+                        if (!Number.isFinite(elem.endX)) elem.endX = elem.x;
+                        if (!Number.isFinite(elem.endY)) elem.endY = elem.y;
+                        if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#e94560';
+                        if (typeof elem.animColor !== 'string') elem.animColor = '#4caf50';
+                        if (typeof elem.flowDirection !== 'string') elem.flowDirection = 'right';
+                        if (!Number.isFinite(elem.animOffset)) elem.animOffset = 0;
+                        if (!Array.isArray(elem.controlPoints)) elem.controlPoints = [];
+                    } else if (elem.type === 'rectangle' || elem.type === 'circle') {
+                        if (!Number.isFinite(elem.x)) elem.x = 0;
+                        if (!Number.isFinite(elem.y)) elem.y = 0;
+                        if (!Number.isFinite(elem.width)) elem.width = 0;
+                        if (!Number.isFinite(elem.height)) elem.height = 0;
+                        if (typeof elem.fillColor !== 'string') elem.fillColor = '#0f3460';
+                        if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#e94560';
+                    } else if (elem.type === 'polygon' || elem.type === 'path') {
+                        if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#e94560';
+                        if (typeof elem.fillColor !== 'string') elem.fillColor = '#0f3460';
+                        if (!Number.isFinite(elem.lineWidth)) elem.lineWidth = 3;
+                    }
+
+                    if (typeof elem.name !== 'string') elem.name = '';
+                    if (typeof elem.locked !== 'boolean') elem.locked = false;
+                    if (typeof elem.active !== 'boolean') elem.active = true;
+                    if (typeof elem.connectionStatus !== 'string') elem.connectionStatus = 'none';
+                };
+
+                this.walkElements(project.elements, (elem) => {
+                    normalizeElement(elem);
+                    return true;
+                });
+
+                if (!project.camera || typeof project.camera !== 'object') {
+                    project.camera = { x: 0, y: 0, zoom: 1 };
+                } else {
+                    const cam = project.camera;
+                    if (!Number.isFinite(cam.x)) cam.x = 0;
+                    if (!Number.isFinite(cam.y)) cam.y = 0;
+                    if (!Number.isFinite(cam.zoom)) cam.zoom = 1;
+                }
+
+                if (typeof project.name !== 'string') project.name = '';
+                if (typeof project.date !== 'string') project.date = new Date().toISOString();
             }
 
             countElementsRecursive(elements) {
@@ -4135,6 +4331,12 @@
             loadFromURLParameter() {
                 const urlParams = new URLSearchParams(window.location.search);
 
+                // 0) Modo escucha (canal vivo): ?listen=SESSION
+                const listenSession = urlParams.get('listen') || urlParams.get('session');
+                if (listenSession) {
+                    this.startListenSession(listenSession, urlParams.get('poll'));
+                }
+
                 // 1) JSON embebido en parámetro (?data=...)
                 const jsonData = urlParams.get('data');
                 if (jsonData) {
@@ -4151,6 +4353,7 @@
                         }
                     }
                     
+                    this.normalizeProjectInPlace(data);
                     this.elements = data.elements || [];
                     this.camera = data.camera || { x: 0, y: 0, zoom: 1 };
                     this.selectedElements = [];
@@ -4172,6 +4375,7 @@
                             return response.json();
                         })
                         .then(data => {
+                            this.normalizeProjectInPlace(data);
                             this.elements = data.elements || [];
                             this.camera = data.camera || { x: 0, y: 0, zoom: 1 };
                             this.selectedElements = [];
@@ -4197,6 +4401,7 @@
                             return response.json();
                         })
                         .then(data => {
+                            this.normalizeProjectInPlace(data);
                             this.elements = data.elements || [];
                             this.camera = data.camera || { x: 0, y: 0, zoom: 1 };
                             this.selectedElements = [];
@@ -4237,6 +4442,7 @@
                     })
                     .then(data => {
                         if (!data) return;
+                        this.normalizeProjectInPlace(data);
                         this.elements = data.elements || [];
                         this.camera = data.camera || { x: 0, y: 0, zoom: 1 };
                         this.selectedElements = [];
@@ -4301,6 +4507,72 @@
                 };
                 reader.readAsText(file);
                 e.target.value = '';
+            }
+
+            sanitizeListenSession(input) {
+                const s = String(input || '').trim().replace(/^\/+/, '').replace(/\\+/g, '/').replace(/\/+$/, '');
+                if (!s) return '';
+                if (!/^[a-zA-Z0-9/_-]+$/.test(s)) return '';
+                if (s.includes('..')) return '';
+                if (s.length > 120) return '';
+                return s;
+            }
+
+            startListenSession(sessionRaw, pollMsRaw) {
+                const session = this.sanitizeListenSession(sessionRaw);
+                if (!session) {
+                    console.warn('⚠️ listen inválido (ignorado).');
+                    return;
+                }
+
+                const parsed = Number.parseInt(String(pollMsRaw || ''), 10);
+                const intervalMs = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 500), 10000) : 1500;
+
+                // Reset previo
+                if (this.listenTimer) {
+                    clearTimeout(this.listenTimer);
+                    this.listenTimer = null;
+                }
+                this.listenSession = session;
+                this.listenLastDate = null;
+
+                const loop = async () => {
+                    if (!this.listenSession) return;
+
+                    try {
+                        const res = await fetch(`/api/inject?session=${encodeURIComponent(session)}&t=${Date.now()}`, { cache: 'no-store' });
+
+                        if (res.status === 404) {
+                            // Aún no hay nada publicado en el canal.
+                        } else if (!res.ok) {
+                            console.warn('⚠️ listen error', res.status);
+                        } else {
+                            const data = await res.json();
+                            const stamp = (data && typeof data.date === 'string') ? data.date : '';
+
+                            if (stamp && stamp === this.listenLastDate) {
+                                // sin cambios
+                            } else if (data && typeof data === 'object' && Array.isArray(data.elements)) {
+                                this.normalizeProjectInPlace(data);
+                                this.elements = data.elements || [];
+                                this.camera = data.camera || { x: 0, y: 0, zoom: 1 };
+                                this.selectedElements = [];
+                                this.saveHistory();
+                                this.updateZoomIndicator();
+                                this.refreshDeckUI();
+                                this.listenLastDate = stamp || new Date().toISOString();
+                                console.log('📡 Canal IA actualizado:', session);
+                            }
+                        }
+                    } catch (err) {
+                        console.warn('⚠️ listen network error', err);
+                    } finally {
+                        this.listenTimer = setTimeout(loop, intervalMs);
+                    }
+                };
+
+                console.log('📡 LISTEN ACTIVADO:', session, `(${intervalMs}ms)`);
+                loop();
             }
             
             // ==================== UI ====================
