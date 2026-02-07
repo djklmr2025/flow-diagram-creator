@@ -269,11 +269,12 @@
             cursor: grabbing;
         }
 
-        #main-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
+	        #main-canvas {
+	            position: absolute;
+	            top: 0;
+	            left: 0;
+	            touch-action: none; /* Evita scroll/zoom nativo sobre el canvas (mobile) */
+	        }
 
         #properties-panel {
             position: fixed;
@@ -304,16 +305,52 @@
             color: #aaa;
         }
 
-        .property-group input,
-        .property-group select {
-            width: 100%;
-            padding: 8px;
-            background: #0f3460;
-            border: 1px solid #1a1a2e;
-            border-radius: 5px;
-            color: #eee;
-            font-size: 14px;
-        }
+	        .property-group input:not([type="checkbox"]):not([type="range"]),
+	        .property-group select {
+	            width: 100%;
+	            padding: 8px;
+	            background: #0f3460;
+	            border: 1px solid #1a1a2e;
+	            border-radius: 5px;
+	            color: #eee;
+	            font-size: 14px;
+	        }
+
+	        .property-checkbox {
+	            display: flex;
+	            align-items: center;
+	            gap: 8px;
+	            margin-top: 6px;
+	            color: #aaa;
+	            font-size: 12px;
+	        }
+
+	        .property-checkbox input[type="checkbox"] {
+	            width: auto;
+	            padding: 0;
+	            margin: 0;
+	        }
+
+	        .property-range-row {
+	            display: flex;
+	            align-items: center;
+	            gap: 10px;
+	        }
+
+	        .property-range-row input[type="range"] {
+	            flex: 1;
+	            width: 100%;
+	            padding: 0;
+	            background: transparent;
+	            border: none;
+	        }
+
+	        .property-range-row span {
+	            width: 52px;
+	            text-align: right;
+	            font-size: 12px;
+	            color: #aaa;
+	        }
 
         .color-picker {
             width: 100%;
@@ -1002,18 +1039,31 @@
             <label>Nombre:</label>
             <input type="text" id="prop-name" placeholder="Nombre del elemento">
         </div>
-        <div class="property-group">
-            <label>Color de Relleno:</label>
-            <input type="color" id="prop-fill-color" class="color-picker" value="#0f3460">
-        </div>
-        <div class="property-group">
-            <label>Color de Borde:</label>
-            <input type="color" id="prop-stroke-color" class="color-picker" value="#e94560">
-        </div>
-        <div class="property-group">
-            <label>Color de Animación:</label>
-            <input type="color" id="prop-anim-color" class="color-picker" value="#4caf50">
-        </div>
+	        <div class="property-group">
+	            <label>Color de Relleno:</label>
+	            <input type="color" id="prop-fill-color" class="color-picker" value="#0f3460">
+	            <label class="property-checkbox">
+	                <input type="checkbox" id="prop-fill-transparent"> Transparente
+	            </label>
+	        </div>
+	        <div class="property-group">
+	            <label>Color de Borde:</label>
+	            <input type="color" id="prop-stroke-color" class="color-picker" value="#e94560">
+	            <label class="property-checkbox">
+	                <input type="checkbox" id="prop-stroke-transparent"> Transparente
+	            </label>
+	        </div>
+	        <div class="property-group" id="prop-line-width-group">
+	            <label>Ancho de Línea:</label>
+	            <div class="property-range-row">
+	                <input type="range" id="prop-line-width" min="1" max="20" value="3">
+	                <span id="prop-line-width-value">3px</span>
+	            </div>
+	        </div>
+	        <div class="property-group">
+	            <label>Color de Animación:</label>
+	            <input type="color" id="prop-anim-color" class="color-picker" value="#4caf50">
+	        </div>
         <div class="property-group">
             <label>Dirección de Flujo:</label>
             <select id="prop-flow-direction">
@@ -1068,6 +1118,9 @@
             <span>⬇️</span> Enviar al Fondo
         </div>
         <div class="context-menu-separator"></div>
+        <div class="context-menu-item" id="ctx-line-width">
+            <span>📏</span> Cambiar Ancho...
+        </div>
         <div class="context-menu-item" id="ctx-duplicate">
             <span>📋</span> Duplicar
         </div>
@@ -1179,6 +1232,12 @@
                 this.contextMenuElement = null;
                 this.loadedImages = {}; // Cache de imágenes cargadas
                 this.autoClosePathDistance = 15; // Distancia para auto-cerrar paths
+                // Touch (mobile)
+                this.touches = [];
+                this.lastTouchDistance = 0;
+                this.lastTouchCenter = { x: 0, y: 0 };
+                this._touchMode = null; // null | 'mouse' | 'pinch'
+                this._touchMouseDown = false;
                 // Herramienta "Formas" (plantillas vectoriales)
                 this.shapeType = localStorage.getItem('flow-diagram-shape-type') || 'triangle';
                 // Panel Objetos (Capas)
@@ -1280,6 +1339,12 @@
                 this.canvas.addEventListener('wheel', (e) => this.onWheel(e));
                 this.canvas.addEventListener('click', (e) => this.onClick(e));
                 this.canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // Prevenir menú contextual
+
+                // Touch events (mobile)
+                this.canvas.addEventListener('touchstart', (e) => this.onTouchStart(e), { passive: false });
+                this.canvas.addEventListener('touchmove', (e) => this.onTouchMove(e), { passive: false });
+                this.canvas.addEventListener('touchend', (e) => this.onTouchEnd(e), { passive: false });
+                this.canvas.addEventListener('touchcancel', (e) => this.onTouchEnd(e), { passive: false });
                 
                 // Cerrar menú contextual al hacer clic fuera
                 document.addEventListener('click', () => this.hideContextMenu());
@@ -1428,21 +1493,52 @@
                     this.deleteElements();
                     this.hideContextMenu();
                 });
-            }
-            
-            setupPropertiesPanel() {
-                const inputs = ['prop-name', 'prop-fill-color', 'prop-stroke-color', 'prop-anim-color', 
-                               'prop-flow-direction', 'prop-connection-status', 'prop-active'];
-                
-                inputs.forEach(id => {
-                    document.getElementById(id).addEventListener('change', () => this.updateSelectedProperties());
-                });
 
-                const btnConvert = document.getElementById('btn-convert-to-polygon');
-                if (btnConvert) {
-                    btnConvert.addEventListener('click', () => this.convertSelectedToPolygon());
+                const ctxLineWidth = document.getElementById('ctx-line-width');
+                if (ctxLineWidth) {
+                    ctxLineWidth.addEventListener('click', () => {
+                        this.changeLineWidth();
+                        this.hideContextMenu();
+                    });
                 }
             }
+            
+	            setupPropertiesPanel() {
+	                const inputs = [
+	                    'prop-name',
+	                    'prop-fill-color',
+	                    'prop-stroke-color',
+	                    'prop-anim-color',
+	                    'prop-flow-direction',
+	                    'prop-connection-status',
+	                    'prop-active',
+	                    'prop-fill-transparent',
+	                    'prop-stroke-transparent',
+	                ];
+	                
+	                inputs.forEach(id => {
+	                    const el = document.getElementById(id);
+	                    if (!el) return;
+	                    el.addEventListener('change', () => this.updateSelectedProperties());
+	                });
+
+	                const lw = document.getElementById('prop-line-width');
+	                const lwVal = document.getElementById('prop-line-width-value');
+	                if (lw) {
+	                    const onChange = () => {
+	                        const v = String(lw.value || '');
+	                        if (lwVal) lwVal.textContent = `${v || 0}px`;
+	                        this.updateSelectedProperties();
+	                    };
+	                    lw.addEventListener('input', onChange);
+	                    lw.addEventListener('change', onChange);
+	                }
+
+	                const btnConvert = document.getElementById('btn-convert-to-polygon');
+	                if (btnConvert) {
+	                    btnConvert.addEventListener('click', () => this.convertSelectedToPolygon());
+	                }
+	            }
 
             // ==================== PANEL OBJETOS (CAPAS) ====================
 
@@ -1841,6 +1937,134 @@
 
                 // Mostrar/ocultar selector de formas
                 document.body.classList.toggle('shape-tool-active', tool === 'shape');
+            }
+
+            // ==================== TOUCH SUPPORT ====================
+
+            onTouchStart(e) {
+                if (!e) return;
+                e.preventDefault();
+                this.hideContextMenu();
+
+                const touches = Array.from(e.touches || []);
+                this.touches = touches;
+
+                if (touches.length >= 2) {
+                    this._touchMode = 'pinch';
+                    this._touchMouseDown = false;
+                    this.isPanning = false;
+                    this.isDragging = false;
+                    this.resizingElement = null;
+                    this.resizeHandle = null;
+
+                    const dx = touches[0].clientX - touches[1].clientX;
+                    const dy = touches[0].clientY - touches[1].clientY;
+                    this.lastTouchDistance = Math.sqrt(dx * dx + dy * dy);
+                    this.lastTouchCenter = {
+                        x: (touches[0].clientX + touches[1].clientX) / 2,
+                        y: (touches[0].clientY + touches[1].clientY) / 2
+                    };
+
+                    const container = document.getElementById('canvas-container');
+                    if (container) container.classList.remove('grabbing');
+                    return;
+                }
+
+                if (touches.length === 1) {
+                    this._touchMode = 'mouse';
+                    this._touchMouseDown = true;
+                    const t = touches[0];
+                    this.onMouseDown({
+                        clientX: t.clientX,
+                        clientY: t.clientY,
+                        button: 0,
+                        ctrlKey: false,
+                        preventDefault: () => {}
+                    });
+                }
+            }
+
+            onTouchMove(e) {
+                if (!e) return;
+                e.preventDefault();
+
+                const touches = Array.from(e.touches || []);
+                this.touches = touches;
+
+                if (touches.length >= 2) {
+                    this._touchMode = 'pinch';
+                    const dx = touches[0].clientX - touches[1].clientX;
+                    const dy = touches[0].clientY - touches[1].clientY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const center = {
+                        x: (touches[0].clientX + touches[1].clientX) / 2,
+                        y: (touches[0].clientY + touches[1].clientY) / 2
+                    };
+
+                    if (this.lastTouchDistance > 0) {
+                        const zoomFactor = distance / this.lastTouchDistance;
+                        if (Number.isFinite(zoomFactor) && zoomFactor > 0) {
+                            const newZoom = Math.max(0.1, Math.min(5, this.camera.zoom * zoomFactor));
+                            const rect = this.canvas.getBoundingClientRect();
+                            const canvasX = center.x - rect.left;
+                            const canvasY = center.y - rect.top;
+
+                            const worldBefore = this.screenToWorld(canvasX, canvasY);
+                            this.camera.zoom = newZoom;
+                            const worldAfter = this.screenToWorld(canvasX, canvasY);
+
+                            // Mantener el punto bajo el centro de los dedos
+                            this.camera.x += (worldAfter.x - worldBefore.x) * this.camera.zoom;
+                            this.camera.y += (worldAfter.y - worldBefore.y) * this.camera.zoom;
+                        }
+
+                        // Pan con 2 dedos (delta en pixeles de pantalla)
+                        const dx2 = center.x - this.lastTouchCenter.x;
+                        const dy2 = center.y - this.lastTouchCenter.y;
+                        this.camera.x += dx2;
+                        this.camera.y += dy2;
+                        this.updateZoomIndicator();
+                    }
+
+                    this.lastTouchDistance = distance;
+                    this.lastTouchCenter = center;
+                    return;
+                }
+
+                if (touches.length === 1) {
+                    const t = touches[0];
+                    // Si venimos de un pinch, dejamos el modo "mouse" sin forzar mousedown.
+                    this._touchMode = 'mouse';
+                    this.onMouseMove({
+                        clientX: t.clientX,
+                        clientY: t.clientY,
+                        preventDefault: () => {}
+                    });
+                }
+            }
+
+            onTouchEnd(e) {
+                if (!e) return;
+                e.preventDefault();
+
+                const touches = Array.from(e.touches || []);
+                this.touches = touches;
+
+                if (touches.length < 2) this.lastTouchDistance = 0;
+
+                if (touches.length === 0) {
+                    if (this._touchMouseDown) {
+                        this.onMouseUp({ preventDefault: () => {} });
+                    } else {
+                        this.isPanning = false;
+                        this.isDragging = false;
+                        const container = document.getElementById('canvas-container');
+                        if (container) container.classList.remove('grabbing');
+                    }
+
+                    this._touchMouseDown = false;
+                    this._touchMode = null;
+                }
             }
             
             // ==================== TRANSFORMACIONES ====================
@@ -2451,6 +2675,23 @@
             hideContextMenu() {
                 document.getElementById('context-menu').classList.remove('show');
             }
+
+            changeLineWidth() {
+                if (this.readOnly) return;
+                if (!this.selectedElements || this.selectedElements.length === 0) return;
+
+                const current = this.getElementLineWidth(this.selectedElements[0]);
+                const newWidth = prompt('Nuevo ancho de línea (1-20):', String(current));
+                if (newWidth === null) return;
+
+                const width = Math.max(1, Math.min(20, Number.parseInt(String(newWidth), 10) || current));
+                this.selectedElements.forEach((elem) => {
+                    if (!elem || typeof elem !== 'object') return;
+                    if (!this.elementSupportsLineWidth(elem)) return;
+                    elem.lineWidth = width;
+                });
+                this.updatePropertiesPanel();
+            }
             
             // ==================== REDIMENSIONAMIENTO ====================
             
@@ -2479,7 +2720,28 @@
                         { x: elem.endX, y: elem.endY, position: 'end' }
                     );
                 } else if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points) && elem.points.length) {
-                    // Handles por punto (para deformar el contorno)
+                    // Handles de bounding box (para escalar) + por punto (para deformar el contorno)
+                    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                    elem.points.forEach((p) => {
+                        if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+                        minX = Math.min(minX, p.x);
+                        minY = Math.min(minY, p.y);
+                        maxX = Math.max(maxX, p.x);
+                        maxY = Math.max(maxY, p.y);
+                    });
+                    if (Number.isFinite(minX) && Number.isFinite(minY) && Number.isFinite(maxX) && Number.isFinite(maxY)) {
+                        handles.push(
+                            { x: minX, y: minY, position: 'nw' },
+                            { x: elem.points.length ? (minX + maxX) / 2 : minX, y: minY, position: 'n' },
+                            { x: maxX, y: minY, position: 'ne' },
+                            { x: maxX, y: (minY + maxY) / 2, position: 'e' },
+                            { x: maxX, y: maxY, position: 'se' },
+                            { x: (minX + maxX) / 2, y: maxY, position: 's' },
+                            { x: minX, y: maxY, position: 'sw' },
+                            { x: minX, y: (minY + maxY) / 2, position: 'w' }
+                        );
+                    }
+
                     const maxHandles = 80;
                     const len = elem.points.length;
                     const step = Math.max(1, Math.ceil(len / maxHandles));
@@ -2527,6 +2789,82 @@
                         if (elem.type === 'polygon') elem.closed = true;
                     }
                     return;
+                }
+
+                if ((elem.type === 'path' || elem.type === 'polygon') &&
+                    typeof handle === 'string' &&
+                    Array.isArray(elem.points) &&
+                    elem.points.length > 0) {
+                    const h = handle;
+                    const isBoxHandle =
+                        h === 'nw' || h === 'n' || h === 'ne' ||
+                        h === 'e' || h === 'se' || h === 's' ||
+                        h === 'sw' || h === 'w';
+                    if (isBoxHandle) {
+                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                        elem.points.forEach((p) => {
+                            if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+                            minX = Math.min(minX, p.x);
+                            minY = Math.min(minY, p.y);
+                            maxX = Math.max(maxX, p.x);
+                            maxY = Math.max(maxY, p.y);
+                        });
+                        if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+                            return;
+                        }
+
+                        const oldWidth = maxX - minX;
+                        const oldHeight = maxY - minY;
+
+                        let newMinX = minX, newMinY = minY, newMaxX = maxX, newMaxY = maxY;
+                        switch (h) {
+                            case 'se':
+                                newMaxX = worldPos.x;
+                                newMaxY = worldPos.y;
+                                break;
+                            case 'nw':
+                                newMinX = worldPos.x;
+                                newMinY = worldPos.y;
+                                break;
+                            case 'ne':
+                                newMaxX = worldPos.x;
+                                newMinY = worldPos.y;
+                                break;
+                            case 'sw':
+                                newMinX = worldPos.x;
+                                newMaxY = worldPos.y;
+                                break;
+                            case 'e':
+                                newMaxX = worldPos.x;
+                                break;
+                            case 'w':
+                                newMinX = worldPos.x;
+                                break;
+                            case 's':
+                                newMaxY = worldPos.y;
+                                break;
+                            case 'n':
+                                newMinY = worldPos.y;
+                                break;
+                        }
+
+                        const newWidth = newMaxX - newMinX;
+                        const newHeight = newMaxY - newMinY;
+
+                        const invOldW = oldWidth !== 0 ? 1 / oldWidth : 0;
+                        const invOldH = oldHeight !== 0 ? 1 / oldHeight : 0;
+
+                        elem.points.forEach((p) => {
+                            if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+                            const relX = oldWidth !== 0 ? (p.x - minX) * invOldW : 0;
+                            const relY = oldHeight !== 0 ? (p.y - minY) * invOldH : 0;
+                            p.x = newMinX + relX * newWidth;
+                            p.y = newMinY + relY * newHeight;
+                        });
+
+                        if (elem.type === 'polygon') elem.closed = true;
+                        return;
+                    }
                 }
 
                 if (elem.type === 'rectangle' || elem.type === 'circle') {
@@ -2770,6 +3108,7 @@
                     name: '',
                     fillColor: '#0f3460',
                     strokeColor: '#e94560',
+                    lineWidth: 2,
                     locked: false,
                     active: true,
                     connectionStatus: 'none'
@@ -2807,6 +3146,7 @@
                         type: 'line',
                         endX: x,
                         endY: y,
+                        lineWidth: 3,
                         animColor: '#4caf50',
                         flowDirection: 'right',
                         animOffset: 0,
@@ -3206,12 +3546,20 @@
                     }
                     
                 } else if (elem.type === 'rectangle') {
-                    this.ctx.fillStyle = elem.fillColor;
-                    this.ctx.strokeStyle = elem.strokeColor;
-                    this.ctx.lineWidth = 2 / this.camera.zoom;
-                    
-                    this.ctx.fillRect(elem.x, elem.y, elem.width, elem.height);
-                    this.ctx.strokeRect(elem.x, elem.y, elem.width, elem.height);
+                    const fillColor = this.normalizeCanvasColor(elem.fillColor);
+                    const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
+                    const doFill = !this.isTransparentColor(fillColor);
+                    const doStroke = !this.isTransparentColor(strokeColor);
+
+                    this.ctx.lineWidth = this.getElementLineWidth(elem) / this.camera.zoom;
+                    if (doFill) {
+                        this.ctx.fillStyle = fillColor;
+                        this.ctx.fillRect(elem.x, elem.y, elem.width, elem.height);
+                    }
+                    if (doStroke) {
+                        this.ctx.strokeStyle = strokeColor;
+                        this.ctx.strokeRect(elem.x, elem.y, elem.width, elem.height);
+                    }
                     
                     // Indicador de conexión
                     this.drawConnectionIndicator(elem, elem.x + elem.width, elem.y);
@@ -3221,28 +3569,40 @@
                     const centerY = elem.y + elem.height / 2;
                     const radiusX = Math.abs(elem.width / 2);
                     const radiusY = Math.abs(elem.height / 2);
-                    
-                    this.ctx.fillStyle = elem.fillColor;
-                    this.ctx.strokeStyle = elem.strokeColor;
-                    this.ctx.lineWidth = 2 / this.camera.zoom;
+
+                    const fillColor = this.normalizeCanvasColor(elem.fillColor);
+                    const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
+                    const doFill = !this.isTransparentColor(fillColor);
+                    const doStroke = !this.isTransparentColor(strokeColor);
+                    this.ctx.lineWidth = this.getElementLineWidth(elem) / this.camera.zoom;
                     
                     this.ctx.beginPath();
                     this.ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
-                    this.ctx.fill();
-                    this.ctx.stroke();
+                    if (doFill) {
+                        this.ctx.fillStyle = fillColor;
+                        this.ctx.fill();
+                    }
+                    if (doStroke) {
+                        this.ctx.strokeStyle = strokeColor;
+                        this.ctx.stroke();
+                    }
                     
                     // Indicador de conexión
                     this.drawConnectionIndicator(elem, centerX + radiusX, centerY);
                     
                 } else if (elem.type === 'line') {
                     // Dibujar línea
-                    this.ctx.strokeStyle = elem.strokeColor;
-                    this.ctx.lineWidth = 3 / this.camera.zoom;
+                    const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
+                    const doStroke = !this.isTransparentColor(strokeColor);
+                    this.ctx.strokeStyle = strokeColor;
+                    this.ctx.lineWidth = this.getElementLineWidth(elem) / this.camera.zoom;
                     
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(elem.x, elem.y);
-                    this.ctx.lineTo(elem.endX, elem.endY);
-                    this.ctx.stroke();
+                    if (doStroke) {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(elem.x, elem.y);
+                        this.ctx.lineTo(elem.endX, elem.endY);
+                        this.ctx.stroke();
+                    }
                     
                     // Animación de flujo
                     if (elem.active) {
@@ -3255,8 +3615,13 @@
                 } else if (elem.type === 'path' || elem.type === 'polygon') {
                     // Dibujar trazado libre o polígono cerrado
                     if (elem.points && elem.points.length > 1) {
-                        this.ctx.strokeStyle = elem.strokeColor;
-                        this.ctx.lineWidth = (elem.lineWidth || 3) / this.camera.zoom;
+                        const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
+                        const fillColor = this.normalizeCanvasColor(elem.fillColor);
+                        const doStroke = !this.isTransparentColor(strokeColor);
+                        const doFill = !this.isTransparentColor(fillColor);
+
+                        this.ctx.strokeStyle = strokeColor;
+                        this.ctx.lineWidth = this.getElementLineWidth(elem) / this.camera.zoom;
                         this.ctx.lineCap = 'round';
                         this.ctx.lineJoin = 'round';
                         
@@ -3271,13 +3636,13 @@
                         if (elem.type === 'polygon' || elem.closed) {
                             this.ctx.closePath();
                             
-                            if (elem.fillColor && elem.fillColor !== 'transparent') {
-                                this.ctx.fillStyle = elem.fillColor;
+                            if (doFill) {
+                                this.ctx.fillStyle = fillColor;
                                 this.ctx.fill();
                             }
                         }
                         
-                        this.ctx.stroke();
+                        if (doStroke) this.ctx.stroke();
                     }
                 }
 
@@ -5842,8 +6207,43 @@
                     const elem = this.selectedElements[0];
                     
                     document.getElementById('prop-name').value = elem.name || '';
-                    document.getElementById('prop-fill-color').value = elem.fillColor;
-                    document.getElementById('prop-stroke-color').value = elem.strokeColor;
+                    const fillTransparent = this.isTransparentColor(elem.fillColor);
+                    const strokeTransparent = this.isTransparentColor(elem.strokeColor);
+
+                    const fillPicker = document.getElementById('prop-fill-color');
+                    const strokePicker = document.getElementById('prop-stroke-color');
+                    const fillCb = document.getElementById('prop-fill-transparent');
+                    const strokeCb = document.getElementById('prop-stroke-transparent');
+
+                    if (fillCb) fillCb.checked = fillTransparent;
+                    if (strokeCb) strokeCb.checked = strokeTransparent;
+
+                    if (fillPicker) {
+                        if (!fillTransparent && this.isHexColor(elem.fillColor)) {
+                            fillPicker.value = elem.fillColor;
+                        } else if (!this.isHexColor(fillPicker.value)) {
+                            fillPicker.value = '#0f3460';
+                        }
+                    }
+                    if (strokePicker) {
+                        if (!strokeTransparent && this.isHexColor(elem.strokeColor)) {
+                            strokePicker.value = elem.strokeColor;
+                        } else if (!this.isHexColor(strokePicker.value)) {
+                            strokePicker.value = '#e94560';
+                        }
+                    }
+
+                    const lwGroup = document.getElementById('prop-line-width-group');
+                    const lw = document.getElementById('prop-line-width');
+                    const lwVal = document.getElementById('prop-line-width-value');
+                    const supportsLW = this.elementSupportsLineWidth(elem);
+                    if (lwGroup) lwGroup.style.display = supportsLW ? 'block' : 'none';
+                    if (supportsLW && lw) {
+                        const v = this.getElementLineWidth(elem);
+                        const clamped = Math.max(1, Math.min(20, Math.round(v)));
+                        lw.value = String(clamped);
+                        if (lwVal) lwVal.textContent = `${clamped}px`;
+                    }
                     
                     if (elem.type === 'line') {
                         document.getElementById('prop-anim-color').value = elem.animColor || '#4caf50';
@@ -5872,18 +6272,84 @@
             }
             
             updateSelectedProperties() {
-                this.selectedElements.forEach(elem => {
-                    elem.name = document.getElementById('prop-name').value;
-                    elem.fillColor = document.getElementById('prop-fill-color').value;
-                    elem.strokeColor = document.getElementById('prop-stroke-color').value;
-                    elem.connectionStatus = document.getElementById('prop-connection-status').value;
-                    elem.active = document.getElementById('prop-active').value === 'true';
+                const name = document.getElementById('prop-name').value;
+                const fillPicker = document.getElementById('prop-fill-color');
+                const strokePicker = document.getElementById('prop-stroke-color');
+                const fillCb = document.getElementById('prop-fill-transparent');
+                const strokeCb = document.getElementById('prop-stroke-transparent');
+                const conn = document.getElementById('prop-connection-status').value;
+                const active = document.getElementById('prop-active').value === 'true';
+
+                const fillTransparent = Boolean(fillCb && fillCb.checked);
+                const strokeTransparent = Boolean(strokeCb && strokeCb.checked);
+
+                const lw = document.getElementById('prop-line-width');
+                const lwValue = lw ? Number.parseInt(String(lw.value || ''), 10) : NaN;
+                const lineWidth = Number.isFinite(lwValue) ? Math.max(1, Math.min(20, lwValue)) : null;
+
+                this.selectedElements.forEach((elem) => {
+                    if (!elem || typeof elem !== 'object') return;
+                    elem.name = name;
+
+                    if (fillTransparent) {
+                        elem.fillColor = 'transparent';
+                    } else if (fillPicker && typeof fillPicker.value === 'string') {
+                        elem.fillColor = fillPicker.value;
+                    }
+
+                    if (strokeTransparent) {
+                        elem.strokeColor = 'transparent';
+                    } else if (strokePicker && typeof strokePicker.value === 'string') {
+                        elem.strokeColor = strokePicker.value;
+                    }
+
+                    if (lineWidth !== null && this.elementSupportsLineWidth(elem)) {
+                        elem.lineWidth = lineWidth;
+                    }
+
+                    elem.connectionStatus = conn;
+                    elem.active = active;
                     
                     if (elem.type === 'line') {
                         elem.animColor = document.getElementById('prop-anim-color').value;
                         elem.flowDirection = document.getElementById('prop-flow-direction').value;
                     }
                 });
+            }
+
+            isTransparentColor(value) {
+                if (value === null || value === undefined) return true;
+                const v = String(value).trim().toLowerCase();
+                if (!v) return true;
+                if (v === 'transparent') return true;
+                if (v === '#00000000') return true;
+                if (/^rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0(?:\.0+)?\s*\)$/.test(v)) return true;
+                return false;
+            }
+
+            normalizeCanvasColor(value) {
+                return this.isTransparentColor(value) ? 'rgba(0,0,0,0)' : String(value);
+            }
+
+            isHexColor(value) {
+                if (value === null || value === undefined) return false;
+                return /^#[0-9a-fA-F]{6}$/.test(String(value).trim());
+            }
+
+            elementSupportsLineWidth(elem) {
+                if (!elem || typeof elem !== 'object') return false;
+                const t = String(elem.type || '');
+                return t === 'rectangle' || t === 'circle' || t === 'line' || t === 'path' || t === 'polygon';
+            }
+
+            getElementLineWidth(elem) {
+                const t = elem && elem.type ? String(elem.type) : '';
+                const raw = elem ? elem.lineWidth : null;
+                const v = (typeof raw === 'number') ? raw : Number.parseFloat(String(raw));
+                if (Number.isFinite(v) && v > 0) return v;
+                // Defaults históricos del editor: rect/circle = 2, líneas = 3
+                if (t === 'rectangle' || t === 'circle' || t === 'image') return 2;
+                return 3;
             }
             
             updateZoomIndicator() {
