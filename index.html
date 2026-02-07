@@ -82,6 +82,27 @@
             box-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
         }
 
+        #shape-type {
+            padding: 8px 12px;
+            background: #0f3460;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 5px;
+            color: #eee;
+            font-size: 14px;
+            cursor: pointer;
+            display: none;
+            height: 36px;
+        }
+
+        body.shape-tool-active #shape-type {
+            display: block;
+        }
+
+        #shape-type:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.22);
+        }
+
         .separator {
             width: 2px;
             background: #0f3460;
@@ -663,6 +684,19 @@
         <button class="btn" id="btn-circle" title="Círculo (C)">
             <span>●</span> Círculo
         </button>
+        <button class="btn" id="btn-shape" title="Formas (T)">
+            <span>⬟</span> Formas
+        </button>
+        <select id="shape-type" title="Tipo de forma">
+            <option value="triangle">Triángulo</option>
+            <option value="trapezoid">Trapecio</option>
+            <option value="diamond">Rombo</option>
+            <option value="star5">Estrella (5)</option>
+            <option value="star6">Estrella (6)</option>
+            <option value="star7">Estrella (7)</option>
+            <option value="star8">Estrella (8)</option>
+            <option value="gear">Engrane</option>
+        </select>
         <button class="btn" id="btn-line" title="Línea Animada (L)">
             <span>→</span> Línea
         </button>
@@ -834,6 +868,12 @@
                 <option value="false">No - Pausado</option>
             </select>
         </div>
+        <div class="property-group" id="prop-geometry-tools" style="display:none;">
+            <label>Geometría:</label>
+            <button class="btn small" id="btn-convert-to-polygon" title="Convierte la figura en polígono editable por puntos">
+                Convertir a Polígono
+            </button>
+        </div>
     </div>
 
     <!-- Indicador de Zoom -->
@@ -971,6 +1011,8 @@
                 this.contextMenuElement = null;
                 this.loadedImages = {}; // Cache de imágenes cargadas
                 this.autoClosePathDistance = 15; // Distancia para auto-cerrar paths
+                // Herramienta "Formas" (plantillas vectoriales)
+                this.shapeType = localStorage.getItem('flow-diagram-shape-type') || 'triangle';
 
                 // Modo visor (IA/preview): sin edición, sin grid y con fondo transparente.
                 this.readOnly = false;
@@ -1082,6 +1124,15 @@
                 document.getElementById('btn-select').addEventListener('click', () => this.setTool('select'));
                 document.getElementById('btn-rectangle').addEventListener('click', () => this.setTool('rectangle'));
                 document.getElementById('btn-circle').addEventListener('click', () => this.setTool('circle'));
+                document.getElementById('btn-shape').addEventListener('click', () => this.setTool('shape'));
+                const shapeTypeSelect = document.getElementById('shape-type');
+                if (shapeTypeSelect) {
+                    shapeTypeSelect.value = this.shapeType || 'triangle';
+                    shapeTypeSelect.addEventListener('change', () => {
+                        this.shapeType = String(shapeTypeSelect.value || 'triangle');
+                        localStorage.setItem('flow-diagram-shape-type', this.shapeType);
+                    });
+                }
                 document.getElementById('btn-line').addEventListener('click', () => this.setTool('line'));
                 document.getElementById('btn-pencil').addEventListener('click', () => this.setTool('pencil'));
                 document.getElementById('btn-image').addEventListener('click', () => this.insertImage());
@@ -1203,6 +1254,11 @@
                 inputs.forEach(id => {
                     document.getElementById(id).addEventListener('change', () => this.updateSelectedProperties());
                 });
+
+                const btnConvert = document.getElementById('btn-convert-to-polygon');
+                if (btnConvert) {
+                    btnConvert.addEventListener('click', () => this.convertSelectedToPolygon());
+                }
             }
             
             setTool(tool) {
@@ -1215,7 +1271,7 @@
                 this.tool = tool;
                 
                 // Actualizar UI
-                document.querySelectorAll('.btn').forEach(btn => {
+                document.querySelectorAll('#toolbar .btn').forEach(btn => {
                     btn.classList.remove('active');
                 });
                 
@@ -1223,6 +1279,7 @@
                     'select': 'btn-select',
                     'rectangle': 'btn-rectangle',
                     'circle': 'btn-circle',
+                    'shape': 'btn-shape',
                     'line': 'btn-line',
                     'pencil': 'btn-pencil'
                 };
@@ -1230,6 +1287,9 @@
                 if (btnMap[tool]) {
                     document.getElementById(btnMap[tool]).classList.add('active');
                 }
+
+                // Mostrar/ocultar selector de formas
+                document.body.classList.toggle('shape-tool-active', tool === 'shape');
             }
             
             // ==================== TRANSFORMACIONES ====================
@@ -1431,6 +1491,14 @@
                     if (this.tool === 'rectangle' || this.tool === 'circle') {
                         this.tempElement.width = worldPos.x - this.tempElement.x;
                         this.tempElement.height = worldPos.y - this.tempElement.y;
+                    } else if (this.tool === 'shape') {
+                        this.tempElement.points = this.buildShapePoints(
+                            this.tempElement.shapeType || this.shapeType,
+                            this.dragStart.x,
+                            this.dragStart.y,
+                            worldPos.x,
+                            worldPos.y
+                        );
                     } else if (this.tool === 'line') {
                         this.tempElement.endX = worldPos.x;
                         this.tempElement.endY = worldPos.y;
@@ -1630,6 +1698,9 @@
                             break;
                         case 'c':
                             this.setTool('circle');
+                            break;
+                        case 't':
+                            this.setTool('shape');
                             break;
                         case 'l':
                             this.setTool('line');
@@ -1850,6 +1921,24 @@
                         { x: elem.x, y: elem.y, position: 'start' },
                         { x: elem.endX, y: elem.endY, position: 'end' }
                     );
+                } else if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points) && elem.points.length) {
+                    // Handles por punto (para deformar el contorno)
+                    const maxHandles = 80;
+                    const len = elem.points.length;
+                    const step = Math.max(1, Math.ceil(len / maxHandles));
+                    for (let i = 0; i < len; i += step) {
+                        const p = elem.points[i];
+                        if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+                        handles.push({ x: p.x, y: p.y, position: `p:${i}` });
+                    }
+                    // Asegurar que el último punto también tenga handle (si se decimó).
+                    if (step > 1 && len > 1) {
+                        const lastIndex = len - 1;
+                        const last = elem.points[lastIndex];
+                        if (last && Number.isFinite(last.x) && Number.isFinite(last.y)) {
+                            handles.push({ x: last.x, y: last.y, position: `p:${lastIndex}` });
+                        }
+                    }
                 }
                 
                 return handles;
@@ -1871,6 +1960,18 @@
             }
             
             resizeElement(elem, handle, worldPos) {
+                if ((elem.type === 'path' || elem.type === 'polygon') &&
+                    typeof handle === 'string' && handle.startsWith('p:') &&
+                    Array.isArray(elem.points)) {
+                    const idx = Number.parseInt(handle.slice(2), 10);
+                    if (Number.isFinite(idx) && elem.points[idx]) {
+                        elem.points[idx].x = worldPos.x;
+                        elem.points[idx].y = worldPos.y;
+                        if (elem.type === 'polygon') elem.closed = true;
+                    }
+                    return;
+                }
+
                 if (elem.type === 'rectangle' || elem.type === 'circle') {
                     const originalRight = elem.x + elem.width;
                     const originalBottom = elem.y + elem.height;
@@ -1982,7 +2083,103 @@
                     'start': 'move',
                     'end': 'move'
                 };
+                if (typeof handle === 'string' && handle.startsWith('p:')) return 'move';
                 return cursors[handle] || 'default';
+            }
+
+            // ==================== FORMAS (POLÍGONOS) ====================
+
+            getNormalizedBoxFromDrag(x1, y1, x2, y2) {
+                const left = Math.min(x1, x2);
+                const right = Math.max(x1, x2);
+                const top = Math.min(y1, y2);
+                const bottom = Math.max(y1, y2);
+                const width = right - left;
+                const height = bottom - top;
+                const cx = (left + right) / 2;
+                const cy = (top + bottom) / 2;
+                const size = Math.min(width, height);
+                return { left, right, top, bottom, width, height, cx, cy, size };
+            }
+
+            buildShapePoints(shapeTypeRaw, x1, y1, x2, y2) {
+                const st = String(shapeTypeRaw || '').trim().toLowerCase() || 'triangle';
+                const b = this.getNormalizedBoxFromDrag(x1, y1, x2, y2);
+
+                const left = b.left;
+                const right = b.right;
+                const top = b.top;
+                const bottom = b.bottom;
+                const cx = b.cx;
+                const cy = b.cy;
+                const w = b.width;
+                const h = b.height;
+
+                const outer = Math.max(0, b.size / 2);
+
+                if (st === 'triangle') {
+                    return [
+                        { x: cx, y: top },
+                        { x: right, y: bottom },
+                        { x: left, y: bottom }
+                    ];
+                }
+
+                if (st === 'trapezoid') {
+                    const inset = Math.min(w * 0.28, w / 2);
+                    return [
+                        { x: left + inset, y: top },
+                        { x: right - inset, y: top },
+                        { x: right, y: bottom },
+                        { x: left, y: bottom }
+                    ];
+                }
+
+                if (st === 'diamond') {
+                    return [
+                        { x: cx, y: top },
+                        { x: right, y: cy },
+                        { x: cx, y: bottom },
+                        { x: left, y: cy }
+                    ];
+                }
+
+                if (st.startsWith('star')) {
+                    const n = Number.parseInt(st.slice(4), 10);
+                    const spikes = Number.isFinite(n) ? Math.min(Math.max(n, 5), 12) : 5;
+                    const inner = outer * 0.48;
+                    const pts = [];
+                    for (let i = 0; i < spikes * 2; i++) {
+                        const angle = -Math.PI / 2 + (i * Math.PI) / spikes;
+                        const r = (i % 2 === 0) ? outer : inner;
+                        pts.push({ x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
+                    }
+                    return pts;
+                }
+
+                if (st === 'gear') {
+                    const teeth = 12;
+                    const inner = outer * 0.78;
+                    const step = (Math.PI * 2) / teeth;
+                    const pts = [];
+                    for (let i = 0; i < teeth; i++) {
+                        const base = -Math.PI / 2 + i * step;
+                        // 4 puntos por diente (aspecto de engrane simple)
+                        pts.push({ x: cx + outer * Math.cos(base + step * 0.15), y: cy + outer * Math.sin(base + step * 0.15) });
+                        pts.push({ x: cx + outer * Math.cos(base + step * 0.35), y: cy + outer * Math.sin(base + step * 0.35) });
+                        pts.push({ x: cx + inner * Math.cos(base + step * 0.60), y: cy + inner * Math.sin(base + step * 0.60) });
+                        pts.push({ x: cx + inner * Math.cos(base + step * 0.95), y: cy + inner * Math.sin(base + step * 0.95) });
+                    }
+                    return pts;
+                }
+
+                // Fallback: rectángulo como polígono.
+                return [
+                    { x: left, y: top },
+                    { x: right, y: top },
+                    { x: right, y: bottom },
+                    { x: left, y: bottom }
+                ];
             }
             
             // ==================== CREACIÓN DE ELEMENTOS ====================
@@ -2014,6 +2211,18 @@
                         width: 0,
                         height: 0
                     };
+                } else if (this.tool === 'shape') {
+                    const shapeType = this.shapeType || 'triangle';
+                    return {
+                        ...baseElement,
+                        type: 'polygon',
+                        points: this.buildShapePoints(shapeType, x, y, x, y),
+                        strokeColor: baseElement.strokeColor,
+                        fillColor: baseElement.fillColor,
+                        lineWidth: 3,
+                        closed: true,
+                        shapeType
+                    };
                 } else if (this.tool === 'line') {
                     return {
                         ...baseElement,
@@ -2026,6 +2235,67 @@
                         controlPoints: [] // Para curvas editables
                     };
                 }
+            }
+
+            convertSelectedToPolygon() {
+                if (this.readOnly) return;
+                if (this.selectedElements.length !== 1) return;
+
+                const elem = this.selectedElements[0];
+                if (!elem || typeof elem !== 'object') return;
+                if (elem.locked) return;
+                if (!(elem.type === 'rectangle' || elem.type === 'circle')) return;
+
+                const idx = this.elements.indexOf(elem);
+                if (idx < 0) return;
+
+                let points = [];
+
+                if (elem.type === 'rectangle') {
+                    const x1 = Number(elem.x);
+                    const y1 = Number(elem.y);
+                    const x2 = Number(elem.x + elem.width);
+                    const y2 = Number(elem.y + elem.height);
+                    const left = Math.min(x1, x2);
+                    const right = Math.max(x1, x2);
+                    const top = Math.min(y1, y2);
+                    const bottom = Math.max(y1, y2);
+                    points = [
+                        { x: left, y: top },
+                        { x: right, y: top },
+                        { x: right, y: bottom },
+                        { x: left, y: bottom }
+                    ];
+                } else if (elem.type === 'circle') {
+                    const cx = Number(elem.x) + Number(elem.width) / 2;
+                    const cy = Number(elem.y) + Number(elem.height) / 2;
+                    const rx = Math.abs(Number(elem.width) / 2);
+                    const ry = Math.abs(Number(elem.height) / 2);
+                    const segments = 24;
+                    for (let i = 0; i < segments; i++) {
+                        const a = (Math.PI * 2 * i) / segments;
+                        points.push({ x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) });
+                    }
+                }
+
+                const poly = {
+                    id: elem.id,
+                    type: 'polygon',
+                    points,
+                    lineWidth: 3,
+                    fillColor: elem.fillColor,
+                    strokeColor: elem.strokeColor,
+                    locked: false,
+                    active: elem.active,
+                    connectionStatus: elem.connectionStatus || 'none',
+                    name: elem.name || '',
+                    closed: true
+                };
+
+                this.elements[idx] = poly;
+                this.selectedElements = [poly];
+                this.saveHistory();
+                this.updatePropertiesPanel();
             }
             
             getElementAt(x, y) {
@@ -4899,6 +5169,12 @@
                     
                     document.getElementById('prop-connection-status').value = elem.connectionStatus || 'none';
                     document.getElementById('prop-active').value = elem.active ? 'true' : 'false';
+
+                    const geoTools = document.getElementById('prop-geometry-tools');
+                    if (geoTools) {
+                        geoTools.style.display =
+                            (elem.type === 'rectangle' || elem.type === 'circle') ? 'block' : 'none';
+                    }
                     
                     document.getElementById('properties-panel').classList.add('show');
                 } else {
@@ -4970,7 +5246,7 @@
         console.log('   - Duplicar / Eliminar');
         console.log('');
         console.log('⌨️ ATAJOS DE TECLADO:');
-        console.log('   V = Seleccionar | R = Rectángulo | C = Círculo | L = Línea | P = Lápiz | I = Imagen');
+        console.log('   V = Seleccionar | R = Rectángulo | C = Círculo | T = Formas | L = Línea | P = Lápiz | I = Imagen');
         console.log('   Espacio = Pan (mover canvas) | Ctrl+C/V = Copiar/Pegar');
         console.log('   Doble clic en elemento = Activar/Desactivar animación');
         console.log('   Botón derecho = Menú contextual de capas');

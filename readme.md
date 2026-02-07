@@ -18,6 +18,7 @@ Actualmente, el sistema ha completado su **Fase A (Core Engine)**, lo que permit
 * **Carga de Imágenes:** Soporte para múltiples archivos PNG (con transparencia) y otros formatos.
 * **Herramientas de Dibujo:** Dibujo a mano alzada con lápiz y creación de formas básicas.
 * **Polígonos Inteligentes:** Reconocimiento de cierre automático para crear polígonos con relleno.
+* **Formas Vectoriales:** Triángulo, trapecio, rombo, estrellas y engrane. Los polígonos se pueden deformar moviendo sus puntos; rectángulos/círculos se pueden convertir a polígono.
 * **Gestión de Capas:** Sistema jerárquico para organizar qué elementos van al frente o al fondo.
 * **Interactividad:** Funciones de zoom infinito y redimensionamiento manteniendo proporciones.
 * **Persistencia:** Capacidad para guardar y cargar proyectos en formato JSON.
