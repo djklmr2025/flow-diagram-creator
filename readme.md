@@ -128,6 +128,7 @@ Debes habilitar Vercel Blob y configurar variables de entorno:
 Importante:
 * Si NO defines `PUBLISH_KEY`, el publish queda abierto (ideal para prototipar, pero se puede abusar).
 * Después de agregar variables en Vercel, haz un redeploy.
+* En el UI del editor: el modal **Publicar** tiene el campo **Llave de publicación (PUBLISH_KEY)** y se guarda en `localStorage` (solo en ese navegador).
 
 Endpoints:
 * `POST /api/publish` publica un proyecto (JSON) en Vercel Blob y devuelve `previewUrl` y `jsonUrl`.
@@ -142,6 +143,7 @@ Notas:
 ### 🧪 Ejemplo de publicación (curl)
 ```bash
 curl -sS -X POST "https://TU-DOMINIO.vercel.app/api/publish" \
+  -H "x-publish-key: TU_PUBLISH_KEY" \
   -H "content-type: application/json" \
   -d '{"name":"metro-demo","folder":"metro/linea-1","elements":[],"camera":{"x":0,"y":0,"zoom":1}}'
 ```
@@ -166,7 +168,6 @@ El editor incluye:
 
 Inserción:
 * Un sticker se inserta como **1 solo elemento tipo `group`** para poder moverlo como objeto único.
-
 
 
 

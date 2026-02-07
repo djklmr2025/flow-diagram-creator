@@ -477,6 +477,13 @@
             color: #eee;
         }
 
+        .modal-hint {
+            font-size: 12px;
+            opacity: 0.85;
+            margin-top: -8px;
+            margin-bottom: 15px;
+        }
+
         .modal-buttons {
             display: flex;
             gap: 10px;
@@ -821,6 +828,8 @@
             <h2>Publicar Sticker</h2>
             <input type="text" id="publish-name" placeholder="Nombre (opcional)">
             <input type="text" id="publish-folder" placeholder="Carpeta (ej: metro/linea-1) (opcional)">
+            <input type="password" id="publish-key" placeholder="Llave de publicación (PUBLISH_KEY) (opcional)">
+            <div class="modal-hint">Solo si configuraste <code>PUBLISH_KEY</code> en Vercel. Se guarda en este navegador.</div>
             <div class="modal-buttons" style="justify-content: flex-start;">
                 <button class="btn small" id="btn-pick-publish-file" title="Publicar desde un archivo JSON">Subir JSON…</button>
                 <button class="btn small" id="btn-clear-publish-file" title="Volver a publicar el canvas actual" style="display:none;">Usar Canvas</button>
@@ -1030,6 +1039,7 @@
                 document.getElementById('btn-confirm-publish').addEventListener('click', () => this.publishSticker());
                 document.getElementById('btn-pick-publish-file').addEventListener('click', () => this.pickPublishFile());
                 document.getElementById('btn-clear-publish-file').addEventListener('click', () => this.clearPublishFile());
+                this.setupPublishKey();
 
                 // Modal biblioteca
                 document.getElementById('btn-library-close').addEventListener('click', () => this.hideLibraryModal());
@@ -2682,12 +2692,40 @@
                 document.getElementById('project-name').value = '';
             }
 
+            setupPublishKey() {
+                const keyInput = document.getElementById('publish-key');
+                if (!keyInput) return;
+
+                const stored = localStorage.getItem('flow-diagram-publish-key') || '';
+                keyInput.value = String(stored);
+
+                keyInput.addEventListener('input', () => {
+                    const v = String(keyInput.value || '');
+                    if (v) {
+                        localStorage.setItem('flow-diagram-publish-key', v);
+                    } else {
+                        localStorage.removeItem('flow-diagram-publish-key');
+                    }
+                });
+            }
+
+            getPublishKey() {
+                const keyInput = document.getElementById('publish-key');
+                const v = keyInput ? String(keyInput.value || '').trim() : '';
+                if (v) return v;
+
+                const stored = localStorage.getItem('flow-diagram-publish-key');
+                return stored ? String(stored).trim() : '';
+            }
+
             showPublishModal() {
                 const modal = document.getElementById('publish-modal');
                 const result = document.getElementById('publish-result');
                 modal.classList.add('show');
                 document.getElementById('publish-name').value = '';
                 document.getElementById('publish-folder').value = '';
+                const keyInput = document.getElementById('publish-key');
+                if (keyInput) keyInput.value = localStorage.getItem('flow-diagram-publish-key') || '';
                 document.getElementById('publish-name').focus();
                 result.style.display = 'none';
                 result.textContent = '';
@@ -2812,12 +2850,16 @@
                     tags: []
                 };
 
+                const headers = { 'Content-Type': 'application/json' };
+                const publishKey = this.getPublishKey();
+                if (publishKey) headers['x-publish-key'] = publishKey;
+
                 let response;
                 let data;
                 try {
                     response = await fetch('/api/publish', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers,
                         body: JSON.stringify(payload)
                     });
                     data = await response.json();
@@ -2828,7 +2870,11 @@
 
                 if (!response.ok || !data || !data.ok) {
                     const details = data && data.details ? `\n${JSON.stringify(data.details)}` : '';
-                    result.textContent = `❌ Error al publicar: ${(data && data.error) || response.status}${details}`;
+                    const err = (data && data.error) || response.status;
+                    const hint = err === 'Unauthorized'
+                        ? '\nTip: pega tu PUBLISH_KEY en "Llave de publicación" y vuelve a intentar.'
+                        : '';
+                    result.textContent = `❌ Error al publicar: ${err}${details}${hint}`;
                     return;
                 }
 
@@ -3092,12 +3138,16 @@
 
                     if (uploadStatus) uploadStatus.textContent = 'Subiendo a biblioteca...';
 
+                    const headers = { 'Content-Type': 'application/json' };
+                    const publishKey = this.getPublishKey();
+                    if (publishKey) headers['x-publish-key'] = publishKey;
+
                     let response;
                     let resJson;
                     try {
                         response = await fetch('/api/publish', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers,
                             body: JSON.stringify(payload)
                         });
                         resJson = await response.json();
@@ -3108,7 +3158,12 @@
 
                     if (!response.ok || !resJson || !resJson.ok) {
                         const err = (resJson && resJson.error) || response.status;
-                        const hint = err === 'BlobWriteFailed' ? '\nTip: configura BLOB_READ_WRITE_TOKEN en Vercel (Storage → Blob).' : '';
+                        const hint =
+                            err === 'Unauthorized'
+                                ? '\nTip: pega tu PUBLISH_KEY en "Publicar" (modal) y vuelve a intentar.'
+                                : (err === 'BlobWriteFailed'
+                                    ? '\nTip: configura BLOB_READ_WRITE_TOKEN en Vercel (Storage → Blob).'
+                                    : '');
                         if (uploadStatus) uploadStatus.textContent = `❌ Error al publicar: ${err}${hint}`;
                         return;
                     }
