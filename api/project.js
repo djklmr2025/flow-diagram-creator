@@ -30,6 +30,11 @@ function sanitizeId(input) {
   return id;
 }
 
+async function resolveExactBlob(pathname) {
+  const { blobs } = await list({ prefix: pathname, limit: 2 });
+  return (blobs || []).find((b) => b.pathname === pathname) || null;
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     setCors(res);
@@ -51,17 +56,21 @@ export default async function handler(req, res) {
     return;
   }
 
-  const pathname = `library/${id}.json`;
+  // Soportar dos "scopes":
+  // - library/<id>.json  (stickers vectoriales)
+  // - projects/<id>.json (proyectos con imagenes)
+  const libraryPath = `library/${id}.json`;
+  const projectsPath = `projects/${id}.json`;
 
-  let blobs;
+  let exact;
   try {
-    ({ blobs } = await list({ prefix: pathname, limit: 2 }));
+    exact = await resolveExactBlob(libraryPath);
+    if (!exact) exact = await resolveExactBlob(projectsPath);
   } catch (error) {
     sendJson(res, 500, { ok: false, error: 'BlobListFailed', details: String(error) });
     return;
   }
 
-  const exact = (blobs || []).find((b) => b.pathname === pathname);
   if (!exact) {
     sendJson(res, 404, { ok: false, error: 'NotFound', id });
     return;
@@ -83,4 +92,3 @@ export default async function handler(req, res) {
   res.setHeader('cache-control', 'public, max-age=60');
   res.end(text);
 }
-

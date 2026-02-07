@@ -737,8 +737,11 @@
         <button class="btn" id="btn-export" title="Exportar JSON">
             <span>⬇️</span> Exportar
         </button>
-        <button class="btn" id="btn-publish" title="Publicar Sticker (Link IA)">
-            <span>🔗</span> Publicar
+        <button class="btn" id="btn-publish" title="Publicar sticker vectorial (Link IA)">
+            <span>🔗</span> Publicar Vector
+        </button>
+        <button class="btn" id="btn-publish-project" title="Publicar proyecto (incluye imágenes/fondo)">
+            <span>🖼️</span> Publicar Proyecto
         </button>
         <button class="btn" id="btn-library" title="Biblioteca de Stickers">
             <span>📚</span> Biblioteca
@@ -885,7 +888,10 @@
     <!-- Modal para Publicar -->
     <div id="publish-modal" class="modal">
         <div class="modal-content">
-            <h2>Publicar Sticker</h2>
+            <h2>Publicar</h2>
+            <div class="modal-hint" id="publish-mode-hint">
+                <strong>Vector:</strong> sin imágenes (ideal como sticker/biblioteca). <strong>Proyecto:</strong> permite imágenes/fondo (sube assets).
+            </div>
             <input type="text" id="publish-name" placeholder="Nombre (opcional)">
             <input type="text" id="publish-folder" placeholder="Carpeta (ej: metro/linea-1) (opcional)">
             <input type="password" id="publish-key" placeholder="Llave de publicación (PUBLISH_KEY) (opcional)">
@@ -905,7 +911,8 @@
             </div>
             <div class="modal-buttons">
                 <button class="btn" id="btn-cancel-publish">Cancelar</button>
-                <button class="btn" id="btn-confirm-publish">Publicar</button>
+                <button class="btn" id="btn-confirm-publish">Publicar Vector</button>
+                <button class="btn" id="btn-confirm-publish-project">Publicar Proyecto</button>
             </div>
             <div id="publish-result"></div>
         </div>
@@ -980,6 +987,7 @@
                 // Publicación desde archivo
                 this.publishFileProject = null;
                 this.publishFileName = '';
+                this.publishIntent = 'vector'; // 'vector' | 'project'
 
                 // Navegación de biblioteca
                 this.libraryPrefix = '';
@@ -1101,7 +1109,8 @@
                 document.getElementById('btn-save').addEventListener('click', () => this.showSaveModal());
                 document.getElementById('btn-load').addEventListener('click', () => this.loadProject());
                 document.getElementById('btn-export').addEventListener('click', () => this.exportProject());
-                document.getElementById('btn-publish').addEventListener('click', () => this.showPublishModal());
+                document.getElementById('btn-publish').addEventListener('click', () => this.showPublishModal('vector'));
+                document.getElementById('btn-publish-project').addEventListener('click', () => this.showPublishModal('project'));
                 document.getElementById('btn-library').addEventListener('click', () => this.showLibraryModal());
                 
                 // Modal de guardado
@@ -1111,6 +1120,7 @@
                 // Modal de publicación
                 document.getElementById('btn-cancel-publish').addEventListener('click', () => this.hidePublishModal());
                 document.getElementById('btn-confirm-publish').addEventListener('click', () => this.publishSticker());
+                document.getElementById('btn-confirm-publish-project').addEventListener('click', () => this.publishProject());
                 document.getElementById('btn-pick-publish-file').addEventListener('click', () => this.pickPublishFile());
                 document.getElementById('btn-clear-publish-file').addEventListener('click', () => this.clearPublishFile());
                 document.getElementById('btn-toggle-paste-json').addEventListener('click', () => this.togglePublishPasteBox());
@@ -2853,7 +2863,10 @@
                 return stored ? String(stored).trim() : '';
             }
 
-            showPublishModal() {
+            showPublishModal(intent) {
+                const parsed = String(intent || '').toLowerCase();
+                this.publishIntent = parsed === 'project' ? 'project' : 'vector';
+
                 const modal = document.getElementById('publish-modal');
                 const result = document.getElementById('publish-result');
                 modal.classList.add('show');
@@ -2861,6 +2874,14 @@
                 document.getElementById('publish-folder').value = '';
                 const keyInput = document.getElementById('publish-key');
                 if (keyInput) keyInput.value = localStorage.getItem('flow-diagram-publish-key') || '';
+                const modeHint = document.getElementById('publish-mode-hint');
+                if (modeHint) {
+                    modeHint.innerHTML =
+                        this.publishIntent === 'project'
+                            ? '<strong>Seleccionado: Proyecto</strong> (permite imágenes/fondo; sube assets). <strong>Vector:</strong> sin imágenes (sticker/biblioteca).'
+                            : '<strong>Seleccionado: Vector</strong> (sin imágenes; sticker/biblioteca). <strong>Proyecto:</strong> permite imágenes/fondo (sube assets).';
+                }
+
                 document.getElementById('publish-name').focus();
                 result.style.display = 'none';
                 result.textContent = '';
@@ -3084,13 +3105,128 @@
                     // Ignorar: algunos navegadores/browsers bloquean clipboard.
                 }
 
+                const previewUrl = String(data.previewUrl || '');
+                const stickerUrl = previewUrl ? previewUrl.replace('mode=preview', 'mode=sticker') : '';
                 const deckUrl = `${window.location.origin}/?mode=deck&id=${encodeURIComponent(data.id)}`;
 
                 result.innerHTML = `
-                    <div><strong>Preview (modo sticker):</strong></div>
-                    <input type="text" readonly value="${data.previewUrl}">
+                    <div><strong>Sticker (transparente):</strong></div>
+                    <input type="text" readonly value="${stickerUrl}">
+                    <div style="margin-top: 10px;"><strong>Preview (studio):</strong></div>
+                    <input type="text" readonly value="${previewUrl}">
                     <div style="margin-top: 10px;"><strong>Deck (modo lámina):</strong></div>
                     <input type="text" readonly value="${deckUrl}">
+                    <div style="margin-top: 10px;"><strong>JSON:</strong></div>
+                    <input type="text" readonly value="${data.jsonUrl}">
+                    <div style="margin-top: 10px;">Tip: el link de preview se intentó copiar al portapapeles.</div>
+                `;
+            }
+
+            async publishProject() {
+                const result = document.getElementById('publish-result');
+                result.style.display = 'block';
+                result.textContent = 'Publicando proyecto...';
+
+                const sourceElements = this.publishFileProject ? this.publishFileProject.elements : this.elements;
+                const sourceCamera = this.publishFileProject
+                    ? (this.publishFileProject.camera || { x: 0, y: 0, zoom: 1 })
+                    : this.camera;
+
+                // Normalizar por si el proyecto viene de un JSON "friendly".
+                if (this.publishFileProject) {
+                    this.normalizeProjectInPlace(this.publishFileProject);
+                }
+
+                const totalElements = this.countElementsRecursive(sourceElements);
+                if (totalElements > 2000) {
+                    result.textContent = `❌ Proyecto demasiado grande para publicar (máx 2000 elementos, actual: ${totalElements}).`;
+                    return;
+                }
+
+                const nameInput = (document.getElementById('publish-name').value || '').trim();
+                const fileNameBase = String(this.publishFileName || '').replace(/\.json$/i, '').trim();
+                const defaultName =
+                    (this.publishFileProject && typeof this.publishFileProject.name === 'string' && this.publishFileProject.name.trim())
+                        ? this.publishFileProject.name.trim()
+                        : '';
+                const name = nameInput || defaultName || fileNameBase;
+                const folder = (document.getElementById('publish-folder').value || '').trim();
+
+                const payload = {
+                    name,
+                    folder,
+                    elements: sourceElements,
+                    camera: sourceCamera,
+                    tags: []
+                };
+
+                // Quitar "imageData" (no se puede serializar de forma util).
+                let bodyText;
+                try {
+                    bodyText = JSON.stringify(payload, (key, value) => {
+                        if (key === 'imageData') return undefined;
+                        return value;
+                    });
+                } catch (error) {
+                    result.textContent = `❌ No se pudo serializar el proyecto: ${error}`;
+                    return;
+                }
+
+                // Anti-abuso/limite practico (Vercel Functions).
+                if (bodyText.length > 6_000_000) {
+                    result.textContent = '❌ Proyecto demasiado grande para publicar como "Proyecto" (reduce el tamaño de las imágenes).';
+                    return;
+                }
+
+                const headers = { 'Content-Type': 'application/json' };
+                const publishKey = this.getPublishKey();
+                if (publishKey) headers['x-publish-key'] = publishKey;
+
+                let response;
+                let data;
+                try {
+                    response = await fetch('/api/publish-project', {
+                        method: 'POST',
+                        headers,
+                        body: bodyText
+                    });
+                    data = await response.json();
+                } catch (error) {
+                    result.textContent = `❌ Error de red al publicar: ${error}`;
+                    return;
+                }
+
+                if (!response.ok || !data || !data.ok) {
+                    const details = data && data.details ? `\n${JSON.stringify(data.details)}` : '';
+                    const err = (data && data.error) || response.status;
+                    const hint = err === 'Unauthorized'
+                        ? '\nTip: pega tu PUBLISH_KEY en "Llave de publicación" y vuelve a intentar.'
+                        : '';
+                    result.textContent = `❌ Error al publicar proyecto: ${err}${details}${hint}`;
+                    return;
+                }
+
+                // Intentar copiar el link de preview automaticamente.
+                try {
+                    await navigator.clipboard.writeText(data.previewUrl);
+                } catch {
+                    // Ignorar.
+                }
+
+                const previewUrl = String(data.previewUrl || '');
+                const stickerUrl = previewUrl ? previewUrl.replace('mode=preview', 'mode=sticker') : '';
+                const deckUrl = `${window.location.origin}/?mode=deck&id=${encodeURIComponent(data.id)}`;
+                const editorUrl = String(data.editorUrl || `${window.location.origin}/?id=${encodeURIComponent(data.id)}`);
+
+                result.innerHTML = `
+                    <div><strong>Preview (studio):</strong></div>
+                    <input type="text" readonly value="${previewUrl}">
+                    <div style="margin-top: 10px;"><strong>Sticker (transparente):</strong></div>
+                    <input type="text" readonly value="${stickerUrl}">
+                    <div style="margin-top: 10px;"><strong>Deck (modo lámina):</strong></div>
+                    <input type="text" readonly value="${deckUrl}">
+                    <div style="margin-top: 10px;"><strong>Editor (abre en modo edición):</strong></div>
+                    <input type="text" readonly value="${editorUrl}">
                     <div style="margin-top: 10px;"><strong>JSON:</strong></div>
                     <input type="text" readonly value="${data.jsonUrl}">
                     <div style="margin-top: 10px;">Tip: el link de preview se intentó copiar al portapapeles.</div>

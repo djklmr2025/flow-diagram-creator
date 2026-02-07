@@ -120,9 +120,13 @@ Parámetros extra (viewer):
 * `fx=1|0` (sombra suave para dar “volumen” al sticker en el viewer).
 
 ## 🔌 API Pública Para Agentes IA (Links Compartibles)
-Objetivo: que una IA (o humano) publique un JSON (sin imágenes) y obtenga links para:
-* Previsualizar el diagrama como “sticker” (solo animación, sin UI).
+Objetivo: que una IA (o humano) publique un JSON y obtenga links para:
+* Previsualizar el diagrama como “sticker/preview” (solo animación, sin UI).
 * Consumir el JSON publicado desde cualquier plataforma (promptchats, dashboards, etc).
+
+Hay 2 rutas de publicación:
+* **Vector (sticker/biblioteca):** `POST /api/publish` (rechaza imágenes).
+* **Proyecto (con imágenes/fondo):** `POST /api/publish-project` (sube assets y reemplaza `imageSrc` por URLs).
 
 ### ✅ ¿Dónde se guardan los proyectos?
 * **Guardar:** `localStorage` del navegador (solo en ese dispositivo/navegador). No genera links.
@@ -131,8 +135,8 @@ Objetivo: que una IA (o humano) publique un JSON (sin imágenes) y obtenga links
 
 ### ⚙️ Requisitos en Vercel (para que funcione la biblioteca + publish)
 Debes habilitar Vercel Blob y configurar variables de entorno:
-* `BLOB_READ_WRITE_TOKEN` (obligatorio): habilita `POST /api/publish` y el listado/lectura estable vía API.
-* `PUBLISH_KEY` (opcional): si lo defines, `POST /api/publish` requiere `x-publish-key` o `?key=...`.
+* `BLOB_READ_WRITE_TOKEN` (obligatorio): habilita `POST /api/publish`, `POST /api/publish-project` y el listado/lectura estable vía API.
+* `PUBLISH_KEY` (opcional): si lo defines, los `POST` requieren `x-publish-key` o `?key=...`.
 
 Importante:
 * Si NO defines `PUBLISH_KEY`, el publish queda abierto (ideal para prototipar, pero se puede abusar).
@@ -140,17 +144,19 @@ Importante:
 * En el UI del editor: el modal **Publicar** tiene el campo **Llave de publicación (PUBLISH_KEY)** y se guarda en `localStorage` (solo en ese navegador).
 
 Endpoints:
-* `POST /api/publish` publica un proyecto (JSON) en Vercel Blob y devuelve `previewUrl` y `jsonUrl`.
-* `GET /api/project?id=...` devuelve el JSON publicado.
+* `POST /api/publish` publica un sticker vectorial (JSON sin imágenes) y devuelve links.
+* `POST /api/publish-project` publica un proyecto (JSON con imágenes) y devuelve links.
+* `GET /api/project?id=...` devuelve el JSON publicado (busca en `library/` o `projects/`).
 * `GET /api/library?prefix=...&mode=folded|expanded&limit=...` lista la biblioteca por carpetas.
 * `POST /api/inject?session=...` (canal vivo): inyecta un proyecto a una sesión para actualizar un canvas abierto en tiempo real.
 * `GET /api/inject?session=...` lee el último proyecto inyectado en esa sesión.
 
 Notas:
 * CORS está habilitado (`*`) para facilitar consumo desde plataformas de IA.
-* El publish **rechaza imágenes** (`type: "image"` / `imageSrc`) para mantener stickers vectoriales/animados.
-* Límites anti-abuso: máximo ~200KB por proyecto y máximo 2000 elementos (contando grupos de forma recursiva).
-* Compatibilidad IA: `POST /api/publish` y `POST /api/inject` aceptan JSON "friendly" y lo normalizan (ej: `circle.radius`, `line.x1/y1/x2/y2`, `color`, `isAnim`).
+* `POST /api/publish` **rechaza imágenes** (`type: "image"` / `imageSrc`) para mantener stickers vectoriales/animados.
+* `POST /api/publish-project` permite imágenes y, si vienen embebidas como `data:` (base64), las sube como assets y reemplaza `imageSrc` por URLs públicas.
+* Límites anti-abuso (aprox): máximo 2000 elementos (contando grupos de forma recursiva). `publish` guarda ~200KB y `publish-project` guarda ~300KB (sin base64). `publish-project` limita request a ~6MB y sube hasta 40 imágenes (máx 8MB total).
+* Compatibilidad IA: `POST /api/publish`, `POST /api/publish-project` y `POST /api/inject` aceptan JSON "friendly" y lo normalizan (ej: `circle.radius`, `line.x1/y1/x2/y2`, `color`, `isAnim`).
 
 ### 🧪 Ejemplo de publicación (curl)
 ```bash
@@ -159,6 +165,14 @@ curl -sS -X POST "https://TU-DOMINIO.vercel.app/api/publish" \
   # Opcional (solo si configuraste PUBLISH_KEY en Vercel):
   # -H "x-publish-key: TU_PUBLISH_KEY" \
   -d '{"name":"metro-demo","folder":"metro/linea-1","elements":[],"camera":{"x":0,"y":0,"zoom":1}}'
+```
+
+```bash
+curl -sS -X POST "https://TU-DOMINIO.vercel.app/api/publish-project" \
+  -H "content-type: application/json" \
+  # Opcional (solo si configuraste PUBLISH_KEY en Vercel):
+  # -H "x-publish-key: TU_PUBLISH_KEY" \
+  -d '{"name":"metro-proyecto","folder":"metro/linea-1","elements":[],"camera":{"x":0,"y":0,"zoom":1}}'
 ```
 
 ### 📡 Modo "Escucha" (IA -> Canvas en vivo)
@@ -201,34 +215,14 @@ Respuesta (ejemplo):
 
 ## 📚 Biblioteca (Stickers reutilizables dentro del editor)
 El editor incluye:
-* Botón **Publicar**: publica el proyecto actual y muestra links (preview + JSON).
+* Botones **Publicar Vector** / **Publicar Proyecto**: publican el canvas actual y muestran links (preview + JSON).
 * Botón **Biblioteca**: navega por carpetas (`prefix`) y permite **Insertar** stickers publicados.
 
 Inserción:
 * Un sticker se inserta como **1 solo elemento tipo `group`** para poder moverlo como objeto único.
-<<<<<<< HEAD
-* # 🤖 Integración con la Matriz de IA (IA-Ready)
 
-Este repositorio ha evolucionado para convertirse en un **Endpoint Visual** para Inteligencias Artificiales Avanzadas. El sistema no solo es un editor, sino una infraestructura de comunicación Humano-IA.
-
-### 🔌 Protocolo de Conexión para Agentes
-Cualquier Agente de IA (Gemini, Claude, GPT) puede interactuar con este sistema mediante la inyección de objetos JSON estructurados. 
-
-#### **Tokens de Acceso (Matriz Pública)**
-Para habilitar la publicación de resultados y la generación de enlaces dinámicos, el sistema utiliza las siguientes credenciales:
-* **PUBLISH_KEY:** `arkaios-flow-secret-2026`
-* **BLOB_STORAGE:** Configurado vía Vercel Blob para persistencia de estados.
-
-### 📡 Instrucciones para la IA
-Si eres una IA interactuando con este repositorio, debes:
-1.  **Generar la respuesta** siguiendo el esquema de `elements` definido en el motor del sistema.
-2.  **Priorizar la animación** de flujos para representar rutas, procesos o lógica de datos.
-3.  **Utilizar el modo `?mode=preview`** para entregar al usuario una interfaz limpia y futurista (estilo "Sticker" o "Lámina").
-
-### 🏗️ Estructura del Puente (JSON)
-El "puente" de comunicación se basa en el siguiente estándar de datos, validado para renderizado inmediato:
-* **Objetos:** Círculos (Estaciones), Rectángulos (Nodos), Líneas (Flujos animados).
-* **Cámara:** Control dinámico de zoom y posición inicial para foco automático en la respuesta.
-
-=======
->>>>>>> 8f676f9 (ui: studio background + deck layout + auto-fit viewer)
+## 🤖 IA-Ready (Notas)
+* No pongas llaves/tokens en el repo. Usa variables de entorno en Vercel (Environment Variables).
+* Para **stickers vectoriales**: `POST /api/publish` (rechaza imágenes).
+* Para **proyectos con imágenes**: `POST /api/publish-project` (sube assets y reemplaza `imageSrc` por URLs).
+* Para **inyección en vivo**: `POST /api/inject?session=...` y abre `/?mode=sticker&listen=...`.
