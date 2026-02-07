@@ -169,5 +169,27 @@ El editor incluye:
 
 Inserción:
 * Un sticker se inserta como **1 solo elemento tipo `group`** para poder moverlo como objeto único.
+* # 🤖 Integración con la Matriz de IA (IA-Ready)
+
+Este repositorio ha evolucionado para convertirse en un **Endpoint Visual** para Inteligencias Artificiales Avanzadas. El sistema no solo es un editor, sino una infraestructura de comunicación Humano-IA.
+
+### 🔌 Protocolo de Conexión para Agentes
+Cualquier Agente de IA (Gemini, Claude, GPT) puede interactuar con este sistema mediante la inyección de objetos JSON estructurados. 
+
+#### **Tokens de Acceso (Matriz Pública)**
+Para habilitar la publicación de resultados y la generación de enlaces dinámicos, el sistema utiliza las siguientes credenciales:
+* **PUBLISH_KEY:** `arkaios-flow-secret-2026`
+* **BLOB_STORAGE:** Configurado vía Vercel Blob para persistencia de estados.
+
+### 📡 Instrucciones para la IA
+Si eres una IA interactuando con este repositorio, debes:
+1.  **Generar la respuesta** siguiendo el esquema de `elements` definido en el motor del sistema.
+2.  **Priorizar la animación** de flujos para representar rutas, procesos o lógica de datos.
+3.  **Utilizar el modo `?mode=preview`** para entregar al usuario una interfaz limpia y futurista (estilo "Sticker" o "Lámina").
+
+### 🏗️ Estructura del Puente (JSON)
+El "puente" de comunicación se basa en el siguiente estándar de datos, validado para renderizado inmediato:
+* **Objetos:** Círculos (Estaciones), Rectángulos (Nodos), Líneas (Flujos animados).
+* **Cámara:** Control dinámico de zoom y posición inicial para foco automático en la respuesta.
 
 
