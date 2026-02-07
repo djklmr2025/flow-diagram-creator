@@ -989,6 +989,7 @@
             <div class="deck-share-row">
                 <button class="btn" id="btn-deck-whatsapp" title="Enviar link a WhatsApp">WhatsApp</button>
                 <button class="btn" id="btn-deck-share" title="Compartir (si está disponible)">Compartir</button>
+                <button class="btn" id="btn-deck-moltbook" title="Publicar link en Moltbook">Moltbook</button>
             </div>
             <div id="deck-share-status"></div>
         </div>
@@ -1385,6 +1386,10 @@
                 const deckShare = document.getElementById('btn-deck-share');
                 if (deckShare) {
                     deckShare.addEventListener('click', () => this.shareDeckNative());
+                }
+                const deckMoltbook = document.getElementById('btn-deck-moltbook');
+                if (deckMoltbook) {
+                    deckMoltbook.addEventListener('click', () => this.shareDeckToMoltbook());
                 }
                 const deckCopyLink = document.getElementById('btn-deck-copy-link');
                 if (deckCopyLink) {
@@ -4965,6 +4970,82 @@
                 const text = `${title}\n${url}`;
                 const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
                 window.open(waUrl, '_blank', 'noopener');
+            }
+
+            sanitizeSubmoltName(input) {
+                const s = String(input || '').trim().toLowerCase();
+                if (!s) return 'general';
+                if (!/^[a-z0-9_-]{1,40}$/.test(s)) return 'general';
+                return s;
+            }
+
+            getMoltbookSubmoltFromUrlOrDefault() {
+                try {
+                    const params = new URLSearchParams(window.location.search);
+                    return this.sanitizeSubmoltName(params.get('submolt') || params.get('molt') || 'general');
+                } catch {
+                    return 'general';
+                }
+            }
+
+            async shareDeckToMoltbook() {
+                if (this.viewerMode !== 'deck') return;
+
+                const statusEl = document.getElementById('deck-share-status');
+                const url = this.getDeckShareUrl();
+                if (!url) {
+                    if (statusEl) statusEl.textContent = '⚠️ No hay link para publicar.';
+                    return;
+                }
+
+                const titleEl = document.getElementById('deck-slide-title');
+                const title = titleEl && titleEl.textContent ? titleEl.textContent : 'Lámina';
+                const submolt = this.getMoltbookSubmoltFromUrlOrDefault();
+
+                const headers = { 'content-type': 'application/json' };
+                const publishKey = this.getPublishKey();
+                if (publishKey) headers['x-publish-key'] = publishKey;
+
+                if (statusEl) statusEl.textContent = `🦞 Publicando en Moltbook (m/${submolt})...`;
+
+                let res;
+                let data;
+                try {
+                    res = await fetch('/api/moltbook-post', {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({
+                            submolt,
+                            title: `🗺️ ${title}`,
+                            url
+                        })
+                    });
+                    data = await res.json();
+                } catch (err) {
+                    if (statusEl) statusEl.textContent = `❌ Error de red al publicar en Moltbook: ${String(err)}`;
+                    return;
+                }
+
+                if (!res.ok || !data || data.ok !== true) {
+                    const hint =
+                        (data && data.moltbook && data.moltbook.hint) ||
+                        (data && data.moltbook && data.moltbook.error) ||
+                        (data && data.error) ||
+                        `HTTP ${res.status}`;
+
+                    if (String(data && data.error) === 'Unauthorized' && !publishKey) {
+                        if (statusEl) {
+                            statusEl.textContent =
+                                '❌ Unauthorized. Tip: abre el editor normal, pega tu PUBLISH_KEY en "Publicar", y vuelve a intentar (se guarda en este navegador).';
+                        }
+                        return;
+                    }
+
+                    if (statusEl) statusEl.textContent = `❌ Moltbook error: ${hint}`;
+                    return;
+                }
+
+                if (statusEl) statusEl.textContent = '✅ Publicado en Moltbook.';
             }
 
             setupDeckResizer() {
