@@ -39,6 +39,151 @@
             background: transparent;
         }
 
+        /* ==================== PANEL OBJETOS (CAPAS) ==================== */
+        #layers-panel {
+            position: fixed;
+            left: 0;
+            top: 60px;
+            bottom: 24px;
+            width: 280px;
+            background: rgba(22, 33, 62, 0.98);
+            color: #eee;
+            border-right: 2px solid #0f3460;
+            box-shadow: 8px 0 30px rgba(0, 0, 0, 0.35);
+            z-index: 950;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #layers-panel.show {
+            display: flex;
+        }
+
+        body.layers-open #canvas-container {
+            left: 280px;
+        }
+
+        .layers-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(15, 52, 96, 0.35);
+        }
+
+        .layers-title {
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            color: #00d4ff;
+        }
+
+        .layers-controls {
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        #layers-filter {
+            padding: 8px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(15, 52, 96, 0.65);
+            color: #eee;
+            font-size: 13px;
+        }
+
+        #layers-filter:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.22);
+        }
+
+        .layers-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        #layers-status {
+            padding: 6px 10px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.75);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        #layers-list {
+            flex: 1;
+            overflow: auto;
+            padding: 10px;
+        }
+
+        .layers-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 8px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            background: rgba(15, 52, 96, 0.22);
+            cursor: pointer;
+            user-select: none;
+            margin-bottom: 8px;
+        }
+
+        .layers-item:hover {
+            background: rgba(233, 69, 96, 0.12);
+            border-color: rgba(233, 69, 96, 0.35);
+        }
+
+        .layers-item.selected {
+            background: rgba(0, 212, 255, 0.10);
+            border-color: rgba(0, 212, 255, 0.45);
+        }
+
+        .layers-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .layers-type {
+            width: 18px;
+            text-align: center;
+            opacity: 0.95;
+            flex: 0 0 auto;
+        }
+
+        .layers-name {
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 150px;
+        }
+
+        .layers-badges {
+            display: flex;
+            gap: 6px;
+            font-size: 11px;
+            opacity: 0.85;
+        }
+
+        .layers-actions {
+            display: flex;
+            gap: 6px;
+            flex: 0 0 auto;
+        }
+
+        .layers-actions .btn.small {
+            padding: 5px 8px;
+            font-size: 11px;
+        }
+
         #toolbar {
             position: fixed;
             top: 0;
@@ -780,11 +925,33 @@
         <button class="btn" id="btn-library" title="Biblioteca de Stickers">
             <span>📚</span> Biblioteca
         </button>
+        <button class="btn" id="btn-layers" title="Objetos (O)">
+            <span>≡</span> Objetos
+        </button>
         
         <input type="file" id="file-input" accept=".json">
         <input type="file" id="publish-file-input" accept=".json">
         <input type="file" id="library-upload-input" accept=".json">
         <input type="file" id="image-input" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp">
+    </div>
+
+    <!-- Panel Objetos (Capas) -->
+    <div id="layers-panel">
+        <div class="layers-header">
+            <div class="layers-title">Objetos</div>
+            <div class="layers-actions">
+                <button class="btn small" id="btn-layers-hide" title="Ocultar panel">Ocultar</button>
+            </div>
+        </div>
+        <div class="layers-controls">
+            <input type="text" id="layers-filter" placeholder="Buscar (nombre/tipo)...">
+            <div class="layers-buttons">
+                <button class="btn small" id="btn-layers-unlock-all" title="Quitar fijado/bloqueo a todo">Desbloquear todo</button>
+                <button class="btn small" id="btn-layers-delete-selected" title="Eliminar lo seleccionado">Eliminar selección</button>
+            </div>
+        </div>
+        <div id="layers-status"></div>
+        <div id="layers-list"></div>
     </div>
 
     <!-- Canvas Container -->
@@ -1013,6 +1180,9 @@
                 this.autoClosePathDistance = 15; // Distancia para auto-cerrar paths
                 // Herramienta "Formas" (plantillas vectoriales)
                 this.shapeType = localStorage.getItem('flow-diagram-shape-type') || 'triangle';
+                // Panel Objetos (Capas)
+                this.layersPanelOpen = (localStorage.getItem('flow-diagram-layers-open') || '1') !== '0';
+                this.layersFilter = '';
 
                 // Modo visor (IA/preview): sin edición, sin grid y con fondo transparente.
                 this.readOnly = false;
@@ -1049,6 +1219,7 @@
                 this.resizeCanvas();
                 this.setupEventListeners();
                 this.setupContextMenu();
+                this.setupLayersPanel();
                 this.loadFromLocalStorage();
                 this.startAnimationLoop();
                 
@@ -1064,6 +1235,13 @@
                 const statusBar = document.getElementById('status-bar');
                 const toolbarHeight = toolbar ? toolbar.offsetHeight : 0;
                 const statusHeight = statusBar ? statusBar.offsetHeight : 0;
+
+                // Panel de Objetos (Capas): respetar el layout real (toolbar/status-bar).
+                const layersPanel = document.getElementById('layers-panel');
+                if (layersPanel) {
+                    layersPanel.style.top = `${toolbarHeight}px`;
+                    layersPanel.style.bottom = `${statusHeight}px`;
+                }
 
                 // Mantener el contenedor del canvas alineado con el layout real (toolbar/status-bar)
                 // Nota: en modo deck, el tamaño/posición del contenedor se controla externamente.
@@ -1260,6 +1438,373 @@
                     btnConvert.addEventListener('click', () => this.convertSelectedToPolygon());
                 }
             }
+
+            // ==================== PANEL OBJETOS (CAPAS) ====================
+
+            setupLayersPanel() {
+                const panel = document.getElementById('layers-panel');
+                if (!panel) return;
+
+                const btnToggle = document.getElementById('btn-layers');
+                if (btnToggle) {
+                    btnToggle.addEventListener('click', () => this.toggleLayersPanel());
+                }
+
+                const btnHide = document.getElementById('btn-layers-hide');
+                if (btnHide) {
+                    btnHide.addEventListener('click', () => this.setLayersPanelOpen(false));
+                }
+
+                const filter = document.getElementById('layers-filter');
+                if (filter) {
+                    filter.value = this.layersFilter || '';
+                    filter.addEventListener('input', () => {
+                        this.layersFilter = String(filter.value || '');
+                        this.refreshLayersPanel();
+                    });
+                }
+
+                const btnUnlockAll = document.getElementById('btn-layers-unlock-all');
+                if (btnUnlockAll) {
+                    btnUnlockAll.addEventListener('click', () => this.unlockAllElements());
+                }
+
+                const btnDeleteSel = document.getElementById('btn-layers-delete-selected');
+                if (btnDeleteSel) {
+                    btnDeleteSel.addEventListener('click', () => this.deleteElements());
+                }
+
+                const list = document.getElementById('layers-list');
+                if (list) {
+                    list.addEventListener('click', (e) => this.onLayersListClick(e));
+                }
+
+                this.setLayersPanelOpen(this.layersPanelOpen, { persist: false });
+                this.refreshLayersPanel();
+            }
+
+            setLayersPanelOpen(open, options) {
+                const opts = options && typeof options === 'object' ? options : {};
+                const v = Boolean(open);
+                this.layersPanelOpen = v;
+
+                const panel = document.getElementById('layers-panel');
+                if (panel) panel.classList.toggle('show', v);
+                document.body.classList.toggle('layers-open', v);
+
+                if (opts.persist !== false) {
+                    localStorage.setItem('flow-diagram-layers-open', v ? '1' : '0');
+                }
+
+                this.resizeCanvas();
+                if (v) this.refreshLayersPanel();
+                this.updateLayersSelectionHighlight();
+            }
+
+            toggleLayersPanel() {
+                this.setLayersPanelOpen(!this.layersPanelOpen);
+            }
+
+            getLayerTypeIcon(elem) {
+                const t = elem && elem.type ? String(elem.type) : '';
+                const icons = {
+                    rectangle: '▭',
+                    circle: '●',
+                    line: '→',
+                    polygon: '⬠',
+                    path: '✎',
+                    image: '🖼️',
+                    group: '⊞'
+                };
+                return icons[t] || '•';
+            }
+
+            getLayerTypeLabel(elem) {
+                const t = elem && elem.type ? String(elem.type) : '';
+                const labels = {
+                    rectangle: 'Rectángulo',
+                    circle: 'Círculo',
+                    line: 'Línea',
+                    polygon: 'Polígono',
+                    path: 'Trazado',
+                    image: 'Imagen',
+                    group: 'Grupo'
+                };
+                return labels[t] || t || 'Elemento';
+            }
+
+            getLayerDisplayName(elem) {
+                if (!elem || typeof elem !== 'object') return 'Elemento';
+                const name = (typeof elem.name === 'string' ? elem.name.trim() : '');
+                if (name) return name;
+
+                if (elem.type === 'group') {
+                    const n = Array.isArray(elem.elements) ? elem.elements.length : 0;
+                    return `Grupo (${n})`;
+                }
+
+                const label = this.getLayerTypeLabel(elem);
+                const id = elem.id != null ? String(elem.id) : '';
+                const shortId = id ? id.slice(-6) : '';
+                return shortId ? `${label} · ${shortId}` : label;
+            }
+
+            findTopLevelElementById(idRaw) {
+                const id = String(idRaw || '');
+                return this.elements.find((e) => String(e && e.id) === id) || null;
+            }
+
+            updateLayersSelectionHighlight() {
+                const panel = document.getElementById('layers-panel');
+                if (!panel || !panel.classList.contains('show')) return;
+
+                const list = document.getElementById('layers-list');
+                if (!list) return;
+
+                const selected = new Set(this.selectedElements.map((e) => String(e && e.id)));
+                list.querySelectorAll('.layers-item').forEach((el) => {
+                    const id = el.getAttribute('data-id') || '';
+                    el.classList.toggle('selected', selected.has(String(id)));
+                });
+            }
+
+            refreshLayersPanel() {
+                const panel = document.getElementById('layers-panel');
+                if (!panel || !panel.classList.contains('show')) return;
+
+                const list = document.getElementById('layers-list');
+                const status = document.getElementById('layers-status');
+                if (!list || !status) return;
+
+                const q = String(this.layersFilter || '').trim().toLowerCase();
+                const elements = Array.isArray(this.elements) ? this.elements.slice().reverse() : [];
+
+                list.innerHTML = '';
+
+                let shown = 0;
+                elements.forEach((elem) => {
+                    if (!elem || typeof elem !== 'object') return;
+
+                    const type = String(elem.type || '').toLowerCase();
+                    const name = this.getLayerDisplayName(elem);
+                    const haystack = `${type} ${name}`.toLowerCase();
+                    if (q && !haystack.includes(q)) return;
+
+                    shown++;
+
+                    const row = document.createElement('div');
+                    row.className = 'layers-item';
+                    row.setAttribute('data-id', String(elem.id));
+
+                    const meta = document.createElement('div');
+                    meta.className = 'layers-meta';
+
+                    const typeIcon = document.createElement('div');
+                    typeIcon.className = 'layers-type';
+                    typeIcon.textContent = this.getLayerTypeIcon(elem);
+
+                    const nameEl = document.createElement('div');
+                    nameEl.className = 'layers-name';
+                    nameEl.textContent = name;
+
+                    const badges = document.createElement('div');
+                    badges.className = 'layers-badges';
+                    if (elem.locked) {
+                        const b = document.createElement('span');
+                        b.textContent = '🔒';
+                        badges.appendChild(b);
+                    }
+                    if (elem.active === false) {
+                        const b = document.createElement('span');
+                        b.textContent = '⏸';
+                        badges.appendChild(b);
+                    }
+
+                    meta.appendChild(typeIcon);
+                    meta.appendChild(nameEl);
+                    meta.appendChild(badges);
+
+                    const actions = document.createElement('div');
+                    actions.className = 'layers-actions';
+
+                    const btnFocus = document.createElement('button');
+                    btnFocus.className = 'btn small';
+                    btnFocus.textContent = 'Ir';
+                    btnFocus.setAttribute('data-action', 'focus');
+                    btnFocus.setAttribute('title', 'Centrar vista en este objeto');
+
+                    const btnLock = document.createElement('button');
+                    btnLock.className = 'btn small';
+                    btnLock.textContent = elem.locked ? 'Desbloq' : 'Bloq';
+                    btnLock.setAttribute('data-action', 'lock');
+                    btnLock.setAttribute('title', elem.locked ? 'Desbloquear' : 'Bloquear');
+
+                    const btnDelete = document.createElement('button');
+                    btnDelete.className = 'btn small';
+                    btnDelete.textContent = 'Borrar';
+                    btnDelete.setAttribute('data-action', 'delete');
+                    btnDelete.setAttribute('title', 'Eliminar este objeto del proyecto');
+
+                    actions.appendChild(btnFocus);
+                    actions.appendChild(btnLock);
+                    actions.appendChild(btnDelete);
+
+                    if (elem.type === 'group') {
+                        const btnUngroup = document.createElement('button');
+                        btnUngroup.className = 'btn small';
+                        btnUngroup.textContent = 'Desagrupar';
+                        btnUngroup.setAttribute('data-action', 'ungroup');
+                        btnUngroup.setAttribute('title', 'Desagrupar (convertir grupo en elementos sueltos)');
+                        actions.appendChild(btnUngroup);
+                    }
+
+                    row.appendChild(meta);
+                    row.appendChild(actions);
+
+                    list.appendChild(row);
+                });
+
+                status.textContent = `Objetos: ${shown}/${this.elements.length}`;
+                this.updateLayersSelectionHighlight();
+            }
+
+            onLayersListClick(e) {
+                if (this.readOnly) return;
+
+                const actionBtn = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
+                const row = e.target && e.target.closest ? e.target.closest('.layers-item') : null;
+                if (!row) return;
+
+                const id = row.getAttribute('data-id') || '';
+                const elem = this.findTopLevelElementById(id);
+                if (!elem) return;
+
+                const action = actionBtn ? String(actionBtn.getAttribute('data-action') || '') : '';
+
+                if (action === 'lock') {
+                    elem.locked = !elem.locked;
+                    this.saveHistory();
+                    return;
+                }
+
+                if (action === 'delete') {
+                    // Borrado forzado: aunque sea difícil seleccionarlo desde el canvas.
+                    const idx = this.elements.indexOf(elem);
+                    if (idx >= 0) this.elements.splice(idx, 1);
+                    this.selectedElements = this.selectedElements.filter((s) => s !== elem);
+                    this.saveHistory();
+                    this.hidePropertiesPanel();
+                    this.updateStatusBar();
+                    return;
+                }
+
+                if (action === 'ungroup' && elem.type === 'group') {
+                    const idx = this.elements.indexOf(elem);
+                    if (idx >= 0) {
+                        this.elements.splice(idx, 1);
+                        if (Array.isArray(elem.elements)) this.elements.push(...elem.elements);
+                        this.selectedElements = [];
+                        this.saveHistory();
+                    }
+                    return;
+                }
+
+                if (action === 'focus') {
+                    this.focusCameraOnElement(elem);
+                    return;
+                }
+
+                // Click en la fila: seleccionar (Ctrl para multi-selección)
+                if (e.ctrlKey || e.metaKey) {
+                    const i = this.selectedElements.indexOf(elem);
+                    if (i >= 0) {
+                        this.selectedElements.splice(i, 1);
+                    } else {
+                        this.selectedElements.push(elem);
+                    }
+                } else {
+                    this.selectedElements = [elem];
+                }
+
+                this.updatePropertiesPanel();
+                this.updateStatusBar();
+                this.updateLayersSelectionHighlight();
+            }
+
+            unlockAllElements() {
+                if (this.readOnly) return;
+                this.walkElements(this.elements, (elem) => {
+                    if (elem && typeof elem === 'object') elem.locked = false;
+                    return true;
+                });
+                this.saveHistory();
+            }
+
+            getElementBoundsForFocus(elem) {
+                if (!elem || typeof elem !== 'object') return null;
+
+                if (elem.type === 'line') {
+                    const minX = Math.min(elem.x, elem.endX);
+                    const maxX = Math.max(elem.x, elem.endX);
+                    const minY = Math.min(elem.y, elem.endY);
+                    const maxY = Math.max(elem.y, elem.endY);
+                    return { minX, minY, maxX, maxY };
+                }
+
+                if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points) && elem.points.length) {
+                    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                    elem.points.forEach((p) => {
+                        if (!p) return;
+                        minX = Math.min(minX, p.x);
+                        minY = Math.min(minY, p.y);
+                        maxX = Math.max(maxX, p.x);
+                        maxY = Math.max(maxY, p.y);
+                    });
+                    if (!Number.isFinite(minX)) return null;
+                    return { minX, minY, maxX, maxY };
+                }
+
+                if (elem.type === 'group') {
+                    // Preferir bounds del grupo; si están mal, usar cálculo recursivo.
+                    const x1 = Number(elem.x);
+                    const y1 = Number(elem.y);
+                    const w = Number(elem.width);
+                    const h = Number(elem.height);
+                    if (Number.isFinite(x1) && Number.isFinite(y1) && Number.isFinite(w) && Number.isFinite(h)) {
+                        const minX = Math.min(x1, x1 + w);
+                        const maxX = Math.max(x1, x1 + w);
+                        const minY = Math.min(y1, y1 + h);
+                        const maxY = Math.max(y1, y1 + h);
+                        return { minX, minY, maxX, maxY };
+                    }
+                    if (Array.isArray(elem.elements)) return this.getElementsBounds(elem.elements);
+                    return null;
+                }
+
+                if (typeof elem.x === 'number' && typeof elem.y === 'number' &&
+                    typeof elem.width === 'number' && typeof elem.height === 'number') {
+                    const minX = Math.min(elem.x, elem.x + elem.width);
+                    const maxX = Math.max(elem.x, elem.x + elem.width);
+                    const minY = Math.min(elem.y, elem.y + elem.height);
+                    const maxY = Math.max(elem.y, elem.y + elem.height);
+                    return { minX, minY, maxX, maxY };
+                }
+
+                return null;
+            }
+
+            focusCameraOnElement(elem) {
+                const bounds = this.getElementBoundsForFocus(elem);
+                if (!bounds) return;
+
+                const cx = (bounds.minX + bounds.maxX) / 2;
+                const cy = (bounds.minY + bounds.maxY) / 2;
+                const z = this.camera.zoom || 1;
+
+                this.camera.x = this.canvas.width / 2 - cx * z;
+                this.camera.y = this.canvas.height / 2 - cy * z;
+                this.updateZoomIndicator();
+            }
             
             setTool(tool) {
                 if (this.readOnly) {
@@ -1270,11 +1815,6 @@
 
                 this.tool = tool;
                 
-                // Actualizar UI
-                document.querySelectorAll('#toolbar .btn').forEach(btn => {
-                    btn.classList.remove('active');
-                });
-                
                 const btnMap = {
                     'select': 'btn-select',
                     'rectangle': 'btn-rectangle',
@@ -1283,6 +1823,12 @@
                     'line': 'btn-line',
                     'pencil': 'btn-pencil'
                 };
+
+                // Actualizar UI (solo botones de herramientas, no toda la toolbar)
+                Object.values(btnMap).forEach((id) => {
+                    const b = document.getElementById(id);
+                    if (b) b.classList.remove('active');
+                });
                 
                 if (btnMap[tool]) {
                     document.getElementById(btnMap[tool]).classList.add('active');
@@ -1526,6 +2072,7 @@
                 }
                 
                 if (this.resizingElement) {
+                    this.normalizeBoxElementInPlace(this.resizingElement);
                     this.resizingElement = null;
                     this.resizeHandle = null;
                     this.saveHistory();
@@ -1552,6 +2099,7 @@
                 }
                 
                 if (this.tempElement) {
+                    this.normalizeBoxElementInPlace(this.tempElement);
                     this.elements.push(this.tempElement);
                     this.saveHistory();
                     this.tempElement = null;
@@ -1710,6 +2258,10 @@
                             break;
                         case 'i':
                             this.insertImage();
+                            break;
+                        case 'o':
+                        case 'O':
+                            this.toggleLayersPanel();
                             break;
                         case '+':
                         case '=':
@@ -2069,6 +2621,27 @@
                     }
                 }
             }
+
+            normalizeBoxElementInPlace(elem) {
+                if (!elem || typeof elem !== 'object') return;
+                const t = elem.type ? String(elem.type) : '';
+                if (t !== 'rectangle' && t !== 'circle' && t !== 'image' && t !== 'group') return;
+
+                if (!Number.isFinite(elem.x) || !Number.isFinite(elem.y) ||
+                    !Number.isFinite(elem.width) || !Number.isFinite(elem.height)) {
+                    return;
+                }
+
+                // Evitar cajas "invertidas" (width/height negativos) que rompen selección/handles.
+                if (elem.width < 0) {
+                    elem.x = elem.x + elem.width;
+                    elem.width = Math.abs(elem.width);
+                }
+                if (elem.height < 0) {
+                    elem.y = elem.y + elem.height;
+                    elem.height = Math.abs(elem.height);
+                }
+            }
             
             getResizeCursor(handle) {
                 const cursors = {
@@ -2315,9 +2888,15 @@
                     }
 
                     if (elem.type === 'image' || elem.type === 'rectangle') {
-                        if (x >= elem.x && x <= elem.x + elem.width &&
-                            y >= elem.y && y <= elem.y + elem.height) {
-                            return elem;
+                        if (typeof elem.x === 'number' && typeof elem.y === 'number' &&
+                            typeof elem.width === 'number' && typeof elem.height === 'number') {
+                            const x1 = Math.min(elem.x, elem.x + elem.width);
+                            const x2 = Math.max(elem.x, elem.x + elem.width);
+                            const y1 = Math.min(elem.y, elem.y + elem.height);
+                            const y2 = Math.max(elem.y, elem.y + elem.height);
+                            if (x >= x1 && x <= x2 && y >= y1 && y <= y2) {
+                                return elem;
+                            }
                         }
                     } else if (elem.type === 'circle') {
                         const centerX = elem.x + elem.width / 2;
@@ -3066,6 +3645,8 @@
                     this.history.shift();
                     this.historyIndex--;
                 }
+
+                this.refreshLayersPanel();
             }
             
             undo() {
@@ -3073,6 +3654,10 @@
                     this.historyIndex--;
                     this.elements = JSON.parse(this.history[this.historyIndex]);
                     this.selectedElements = [];
+                    this.hidePropertiesPanel();
+                    this.updateStatusBar();
+                    this.refreshDeckUI();
+                    this.refreshLayersPanel();
                 }
             }
             
@@ -3898,6 +4483,15 @@
                         if (!Number.isFinite(elem.height)) elem.height = 0;
                         if (typeof elem.fillColor !== 'string') elem.fillColor = '#0f3460';
                         if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#e94560';
+                    } else if (elem.type === 'image') {
+                        if (!Number.isFinite(elem.x)) elem.x = 0;
+                        if (!Number.isFinite(elem.y)) elem.y = 0;
+                        if (!Number.isFinite(elem.width)) elem.width = 0;
+                        if (!Number.isFinite(elem.height)) elem.height = 0;
+                        if (!Number.isFinite(elem.originalWidth)) elem.originalWidth = Math.abs(elem.width) || 1;
+                        if (!Number.isFinite(elem.originalHeight)) elem.originalHeight = Math.abs(elem.height) || 1;
+                        if (typeof elem.fillColor !== 'string') elem.fillColor = 'transparent';
+                        if (typeof elem.strokeColor !== 'string') elem.strokeColor = 'transparent';
                     } else if (elem.type === 'polygon' || elem.type === 'path') {
                         if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#e94560';
                         if (typeof elem.fillColor !== 'string') elem.fillColor = '#0f3460';
@@ -3908,6 +4502,8 @@
                     if (typeof elem.locked !== 'boolean') elem.locked = false;
                     if (typeof elem.active !== 'boolean') elem.active = true;
                     if (typeof elem.connectionStatus !== 'string') elem.connectionStatus = 'none';
+
+                    this.normalizeBoxElementInPlace(elem);
                 };
 
                 this.walkElements(project.elements, (elem) => {
@@ -4580,6 +5176,8 @@
             }
 
             applyStickerMode(modeVariant) {
+                this.setLayersPanelOpen(false, { persist: false });
+
                 // Ocultar deck
                 const deckPanel = document.getElementById('deck-panel');
                 if (deckPanel) deckPanel.classList.remove('show');
@@ -4624,6 +5222,8 @@
             }
 
             applyDeckMode() {
+                this.setLayersPanelOpen(false, { persist: false });
+
                 // Ocultar UI de edición
                 document.getElementById('toolbar').style.display = 'none';
                 document.getElementById('properties-panel').style.display = 'none';
@@ -4891,6 +5491,7 @@
                 const projects = JSON.parse(localStorage.getItem('flow-diagrams') || '[]');
                 if (projects.length > 0) {
                     const lastProject = projects[projects.length - 1];
+                    this.normalizeProjectInPlace(lastProject);
                     this.elements = lastProject.elements || [];
                     this.camera = lastProject.camera || { x: 0, y: 0, zoom: 1 };
                 }
@@ -5070,6 +5671,7 @@
                 reader.onload = (event) => {
                     try {
                         const data = JSON.parse(event.target.result);
+                        this.normalizeProjectInPlace(data);
                         this.elements = data.elements || [];
                         this.camera = data.camera || { x: 0, y: 0, zoom: 1 };
                         this.selectedElements = [];
@@ -5180,10 +5782,12 @@
                 } else {
                     this.hidePropertiesPanel();
                 }
+                this.updateLayersSelectionHighlight();
             }
             
             hidePropertiesPanel() {
                 document.getElementById('properties-panel').classList.remove('show');
+                this.updateLayersSelectionHighlight();
             }
             
             updateSelectedProperties() {
