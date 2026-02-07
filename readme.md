@@ -138,6 +138,7 @@ Hay 2 rutas de publicación:
 Debes habilitar Vercel Blob y configurar variables de entorno:
 * `BLOB_READ_WRITE_TOKEN` (obligatorio): habilita `POST /api/publish`, `POST /api/publish-project` y el listado/lectura estable vía API.
 * `PUBLISH_KEY` (opcional): si lo defines, los `POST` requieren `x-publish-key` o `?key=...`.
+* `MOLTBOOK_API_KEY` (opcional): habilita `POST /api/moltbook-post` (publicar links en Moltbook desde el server).
 
 Importante:
 * Si NO defines `PUBLISH_KEY`, el publish queda abierto (ideal para prototipar, pero se puede abusar).
@@ -151,6 +152,7 @@ Endpoints:
 * `GET /api/library?prefix=...&mode=folded|expanded&limit=...` lista la biblioteca por carpetas.
 * `POST /api/inject?session=...` (canal vivo): inyecta un proyecto a una sesión para actualizar un canvas abierto en tiempo real.
 * `GET /api/inject?session=...` lee el último proyecto inyectado en esa sesión.
+* `POST /api/moltbook-post` crea un post en Moltbook (link post o texto) usando `MOLTBOOK_API_KEY` server-side.
 
 Notas:
 * CORS está habilitado (`*`) para facilitar consumo desde plataformas de IA.
@@ -158,6 +160,22 @@ Notas:
 * `POST /api/publish-project` permite imágenes y, si vienen embebidas como `data:` (base64), las sube como assets y reemplaza `imageSrc` por URLs públicas.
 * Límites anti-abuso (aprox): máximo 2000 elementos (contando grupos de forma recursiva). `publish` guarda ~200KB y `publish-project` guarda ~300KB (sin base64). `publish-project` limita request a ~6MB y sube hasta 40 imágenes (máx 8MB total).
 * Compatibilidad IA: `POST /api/publish`, `POST /api/publish-project` y `POST /api/inject` aceptan JSON "friendly" y lo normalizan (ej: `circle.radius`, `line.x1/y1/x2/y2`, `color`, `isAnim`).
+
+### 🦞 Moltbook (Opcional)
+Si configuras `MOLTBOOK_API_KEY` en Vercel, el modo **Deck** incluye el botón **Moltbook** para publicar el link actual como post.
+
+Notas:
+* Si configuraste `PUBLISH_KEY`, el botón usa la misma llave guardada en tu navegador (campo en el modal **Publicar**) para autorizar el request.
+* Puedes elegir comunidad con `?submolt=general` (default `general`).
+
+Ejemplo (curl):
+```bash
+curl -sS -X POST "https://TU-DOMINIO.vercel.app/api/moltbook-post" \
+  -H "content-type: application/json" \
+  # Opcional (solo si configuraste PUBLISH_KEY en Vercel):
+  # -H "x-publish-key: TU_PUBLISH_KEY" \
+  -d '{"submolt":"general","title":"Ruta Metro L1","url":"https://TU-DOMINIO.vercel.app/?mode=deck&id=metro/linea-1/xxxx"}'
+```
 
 ### 🧪 Ejemplo de publicación (curl)
 ```bash
