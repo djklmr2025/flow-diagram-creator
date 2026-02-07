@@ -98,10 +98,13 @@ Mensaje para claude:
 * **Guardar:** se guarda en `localStorage` del navegador (solo en ese dispositivo/navegador).
 * **Exportar:** descarga un archivo `*.json` local (ej. en Descargas).
 
-## 🧩 Modo Sticker (Solo Animación)
-En `mode=preview` / `mode=sticker`:
+## 🧩 Modo Sticker / Preview (Solo Animación)
+* `mode=sticker`: pensado para embeber (fondo transparente por defecto).
+* `mode=preview`: pensado para visualizar “bonito” en navegador (fondo `studio` tipo 3D por defecto).
+
+En ambos:
 * Se ocultan barras/paneles/overlays.
-* Fondo transparente y grid desactivado.
+* Grid desactivado.
 * Modo **solo lectura**: pan con click izquierdo y zoom con rueda/teclas.
 
 Parámetros soportados:
@@ -109,6 +112,12 @@ Parámetros soportados:
 * `?project=...` URL externa a JSON.
 * `?id=...` ID publicado (ver API abajo).
 * Auto: `./project.json` (si existe y es JSON real).
+
+Parámetros extra (viewer):
+* `bg=transparent|studio` (override de fondo del viewer, no afecta el JSON).
+* `fit=1|0` (auto-encuadre). Por defecto se auto-encuadra solo si la cámara es “default” (`x=0,y=0,zoom=1`).
+* `pad=64` (padding en px para el auto-encuadre).
+* `fx=1|0` (sombra suave para dar “volumen” al sticker en el viewer).
 
 ## 🔌 API Pública Para Agentes IA (Links Compartibles)
 Objetivo: que una IA (o humano) publique un JSON (sin imágenes) y obtenga links para:
@@ -197,6 +206,7 @@ El editor incluye:
 
 Inserción:
 * Un sticker se inserta como **1 solo elemento tipo `group`** para poder moverlo como objeto único.
+<<<<<<< HEAD
 * # 🤖 Integración con la Matriz de IA (IA-Ready)
 
 Este repositorio ha evolucionado para convertirse en un **Endpoint Visual** para Inteligencias Artificiales Avanzadas. El sistema no solo es un editor, sino una infraestructura de comunicación Humano-IA.
@@ -220,3 +230,5 @@ El "puente" de comunicación se basa en el siguiente estándar de datos, validad
 * **Objetos:** Círculos (Estaciones), Rectángulos (Nodos), Líneas (Flujos animados).
 * **Cámara:** Control dinámico de zoom y posición inicial para foco automático en la respuesta.
 
+=======
+>>>>>>> 8f676f9 (ui: studio background + deck layout + auto-fit viewer)
