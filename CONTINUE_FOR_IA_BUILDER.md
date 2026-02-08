@@ -580,6 +580,20 @@ Y ANTES de esa línea, AGREGAR:
 
 ---
 
+### BLOQUE 7: Navegación por Teclado (Flechas) (PRIORIDAD ALTA) ⌨️
+
+**Estado:** ✅ IMPLEMENTADO (2026-02-07)
+
+**Qué incluye:**
+1. Flechas para mover elementos seleccionados (nudge).
+2. Flechas para hacer pan del canvas cuando no hay selección.
+3. `Shift` = paso grande, `Alt` = paso fino.
+4. `Backspace` también elimina selección (igual que `Delete`).
+
+**Nota sobre “piezas fijas / imborrables”:**
+* Si un objeto no se puede mover, revisa si está **Fijado** (`locked`). Usa el botón **Fijar** o el panel **Objetos (O)** → **Desbloquear todo**.
+* Si un grupo viene de JSON viejo sin `x/y/width/height`, el sistema ahora calcula sus bounds automáticamente para poder seleccionarlo/eliminarlo.
+
 ### BLOQUE 5: Animaciones Avanzadas (PRIORIDAD MEDIA) ⚡
 
 **Estado:** ❌ NO IMPLEMENTADO

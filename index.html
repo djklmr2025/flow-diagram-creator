@@ -1238,6 +1238,7 @@
                 this.lastTouchCenter = { x: 0, y: 0 };
                 this._touchMode = null; // null | 'mouse' | 'pinch'
                 this._touchMouseDown = false;
+                this._nudgeHistoryTimer = null; // Debounce para movimientos por teclado
                 // Herramienta "Formas" (plantillas vectoriales)
                 this.shapeType = localStorage.getItem('flow-diagram-shape-type') || 'triangle';
                 // Panel Objetos (Capas)
@@ -2379,7 +2380,7 @@
             
             onKeyDown(e) {
                 if (this.readOnly) {
-                    // En modo visor solo permitimos zoom (y evitamos crear/modificar elementos).
+                    // En modo visor solo permitimos navegación (pan/zoom) y evitamos crear/modificar elementos.
                     switch (e.key) {
                         case '+':
                         case '=':
@@ -2394,6 +2395,18 @@
                             e.preventDefault();
                             this.resetZoom();
                             break;
+                        case 'ArrowUp':
+                        case 'ArrowDown':
+                        case 'ArrowLeft':
+                        case 'ArrowRight': {
+                            e.preventDefault();
+                            const step = e.shiftKey ? 120 : (e.altKey ? 10 : 40);
+                            if (e.key === 'ArrowUp') this.camera.y -= step;
+                            if (e.key === 'ArrowDown') this.camera.y += step;
+                            if (e.key === 'ArrowLeft') this.camera.x -= step;
+                            if (e.key === 'ArrowRight') this.camera.x += step;
+                            break;
+                        }
                     }
                     return;
                 }
@@ -2433,6 +2446,36 @@
                     e.preventDefault();
                     return;
                 }
+
+                // Flechas: si hay selección → nudge; si no → pan del canvas.
+                if (!e.ctrlKey && !e.metaKey &&
+                    (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                    e.preventDefault();
+
+                    const hasSelection = Array.isArray(this.selectedElements) && this.selectedElements.length > 0;
+                    if (hasSelection) {
+                        const px = e.shiftKey ? 10 : (e.altKey ? 0.25 : 1);
+                        const dx = (e.key === 'ArrowLeft' ? -px : (e.key === 'ArrowRight' ? px : 0)) / (this.camera.zoom || 1);
+                        const dy = (e.key === 'ArrowUp' ? -px : (e.key === 'ArrowDown' ? px : 0)) / (this.camera.zoom || 1);
+
+                        let movedAny = false;
+                        this.selectedElements.forEach((elem) => {
+                            if (!elem || typeof elem !== 'object') return;
+                            if (elem.locked) return;
+                            this.offsetElement(elem, dx, dy);
+                            movedAny = true;
+                        });
+
+                        if (movedAny) this.scheduleNudgeHistorySave();
+                    } else {
+                        const step = e.shiftKey ? 120 : (e.altKey ? 10 : 40);
+                        if (e.key === 'ArrowUp') this.camera.y -= step;
+                        if (e.key === 'ArrowDown') this.camera.y += step;
+                        if (e.key === 'ArrowLeft') this.camera.x -= step;
+                        if (e.key === 'ArrowRight') this.camera.x += step;
+                    }
+                    return;
+                }
                 
                 // Atajos de teclado
                 if (e.ctrlKey || e.metaKey) {
@@ -2465,6 +2508,8 @@
                 } else {
                     switch(e.key) {
                         case 'Delete':
+                        case 'Backspace':
+                            e.preventDefault();
                             this.deleteElements();
                             break;
                         case 'v':
@@ -3221,13 +3266,9 @@
                 for (let i = this.elements.length - 1; i >= 0; i--) {
                     const elem = this.elements[i];
                     
-                    if (elem.type === 'group' && typeof elem.x === 'number' && typeof elem.y === 'number' &&
-                        typeof elem.width === 'number' && typeof elem.height === 'number') {
-                        const x1 = Math.min(elem.x, elem.x + elem.width);
-                        const x2 = Math.max(elem.x, elem.x + elem.width);
-                        const y1 = Math.min(elem.y, elem.y + elem.height);
-                        const y2 = Math.max(elem.y, elem.y + elem.height);
-                        if (x >= x1 && x <= x2 && y >= y1 && y <= y2) {
+                    if (elem.type === 'group' && Array.isArray(elem.elements)) {
+                        const b = this.ensureGroupBounds(elem);
+                        if (b && x >= b.x1 && x <= b.x2 && y >= b.y1 && y <= b.y2) {
                             return elem;
                         }
                     }
@@ -3781,7 +3822,13 @@
             }
             
             drawElementOutline(elem) {
-                if (elem.type === 'rectangle' || elem.type === 'group') {
+                if (elem.type === 'rectangle') {
+                    this.ctx.strokeRect(elem.x - 5 / this.camera.zoom, 
+                                       elem.y - 5 / this.camera.zoom, 
+                                       elem.width + 10 / this.camera.zoom, 
+                                       elem.height + 10 / this.camera.zoom);
+                } else if (elem.type === 'group') {
+                    this.ensureGroupBounds(elem);
                     this.ctx.strokeRect(elem.x - 5 / this.camera.zoom, 
                                        elem.y - 5 / this.camera.zoom, 
                                        elem.width + 10 / this.camera.zoom, 
@@ -3936,6 +3983,9 @@
                 this.selectedElements.forEach(elem => {
                     elem.locked = !elem.locked;
                 });
+                this.saveHistory();
+                this.updatePropertiesPanel();
+                this.updateStatusBar();
             }
             
             copyElements() {
@@ -4017,6 +4067,16 @@
                 }
 
                 this.refreshLayersPanel();
+            }
+
+            scheduleNudgeHistorySave() {
+                if (this._nudgeHistoryTimer) {
+                    clearTimeout(this._nudgeHistoryTimer);
+                }
+                this._nudgeHistoryTimer = setTimeout(() => {
+                    this._nudgeHistoryTimer = null;
+                    this.saveHistory();
+                }, 250);
             }
             
             undo() {
@@ -5794,6 +5854,58 @@
 
                 if (!Number.isFinite(minX)) return null;
                 return { minX, minY, maxX, maxY };
+            }
+
+            ensureGroupBounds(group) {
+                if (!group || typeof group !== 'object') return null;
+                if (group.type !== 'group' || !Array.isArray(group.elements)) return null;
+
+                let x = Number(group.x);
+                let y = Number(group.y);
+                let w = Number(group.width);
+                let h = Number(group.height);
+                const hasBox =
+                    Number.isFinite(x) && Number.isFinite(y) &&
+                    Number.isFinite(w) && Number.isFinite(h);
+
+                if (!hasBox) {
+                    const bounds = this.getElementsBounds(group.elements);
+                    if (bounds) {
+                        group.x = bounds.minX;
+                        group.y = bounds.minY;
+                        group.width = bounds.maxX - bounds.minX;
+                        group.height = bounds.maxY - bounds.minY;
+                        x = group.x;
+                        y = group.y;
+                        w = group.width;
+                        h = group.height;
+                    } else {
+                        group.x = 0;
+                        group.y = 0;
+                        group.width = 0;
+                        group.height = 0;
+                        x = 0;
+                        y = 0;
+                        w = 0;
+                        h = 0;
+                    }
+                }
+
+                if (w < 0) {
+                    x = x + w;
+                    w = Math.abs(w);
+                }
+                if (h < 0) {
+                    y = y + h;
+                    h = Math.abs(h);
+                }
+
+                group.x = x;
+                group.y = y;
+                group.width = w;
+                group.height = h;
+
+                return { x1: x, y1: y, x2: x + w, y2: y + h };
             }
 
             offsetElement(elem, dx, dy) {
