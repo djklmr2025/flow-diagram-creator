@@ -603,6 +603,50 @@ Y ANTES de esa línea, AGREGAR:
 2. `Ctrl` + arrastrar = **suma** a la selección actual.
 3. Se dibuja el rectángulo en el canvas mientras arrastras.
 
+### BLOQUE 9: Puntos de Información (Deck/Lámina) (PRIORIDAD ALTA) 🧩
+
+**Estado:** 🟡 MVP IMPLEMENTADO (2026-02-08)
+
+**Qué incluye (MVP):**
+1. Nueva herramienta **Punto** (tecla `K`) para colocar un **Punto de Información** en el canvas.
+2. En el panel **Propiedades**: checkbox **Punto de Información (Lámina)** para convertir cualquier elemento en “punto”, y campos:
+   * `Orden` (número de diapositiva)
+   * `Título`, `Texto`, `Imagen URL`, `Video URL`
+3. Numeración 1..n: se guarda en `elem.meta.order` y se dibuja un badge con el número sobre el elemento.
+4. En modo **Deck** (`?mode=deck`):
+   * Lista numerada de puntos.
+   * Botones **Anterior/Siguiente** + contador `x / n`.
+   * Soporte de video: YouTube (iframe) o URLs directas (mp4/webm) vía `<video>`.
+5. Navegación bidireccional:
+   * Click en punto del canvas (deck) → enfoca y muestra diapositiva.
+   * Click en lista/prev/next → enfoca el punto correspondiente.
+
+**Formato recomendado (JSON):**
+```json
+{
+  "type": "circle",
+  "x": 100,
+  "y": 100,
+  "width": 36,
+  "height": 36,
+  "meta": {
+    "controlPoint": true,
+    "order": 1,
+    "slide": {
+      "title": "Punto 1",
+      "text": "Texto descriptivo",
+      "imageUrl": "https://.../imagen.png",
+      "videoUrl": "https://youtu.be/VIDEO_ID"
+    }
+  }
+}
+```
+
+**Pendientes sugeridos (mejoras):**
+1. Subir imágenes de diapositiva (assets) a Blob automáticamente desde el editor.
+2. UI de reordenamiento (drag & drop) para `order`.
+3. Thumbnails / preview de slide en el panel deck.
+
 ### BLOQUE 5: Animaciones Avanzadas (PRIORIDAD MEDIA) ⚡
 
 **Estado:** ❌ NO IMPLEMENTADO

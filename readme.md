@@ -124,6 +124,53 @@ Parámetros extra (viewer):
 * `pad=64` (padding en px para el auto-encuadre).
 * `fx=1|0` (sombra suave para dar “volumen” al sticker en el viewer).
 
+## 🧩 Modo Deck (Lámina / Presentación tipo Genially)
+`mode=deck` muestra el canvas como **sticker** (izquierda) + un panel de **Lámina** (derecha) con:
+* Lista **numerada** de puntos.
+* Diapositiva (título, texto, imagen, video).
+* Navegación **Anterior/Siguiente** y botones de compartir.
+
+### Crear Puntos de Información (Builder)
+1. Click en **Punto** (tecla `K`) y colócalo en el canvas.
+2. Selecciónalo y en **Propiedades** activa **Punto de Información (Lámina)**.
+3. Define: `Orden`, `Título`, `Texto`, `Imagen (URL)`, `Video (URL)`.
+
+### JSON para IA (Control Points / Slides)
+Cada “diapositiva” se guarda en el elemento como:
+* `meta.controlPoint: true`
+* `meta.order: 1..n`
+* `meta.slide: { title, text, imageUrl, videoUrl }`
+
+Ejemplo:
+```json
+{
+  "type": "circle",
+  "x": 100,
+  "y": 100,
+  "width": 36,
+  "height": 36,
+  "meta": {
+    "controlPoint": true,
+    "order": 1,
+    "slide": {
+      "title": "Punto 1",
+      "text": "Texto descriptivo",
+      "imageUrl": "https://.../imagen.png",
+      "videoUrl": "https://youtu.be/VIDEO_ID"
+    }
+  }
+}
+```
+
+Video soportado:
+* YouTube: `youtu.be/...`, `youtube.com/watch?v=...`, `youtube.com/shorts/...`.
+* URL directa: `.mp4/.webm` (se renderiza con `<video>`).
+
+URLs:
+* `?mode=deck&id=...` (deck desde un ID publicado).
+* `?mode=deck&data=...` / `?mode=deck&project=...` (deck desde JSON).
+* `?mode=deck&cp=ELEMENT_ID` (fija el punto activo por `id`).
+
 ## 🔌 API Pública Para Agentes IA (Links Compartibles)
 Objetivo: que una IA (o humano) publique un JSON y obtenga links para:
 * Previsualizar el diagrama como “sticker/preview” (solo animación, sin UI).

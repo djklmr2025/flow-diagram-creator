@@ -298,32 +298,38 @@
             margin-bottom: 15px;
         }
 
-        .property-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 12px;
-            color: #aaa;
-        }
-
-	        .property-group input:not([type="checkbox"]):not([type="range"]),
-	        .property-group select {
-	            width: 100%;
-	            padding: 8px;
-	            background: #0f3460;
-	            border: 1px solid #1a1a2e;
-	            border-radius: 5px;
-	            color: #eee;
-	            font-size: 14px;
-	        }
-
-	        .property-checkbox {
-	            display: flex;
-	            align-items: center;
-	            gap: 8px;
-	            margin-top: 6px;
-	            color: #aaa;
+	        .property-group label {
+	            display: block;
+	            margin-bottom: 5px;
 	            font-size: 12px;
+	            color: #aaa;
 	        }
+
+		        .property-group input:not([type="checkbox"]):not([type="range"]),
+		        .property-group textarea,
+		        .property-group select {
+		            width: 100%;
+		            padding: 8px;
+		            background: #0f3460;
+		            border: 1px solid #1a1a2e;
+		            border-radius: 5px;
+		            color: #eee;
+		            font-size: 14px;
+		        }
+
+		        .property-group textarea {
+		            resize: vertical;
+		            min-height: 78px;
+		        }
+
+		        .property-checkbox {
+		            display: flex;
+		            align-items: center;
+		            gap: 8px;
+		            margin-top: 6px;
+		            color: #aaa;
+		            font-size: 12px;
+		        }
 
 	        .property-checkbox input[type="checkbox"] {
 	            width: auto;
@@ -583,40 +589,87 @@
             box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.18) inset;
         }
 
-        .deck-cp-name {
-            flex: 1;
-            font-size: 13px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
+	        .deck-cp-name {
+	            flex: 1;
+	            font-size: 13px;
+	            overflow: hidden;
+	            text-overflow: ellipsis;
+	            white-space: nowrap;
+	        }
 
-        .deck-cp-id {
-            font-size: 11px;
-            color: rgba(15, 52, 96, 0.55);
-        }
+	        .deck-cp-badge {
+	            width: 22px;
+	            height: 22px;
+	            border-radius: 999px;
+	            display: inline-flex;
+	            align-items: center;
+	            justify-content: center;
+	            background: #e94560;
+	            border: 1px solid rgba(233, 69, 96, 0.55);
+	            font-size: 12px;
+	            font-weight: 800;
+	            color: #fff;
+	            box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+	        }
 
-        #deck-slide-title {
-            font-size: 14px;
-            font-weight: 700;
-            margin-bottom: 10px;
-            color: #0b1020;
-        }
+	        .deck-cp-id {
+	            font-size: 11px;
+	            color: rgba(15, 52, 96, 0.55);
+	        }
 
-        #deck-slide-image {
-            width: 100%;
-            max-height: 220px;
-            object-fit: contain;
-            border-radius: 10px;
-            background: rgba(15, 52, 96, 0.06);
-            display: none;
-        }
+	        .deck-slide-nav {
+	            display: flex;
+	            align-items: center;
+	            justify-content: space-between;
+	            gap: 8px;
+	            margin-bottom: 10px;
+	        }
 
-        #deck-slide-text {
-            margin-top: 10px;
-            font-size: 13px;
-            line-height: 1.35;
-            color: rgba(11, 16, 32, 0.92);
+	        #deck-slide-count {
+	            font-size: 12px;
+	            color: rgba(15, 52, 96, 0.7);
+	            font-weight: 700;
+	            letter-spacing: 0.2px;
+	        }
+
+	        #deck-slide-title {
+	            font-size: 14px;
+	            font-weight: 700;
+	            margin-bottom: 10px;
+	            color: #0b1020;
+	        }
+
+	        #deck-slide-image {
+	            width: 100%;
+	            max-height: 220px;
+	            object-fit: contain;
+	            border-radius: 10px;
+	            background: rgba(15, 52, 96, 0.06);
+	            display: none;
+	        }
+
+	        #deck-slide-iframe,
+	        #deck-slide-video {
+	            width: 100%;
+	            border-radius: 10px;
+	            background: rgba(15, 52, 96, 0.06);
+	            display: none;
+	        }
+
+	        #deck-slide-iframe {
+	            border: 0;
+	            height: 220px;
+	        }
+
+	        #deck-slide-video {
+	            max-height: 240px;
+	        }
+
+	        #deck-slide-text {
+	            margin-top: 10px;
+	            font-size: 13px;
+	            line-height: 1.35;
+	            color: rgba(11, 16, 32, 0.92);
             white-space: pre-wrap;
         }
 
@@ -863,14 +916,17 @@
         <button class="btn" id="btn-rectangle" title="Rectángulo (R)">
             <span>▭</span> Rectángulo
         </button>
-        <button class="btn" id="btn-circle" title="Círculo (C)">
-            <span>●</span> Círculo
-        </button>
-        <button class="btn" id="btn-shape" title="Formas (T)">
-            <span>⬟</span> Formas
-        </button>
-        <select id="shape-type" title="Tipo de forma">
-            <option value="triangle">Triángulo</option>
+	        <button class="btn" id="btn-circle" title="Círculo (C)">
+	            <span>●</span> Círculo
+	        </button>
+	        <button class="btn" id="btn-poi" title="Punto de Información (K)">
+	            <span>📍</span> Punto
+	        </button>
+	        <button class="btn" id="btn-shape" title="Formas (T)">
+	            <span>⬟</span> Formas
+	        </button>
+	        <select id="shape-type" title="Tipo de forma">
+	            <option value="triangle">Triángulo</option>
             <option value="trapezoid">Trapecio</option>
             <option value="diamond">Rombo</option>
             <option value="star5">Estrella (5)</option>
@@ -1012,15 +1068,22 @@
             <div id="deck-control-points"></div>
         </div>
 
-        <div class="deck-block">
-            <h3>Diapositiva</h3>
-            <div id="deck-slide">
-                <div id="deck-slide-title"></div>
-                <img id="deck-slide-image" alt="Diapositiva">
-                <div id="deck-slide-text"></div>
-            </div>
-        </div>
-        </div>
+	        <div class="deck-block">
+	            <h3>Diapositiva</h3>
+	            <div id="deck-slide">
+	                <div class="deck-slide-nav">
+	                    <button class="btn small" id="btn-deck-prev" title="Anterior">◀</button>
+	                    <div id="deck-slide-count"></div>
+	                    <button class="btn small" id="btn-deck-next" title="Siguiente">▶</button>
+	                </div>
+	                <div id="deck-slide-title"></div>
+	                <img id="deck-slide-image" alt="Diapositiva">
+	                <iframe id="deck-slide-iframe" title="Video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+	                <video id="deck-slide-video" controls></video>
+	                <div id="deck-slide-text"></div>
+	            </div>
+	        </div>
+	        </div>
 
         <div class="deck-footer">
             <div class="deck-share-row">
@@ -1034,16 +1097,34 @@
 
     <!-- Panel de Propiedades -->
     <div id="properties-panel">
-        <h3>Propiedades</h3>
-        <div class="property-group">
-            <label>Nombre:</label>
-            <input type="text" id="prop-name" placeholder="Nombre del elemento">
-        </div>
+	        <h3>Propiedades</h3>
 	        <div class="property-group">
-	            <label>Color de Relleno:</label>
-	            <input type="color" id="prop-fill-color" class="color-picker" value="#0f3460">
+	            <label>Nombre:</label>
+	            <input type="text" id="prop-name" placeholder="Nombre del elemento">
+	        </div>
+	        <div class="property-group" id="prop-control-point-group" style="display:none;">
 	            <label class="property-checkbox">
-	                <input type="checkbox" id="prop-fill-transparent"> Transparente
+	                <input type="checkbox" id="prop-cp-enabled">
+	                Punto de Información (Lámina)
+	            </label>
+	            <div id="prop-cp-details" style="display:none; margin-top: 10px;">
+	                <label>Orden (Diapositiva #):</label>
+	                <input type="number" id="prop-cp-order" min="1" step="1" placeholder="1">
+	                <label>Título:</label>
+	                <input type="text" id="prop-slide-title" placeholder="Título de la diapositiva">
+	                <label>Texto:</label>
+	                <textarea id="prop-slide-text" placeholder="Texto descriptivo (se muestra en modo Lámina)"></textarea>
+	                <label>Imagen (URL):</label>
+	                <input type="text" id="prop-slide-image-url" placeholder="https://... o /assets/...">
+	                <label>Video (URL):</label>
+	                <input type="text" id="prop-slide-video-url" placeholder="YouTube o mp4/webm">
+	            </div>
+	        </div>
+		        <div class="property-group">
+		            <label>Color de Relleno:</label>
+		            <input type="color" id="prop-fill-color" class="color-picker" value="#0f3460">
+		            <label class="property-checkbox">
+		                <input type="checkbox" id="prop-fill-transparent"> Transparente
 	            </label>
 	        </div>
 	        <div class="property-group">
@@ -1365,16 +1446,17 @@
                 this.setupPropertiesPanel();
             }
             
-            setupToolbar() {
-                // Herramientas de dibujo
-                document.getElementById('btn-select').addEventListener('click', () => this.setTool('select'));
-                document.getElementById('btn-rectangle').addEventListener('click', () => this.setTool('rectangle'));
-                document.getElementById('btn-circle').addEventListener('click', () => this.setTool('circle'));
-                document.getElementById('btn-shape').addEventListener('click', () => this.setTool('shape'));
-                const shapeTypeSelect = document.getElementById('shape-type');
-                if (shapeTypeSelect) {
-                    shapeTypeSelect.value = this.shapeType || 'triangle';
-                    shapeTypeSelect.addEventListener('change', () => {
+	            setupToolbar() {
+	                // Herramientas de dibujo
+	                document.getElementById('btn-select').addEventListener('click', () => this.setTool('select'));
+	                document.getElementById('btn-rectangle').addEventListener('click', () => this.setTool('rectangle'));
+	                document.getElementById('btn-circle').addEventListener('click', () => this.setTool('circle'));
+	                document.getElementById('btn-poi').addEventListener('click', () => this.setTool('poi'));
+	                document.getElementById('btn-shape').addEventListener('click', () => this.setTool('shape'));
+	                const shapeTypeSelect = document.getElementById('shape-type');
+	                if (shapeTypeSelect) {
+	                    shapeTypeSelect.value = this.shapeType || 'triangle';
+	                    shapeTypeSelect.addEventListener('change', () => {
                         this.shapeType = String(shapeTypeSelect.value || 'triangle');
                         localStorage.setItem('flow-diagram-shape-type', this.shapeType);
                     });
@@ -1458,12 +1540,20 @@
                 if (deckMoltbook) {
                     deckMoltbook.addEventListener('click', () => this.shareDeckToMoltbook());
                 }
-                const deckCopyLink = document.getElementById('btn-deck-copy-link');
-                if (deckCopyLink) {
-                    deckCopyLink.addEventListener('click', () => this.copyDeckLink());
-                }
-                this.setupDeckResizer();
-            }
+	                const deckCopyLink = document.getElementById('btn-deck-copy-link');
+	                if (deckCopyLink) {
+	                    deckCopyLink.addEventListener('click', () => this.copyDeckLink());
+	                }
+	                const deckPrev = document.getElementById('btn-deck-prev');
+	                if (deckPrev) {
+	                    deckPrev.addEventListener('click', () => this.goToDeckControlPoint(-1));
+	                }
+	                const deckNext = document.getElementById('btn-deck-next');
+	                if (deckNext) {
+	                    deckNext.addEventListener('click', () => this.goToDeckControlPoint(1));
+	                }
+	                this.setupDeckResizer();
+	            }
             
             setupContextMenu() {
                 document.getElementById('ctx-bring-to-front').addEventListener('click', () => {
@@ -1508,6 +1598,12 @@
 	            setupPropertiesPanel() {
 	                const inputs = [
 	                    'prop-name',
+	                    'prop-cp-enabled',
+	                    'prop-cp-order',
+	                    'prop-slide-title',
+	                    'prop-slide-text',
+	                    'prop-slide-image-url',
+	                    'prop-slide-video-url',
 	                    'prop-fill-color',
 	                    'prop-stroke-color',
 	                    'prop-anim-color',
@@ -1539,6 +1635,16 @@
 	                const btnConvert = document.getElementById('btn-convert-to-polygon');
 	                if (btnConvert) {
 	                    btnConvert.addEventListener('click', () => this.convertSelectedToPolygon());
+	                }
+
+	                const cpEnabled = document.getElementById('prop-cp-enabled');
+	                const cpDetails = document.getElementById('prop-cp-details');
+	                if (cpEnabled) {
+	                    cpEnabled.addEventListener('change', () => {
+	                        if (cpDetails) cpDetails.style.display = cpEnabled.checked ? 'block' : 'none';
+	                        // Al activar/desactivar, refrescar valores (orden/título default).
+	                        this.updatePropertiesPanel();
+	                    });
 	                }
 	            }
 
@@ -1909,23 +2015,24 @@
                 this.updateZoomIndicator();
             }
             
-            setTool(tool) {
-                if (this.readOnly) {
-                    // En modo visor no permitimos cambiar herramientas.
-                    this.tool = 'select';
-                    return;
-                }
+	            setTool(tool) {
+	                if (this.readOnly) {
+	                    // En modo visor no permitimos cambiar herramientas.
+	                    this.tool = 'select';
+	                    return;
+	                }
 
-                this.tool = tool;
-                
-                const btnMap = {
-                    'select': 'btn-select',
-                    'rectangle': 'btn-rectangle',
-                    'circle': 'btn-circle',
-                    'shape': 'btn-shape',
-                    'line': 'btn-line',
-                    'pencil': 'btn-pencil'
-                };
+	                this.tool = tool;
+	                
+	                const btnMap = {
+	                    'select': 'btn-select',
+	                    'rectangle': 'btn-rectangle',
+	                    'circle': 'btn-circle',
+	                    'poi': 'btn-poi',
+	                    'shape': 'btn-shape',
+	                    'line': 'btn-line',
+	                    'pencil': 'btn-pencil'
+	                };
 
                 // Actualizar UI (solo botones de herramientas, no toda la toolbar)
                 Object.values(btnMap).forEach((id) => {
@@ -2132,18 +2239,31 @@
                 }
                 
                 // Pan con rueda del mouse o espacio
-                if (e.button === 1 || this.spacePressed) {
-                    e.preventDefault();
-                    this.isPanning = true;
-                    this.dragStart = { x: mouseX, y: mouseY };
-                    document.getElementById('canvas-container').classList.add('grabbing');
-                    return;
-                }
-                
-                if (this.tool === 'select') {
-                    // Verificar si estamos sobre un handle de redimensionamiento
-                    const handleInfo = this.getResizeHandleAt(worldPos.x, worldPos.y);
-                    if (handleInfo) {
+	                if (e.button === 1 || this.spacePressed) {
+	                    e.preventDefault();
+	                    this.isPanning = true;
+	                    this.dragStart = { x: mouseX, y: mouseY };
+	                    document.getElementById('canvas-container').classList.add('grabbing');
+	                    return;
+	                }
+
+	                // Herramienta Punto (Punto de Información / Lámina): click para colocar
+	                if (this.tool === 'poi' && e.button === 0) {
+	                    const cp = this.createControlPointAt(worldPos.x, worldPos.y);
+	                    this.elements.push(cp);
+	                    this.selectedElements = [cp];
+	                    this.ensureControlPointOrders(this.elements);
+	                    this.saveHistory();
+	                    this.updatePropertiesPanel();
+	                    this.updateStatusBar();
+	                    this.setTool('select');
+	                    return;
+	                }
+	                
+	                if (this.tool === 'select') {
+	                    // Verificar si estamos sobre un handle de redimensionamiento
+	                    const handleInfo = this.getResizeHandleAt(worldPos.x, worldPos.y);
+	                    if (handleInfo) {
                         this.resizingElement = handleInfo.element;
                         this.resizeHandle = handleInfo.handle;
                         this.dragStart = { x: worldPos.x, y: worldPos.y };
@@ -2556,12 +2676,15 @@
                         case 'c':
                             this.setTool('circle');
                             break;
-                        case 't':
-                            this.setTool('shape');
-                            break;
-                        case 'l':
-                            this.setTool('line');
-                            break;
+	                        case 't':
+	                            this.setTool('shape');
+	                            break;
+	                        case 'k':
+	                            this.setTool('poi');
+	                            break;
+	                        case 'l':
+	                            this.setTool('line');
+	                            break;
                         case 'p':
                             this.setTool('pencil');
                             break;
@@ -3180,11 +3303,11 @@
             
             // ==================== CREACIÓN DE ELEMENTOS ====================
             
-            createElementAt(x, y) {
-                const baseElement = {
-                    id: Date.now() + Math.random(),
-                    x: x,
-                    y: y,
+	            createElementAt(x, y) {
+	                const baseElement = {
+	                    id: Date.now() + Math.random(),
+	                    x: x,
+	                    y: y,
                     name: '',
                     fillColor: '#0f3460',
                     strokeColor: '#e94560',
@@ -3220,20 +3343,52 @@
                         closed: true,
                         shapeType
                     };
-                } else if (this.tool === 'line') {
-                    return {
-                        ...baseElement,
-                        type: 'line',
-                        endX: x,
-                        endY: y,
-                        lineWidth: 3,
-                        animColor: '#4caf50',
-                        flowDirection: 'right',
-                        animOffset: 0,
-                        controlPoints: [] // Para curvas editables
-                    };
-                }
-            }
+	                } else if (this.tool === 'line') {
+	                    return {
+	                        ...baseElement,
+	                        type: 'line',
+	                        endX: x,
+	                        endY: y,
+	                        lineWidth: 3,
+	                        animColor: '#4caf50',
+	                        flowDirection: 'right',
+	                        animOffset: 0,
+	                        controlPoints: [] // Para curvas editables
+	                    };
+	                }
+	            }
+
+	            createControlPointAt(x, y) {
+	                const order = this.getNextControlPointOrder(this.elements);
+	                const size = 36; // tamaño en "mundo" (se escala con zoom)
+	                const half = size / 2;
+
+	                return {
+	                    id: Date.now() + Math.random(),
+	                    type: 'circle',
+	                    x: x - half,
+	                    y: y - half,
+	                    width: size,
+	                    height: size,
+	                    name: '',
+	                    fillColor: 'transparent',
+	                    strokeColor: '#00d4ff',
+	                    lineWidth: 3,
+	                    locked: false,
+	                    active: true,
+	                    connectionStatus: 'none',
+	                    meta: {
+	                        controlPoint: true,
+	                        order,
+	                        slide: {
+	                            title: `Punto ${String(order)}`,
+	                            text: '',
+	                            imageUrl: '',
+	                            videoUrl: ''
+	                        }
+	                    }
+	                };
+	            }
 
             convertSelectedToPolygon() {
                 if (this.readOnly) return;
@@ -3572,10 +3727,10 @@
                 }
             }
             
-            drawElement(elem) {
-                if (elem.type === 'group' && Array.isArray(elem.elements)) {
-                    // Dibujar elementos dentro del grupo
-                    elem.elements.forEach(child => this.drawElement(child));
+	            drawElement(elem) {
+	                if (elem.type === 'group' && Array.isArray(elem.elements)) {
+	                    // Dibujar elementos dentro del grupo
+	                    elem.elements.forEach(child => this.drawElement(child));
 
                     // Dibujar nombre si existe
                     if (elem.name) {
@@ -3587,16 +3742,21 @@
                     }
 
                     // Indicador de bloqueado
-                    if (elem.locked) {
-                        this.ctx.fillStyle = '#ff9800';
-                        this.ctx.font = `${14 / this.camera.zoom}px Arial`;
-                        const lockX = elem.x || 0;
-                        const lockY = elem.y || 0;
-                        this.ctx.fillText('🔒', lockX, lockY);
-                    }
-                    return;
+	                    if (elem.locked) {
+	                        this.ctx.fillStyle = '#ff9800';
+	                        this.ctx.font = `${14 / this.camera.zoom}px Arial`;
+	                        const lockX = elem.x || 0;
+	                        const lockY = elem.y || 0;
+	                        this.ctx.fillText('🔒', lockX, lockY);
+	                    }
 
-                }
+	                    // Badge de Lámina (si el grupo es punto de información)
+	                    if (this.isControlPoint(elem)) {
+	                        this.drawControlPointBadgeForElement(elem);
+	                    }
+	                    return;
+
+	                }
 
                 const useDepthFx =
                     this.depthFx &&
@@ -3746,17 +3906,22 @@
                 }
 
                 // Etiquetas sin sombra (solo el "volumen" del elemento).
-                if (useDepthFx) {
-                    this.ctx.shadowColor = 'transparent';
-                    this.ctx.shadowBlur = 0;
-                    this.ctx.shadowOffsetX = 0;
-                    this.ctx.shadowOffsetY = 0;
-                }
-                
-                // Dibujar nombre si existe
-                if (elem.name && elem.type !== 'image') {
-                    this.ctx.fillStyle = '#ffffff';
-                    this.ctx.font = `${12 / this.camera.zoom}px Arial`;
+	                if (useDepthFx) {
+	                    this.ctx.shadowColor = 'transparent';
+	                    this.ctx.shadowBlur = 0;
+	                    this.ctx.shadowOffsetX = 0;
+	                    this.ctx.shadowOffsetY = 0;
+	                }
+
+	                // Badge de Lámina (Punto de Información)
+	                if (this.isControlPoint(elem)) {
+	                    this.drawControlPointBadgeForElement(elem);
+	                }
+	                
+	                // Dibujar nombre si existe
+	                if (elem.name && elem.type !== 'image') {
+	                    this.ctx.fillStyle = '#ffffff';
+	                    this.ctx.font = `${12 / this.camera.zoom}px Arial`;
                     const textX = elem.x || (elem.points ? elem.points[0].x : 0);
                     const textY = elem.y || (elem.points ? elem.points[0].y : 0);
                     this.ctx.fillText(elem.name, textX, textY - 10 / this.camera.zoom);
@@ -3813,11 +3978,16 @@
                 }
             }
             
-            drawConnectionIndicator(elem, x, y) {
-                const size = 12 / this.camera.zoom;
-                
-                let color;
-                switch(elem.connectionStatus) {
+	            drawConnectionIndicator(elem, x, y) {
+	                // En puntos de información, ocultar el indicador si no aplica.
+	                if (this.isControlPoint(elem) && String(elem.connectionStatus || 'none') === 'none') {
+	                    return;
+	                }
+
+	                const size = 12 / this.camera.zoom;
+	                
+	                let color;
+	                switch(elem.connectionStatus) {
                     case 'connected':
                         color = '#4caf50';
                         break;
@@ -3837,14 +4007,59 @@
                     this.ctx.shadowBlur = 10 / this.camera.zoom;
                     this.ctx.shadowColor = color;
                     this.ctx.fill();
-                    this.ctx.shadowBlur = 0;
-                }
-            }
-            
-            drawResizeHandles(elem) {
-                if (elem.locked || elem.type === 'group') return;
-                
-                const handles = this.getResizeHandles(elem);
+	                    this.ctx.shadowBlur = 0;
+	                }
+	            }
+
+	            drawControlPointBadgeForElement(elem) {
+	                const n = this.getControlPointOrder(elem);
+	                if (!Number.isFinite(Number(n))) return;
+
+	                const zoom = this.camera.zoom || 1;
+	                const radius = 11 / zoom;
+	                const pad = 12 / zoom;
+
+	                let bx = null;
+	                let by = null;
+
+	                if (elem.type === 'circle' && Number.isFinite(elem.x) && Number.isFinite(elem.y) &&
+	                    Number.isFinite(elem.width) && Number.isFinite(elem.height)) {
+	                    bx = elem.x + elem.width / 2;
+	                    by = elem.y + elem.height / 2;
+	                } else {
+	                    const b = this.getElementBounds(elem);
+	                    if (!b) return;
+	                    bx = b.minX + pad;
+	                    by = b.minY + pad;
+	                }
+
+	                this.ctx.save();
+	                this.ctx.shadowColor = 'transparent';
+	                this.ctx.shadowBlur = 0;
+	                this.ctx.shadowOffsetX = 0;
+	                this.ctx.shadowOffsetY = 0;
+
+	                this.ctx.beginPath();
+	                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.62)';
+	                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+	                this.ctx.lineWidth = 1 / zoom;
+	                this.ctx.arc(bx, by, radius, 0, Math.PI * 2);
+	                this.ctx.fill();
+	                this.ctx.stroke();
+
+	                this.ctx.fillStyle = '#ffffff';
+	                this.ctx.font = `800 ${12 / zoom}px Segoe UI, Arial`;
+	                this.ctx.textAlign = 'center';
+	                this.ctx.textBaseline = 'middle';
+	                this.ctx.fillText(String(Math.round(Number(n))), bx, by + (0.5 / zoom));
+
+	                this.ctx.restore();
+	            }
+	            
+	            drawResizeHandles(elem) {
+	                if (elem.locked || elem.type === 'group') return;
+	                
+	                const handles = this.getResizeHandles(elem);
                 const handleSize = 8 / this.camera.zoom;
                 
                 handles.forEach(handle => {
@@ -4875,11 +5090,11 @@
                 e.target.value = '';
             }
 
-            walkElements(elements, visitor) {
-                const stack = Array.isArray(elements) ? elements.slice() : [];
-                while (stack.length) {
-                    const elem = stack.pop();
-                    if (!elem || typeof elem !== 'object') continue;
+	            walkElements(elements, visitor) {
+	                const stack = Array.isArray(elements) ? elements.slice() : [];
+	                while (stack.length) {
+	                    const elem = stack.pop();
+	                    if (!elem || typeof elem !== 'object') continue;
 
                     // Si el visitor devuelve false, detenemos el recorrido.
                     if (visitor(elem) === false) return;
@@ -4887,8 +5102,16 @@
                     if (elem.type === 'group' && Array.isArray(elem.elements)) {
                         for (let i = elem.elements.length - 1; i >= 0; i--) {
                             stack.push(elem.elements[i]);
-                        }
-                    }
+	                }
+	            }
+
+	            ensureElementMeta(elem) {
+	                if (!elem || typeof elem !== 'object') return {};
+	                if (!elem.meta || typeof elem.meta !== 'object' || Array.isArray(elem.meta)) {
+	                    elem.meta = {};
+	                }
+	                return elem.meta;
+	            }
                 }
             }
 
@@ -5008,9 +5231,12 @@
                     if (!Number.isFinite(cam.zoom)) cam.zoom = 1;
                 }
 
-                if (typeof project.name !== 'string') project.name = '';
-                if (typeof project.date !== 'string') project.date = new Date().toISOString();
-            }
+	                if (typeof project.name !== 'string') project.name = '';
+	                if (typeof project.date !== 'string') project.date = new Date().toISOString();
+
+	                // Puntos de Información (Lámina): asegurar orden 1..n si hay CPs sin orden.
+	                this.ensureControlPointOrders(project.elements);
+	            }
 
             countElementsRecursive(elements) {
                 let count = 0;
@@ -5030,9 +5256,9 @@
                 this.updateDeckShareStatus();
             }
 
-            isControlPoint(elem) {
-                if (!elem || typeof elem !== 'object') return false;
-                const meta = (elem.meta && typeof elem.meta === 'object') ? elem.meta : null;
+	            isControlPoint(elem) {
+	                if (!elem || typeof elem !== 'object') return false;
+	                const meta = (elem.meta && typeof elem.meta === 'object') ? elem.meta : null;
 
                 if (elem.type === 'controlPoint' || elem.type === 'poi') return true;
                 if (elem.controlPoint === true || elem.isControlPoint === true) return true;
@@ -5051,12 +5277,81 @@
                     return true;
                 }
 
-                return false;
-            }
+	                return false;
+	            }
 
-            collectControlPoints() {
-                const cps = [];
-                const seen = new Set();
+	            getControlPointOrder(elem) {
+	                if (!elem || typeof elem !== 'object') return null;
+	                const meta = (elem.meta && typeof elem.meta === 'object' && !Array.isArray(elem.meta)) ? elem.meta : null;
+
+	                const raw =
+	                    (meta && (meta.order ?? meta.cpOrder ?? meta.slideOrder)) ??
+	                    (elem.order ?? elem.cpOrder ?? elem.slideOrder);
+
+	                const n = Number.parseInt(String(raw ?? ''), 10);
+	                if (Number.isFinite(n) && n > 0) return n;
+	                return null;
+	            }
+
+	            getNextControlPointOrder(elements) {
+	                let max = 0;
+	                this.walkElements(elements || this.elements, (elem) => {
+	                    if (!this.isControlPoint(elem)) return true;
+	                    const o = this.getControlPointOrder(elem);
+	                    if (Number.isFinite(o)) max = Math.max(max, o);
+	                    return true;
+	                });
+	                return max + 1;
+	            }
+
+	            ensureControlPointOrders(elements) {
+	                const cps = [];
+	                this.walkElements(elements || this.elements, (elem) => {
+	                    if (this.isControlPoint(elem)) cps.push(elem);
+	                    return true;
+	                });
+
+	                let max = 0;
+	                cps.forEach((cp) => {
+	                    const o = this.getControlPointOrder(cp);
+	                    if (Number.isFinite(o)) max = Math.max(max, o);
+	                });
+
+	                let next = max + 1;
+	                let changed = false;
+	                cps.forEach((cp) => {
+	                    const o = this.getControlPointOrder(cp);
+	                    if (Number.isFinite(o) && o > 0) return;
+	                    const meta = this.ensureElementMeta(cp);
+	                    meta.order = next++;
+	                    changed = true;
+	                });
+
+	                return changed;
+	            }
+
+	            goToDeckControlPoint(delta) {
+	                if (this.viewerMode !== 'deck') return;
+	                const step = delta < 0 ? -1 : 1;
+
+	                const cps = this.collectControlPoints();
+	                if (!cps.length) return;
+
+	                let idx = 0;
+	                if (this.activeControlPointId != null) {
+	                    const cur = String(this.activeControlPointId);
+	                    const found = cps.findIndex((cp) => cp && cp.id != null && String(cp.id) === cur);
+	                    idx = found >= 0 ? found : 0;
+	                }
+
+	                const next = Math.max(0, Math.min(cps.length - 1, idx + step));
+	                if (next === idx) return;
+	                this.setActiveControlPoint(cps[next], { focus: true, updateUrl: true });
+	            }
+
+	            collectControlPoints() {
+	                const cps = [];
+	                const seen = new Set();
 
                 this.walkElements(this.elements, (elem) => {
                     if (!this.isControlPoint(elem)) return true;
@@ -5067,13 +5362,18 @@
                     return true;
                 });
 
-                cps.sort((a, b) => {
-                    const aLabel = this.getControlPointLabel(a);
-                    const bLabel = this.getControlPointLabel(b);
-                    const byLabel = String(aLabel).localeCompare(String(bLabel));
-                    if (byLabel !== 0) return byLabel;
-                    return String(a && a.id).localeCompare(String(b && b.id));
-                });
+	                cps.sort((a, b) => {
+	                    const aOrder = this.getControlPointOrder(a);
+	                    const bOrder = this.getControlPointOrder(b);
+	                    if (aOrder != null && bOrder != null && aOrder !== bOrder) return aOrder - bOrder;
+	                    if (aOrder != null && bOrder == null) return -1;
+	                    if (aOrder == null && bOrder != null) return 1;
+	                    const aLabel = this.getControlPointLabel(a);
+	                    const bLabel = this.getControlPointLabel(b);
+	                    const byLabel = String(aLabel).localeCompare(String(bLabel));
+	                    if (byLabel !== 0) return byLabel;
+	                    return String(a && a.id).localeCompare(String(b && b.id));
+	                });
 
                 return cps;
             }
@@ -5100,46 +5400,53 @@
                 return elem.id != null ? `CP ${String(elem.id)}` : 'Punto';
             }
 
-            updateDeckControlPointsUI() {
-                if (this.viewerMode !== 'deck') return;
+	            updateDeckControlPointsUI() {
+	                if (this.viewerMode !== 'deck') return;
+	                
+	                const listEl = document.getElementById('deck-control-points');
+	                if (!listEl) return;
 
-                const listEl = document.getElementById('deck-control-points');
-                if (!listEl) return;
+	                this.ensureControlPointOrders(this.elements);
+	                const cps = this.collectControlPoints();
+	                listEl.innerHTML = '';
 
-                const cps = this.collectControlPoints();
-                listEl.innerHTML = '';
+	                if (cps.length === 0) {
+	                    const empty = document.createElement('div');
+	                    empty.style.color = 'rgba(11, 16, 32, 0.65)';
+	                    empty.style.fontSize = '13px';
+	                    empty.textContent = '(No hay puntos de control en este diseño)';
+	                    listEl.appendChild(empty);
+	                    return;
+	                }
 
-                if (cps.length === 0) {
-                    const empty = document.createElement('div');
-                    empty.style.color = 'rgba(255, 255, 255, 0.75)';
-                    empty.style.fontSize = '13px';
-                    empty.textContent = '(No hay puntos de control en este diseño)';
-                    listEl.appendChild(empty);
-                    return;
-                }
+	                cps.forEach((elem) => {
+	                    const btn = document.createElement('button');
+	                    btn.type = 'button';
+	                    btn.className = 'deck-cp';
+	                    btn.dataset.cpId = elem.id != null ? String(elem.id) : '';
+	                    if (this.activeControlPointId != null && String(this.activeControlPointId) === String(elem.id)) {
+	                        btn.classList.add('active');
+	                    }
 
-                cps.forEach((elem) => {
-                    const btn = document.createElement('button');
-                    btn.type = 'button';
-                    btn.className = 'deck-cp';
-                    btn.dataset.cpId = elem.id != null ? String(elem.id) : '';
-                    if (this.activeControlPointId != null && String(this.activeControlPointId) === String(elem.id)) {
-                        btn.classList.add('active');
-                    }
+	                    const badge = document.createElement('span');
+	                    badge.className = 'deck-cp-badge';
+	                    const order = this.getControlPointOrder(elem);
+	                    badge.textContent = order != null ? String(order) : '';
 
-                    const name = document.createElement('span');
-                    name.className = 'deck-cp-name';
-                    name.textContent = this.getControlPointLabel(elem);
+	                    const name = document.createElement('span');
+	                    name.className = 'deck-cp-name';
+	                    name.textContent = this.getControlPointLabel(elem);
 
-                    const id = document.createElement('span');
-                    id.className = 'deck-cp-id';
-                    id.textContent = elem.id != null ? String(elem.id) : '';
+	                    const id = document.createElement('span');
+	                    id.className = 'deck-cp-id';
+	                    id.textContent = elem.id != null ? String(elem.id) : '';
 
-                    btn.appendChild(name);
-                    btn.appendChild(id);
-                    listEl.appendChild(btn);
-                });
-            }
+	                    btn.appendChild(badge);
+	                    btn.appendChild(name);
+	                    btn.appendChild(id);
+	                    listEl.appendChild(btn);
+	                });
+	            }
 
             onDeckControlPointClick(e) {
                 if (this.viewerMode !== 'deck') return;
@@ -5238,11 +5545,11 @@
                 }
             }
 
-            extractSlideInfo(elem) {
-                const meta = (elem && elem.meta && typeof elem.meta === 'object') ? elem.meta : {};
-                const slideObj = (meta.slide && typeof meta.slide === 'object')
-                    ? meta.slide
-                    : (elem && elem.slide && typeof elem.slide === 'object' ? elem.slide : {});
+	            extractSlideInfo(elem) {
+	                const meta = (elem && elem.meta && typeof elem.meta === 'object') ? elem.meta : {};
+	                const slideObj = (meta.slide && typeof meta.slide === 'object')
+	                    ? meta.slide
+	                    : (elem && elem.slide && typeof elem.slide === 'object' ? elem.slide : {});
 
                 const titleRaw =
                     slideObj.title ||
@@ -5261,49 +5568,116 @@
                     (elem && elem.slideImageUrl) ||
                     '';
 
-                const textRaw =
-                    slideObj.text ||
-                    meta.slideText ||
-                    (elem && elem.slideText) ||
-                    meta.description ||
-                    (elem && elem.description) ||
-                    '';
+	                const textRaw =
+	                    slideObj.text ||
+	                    meta.slideText ||
+	                    (elem && elem.slideText) ||
+	                    meta.description ||
+	                    (elem && elem.description) ||
+	                    '';
 
-                const title = String(titleRaw || '').trim() || 'Punto de control';
-                const text = String(textRaw || '').trim();
+	                const videoUrl =
+	                    slideObj.videoUrl ||
+	                    slideObj.video ||
+	                    meta.slideVideoUrl ||
+	                    (elem && elem.slideVideoUrl) ||
+	                    '';
 
-                return { title, imageUrl: String(imageUrl || '').trim(), text };
-            }
+	                const title = String(titleRaw || '').trim() || 'Punto de control';
+	                const text = String(textRaw || '').trim();
 
-            updateDeckSlideUI(elem) {
-                if (this.viewerMode !== 'deck') return;
+	                return {
+	                    title,
+	                    imageUrl: String(imageUrl || '').trim(),
+	                    videoUrl: String(videoUrl || '').trim(),
+	                    text
+	                };
+	            }
 
-                const titleEl = document.getElementById('deck-slide-title');
-                const imgEl = document.getElementById('deck-slide-image');
-                const textEl = document.getElementById('deck-slide-text');
+	            toYouTubeEmbedUrl(rawUrl) {
+	                const s = String(rawUrl || '').trim();
+	                if (!s) return '';
 
-                if (!titleEl || !imgEl || !textEl) return;
+	                // Soporta: youtu.be/ID, youtube.com/watch?v=ID, /embed/ID, /shorts/ID
+	                const m = s.match(/(?:youtube\\.com\\/(?:watch\\?v=|embed\\/|shorts\\/)|youtu\\.be\\/)([a-zA-Z0-9_-]{6,})/i);
+	                if (!m) return '';
+	                const id = m[1];
+	                return `https://www.youtube.com/embed/${encodeURIComponent(id)}`;
+	            }
 
-                if (!elem) {
-                    titleEl.textContent = '';
-                    textEl.textContent = '';
-                    imgEl.removeAttribute('src');
-                    imgEl.style.display = 'none';
-                    return;
-                }
+	            updateDeckSlideUI(elem) {
+	                if (this.viewerMode !== 'deck') return;
 
-                const info = this.extractSlideInfo(elem);
-                titleEl.textContent = info.title;
-                textEl.textContent = info.text || '';
+	                const titleEl = document.getElementById('deck-slide-title');
+	                const imgEl = document.getElementById('deck-slide-image');
+	                const iframeEl = document.getElementById('deck-slide-iframe');
+	                const videoEl = document.getElementById('deck-slide-video');
+	                const textEl = document.getElementById('deck-slide-text');
+	                const countEl = document.getElementById('deck-slide-count');
+	                const prevBtn = document.getElementById('btn-deck-prev');
+	                const nextBtn = document.getElementById('btn-deck-next');
 
-                if (info.imageUrl) {
-                    imgEl.src = info.imageUrl;
-                    imgEl.style.display = 'block';
-                } else {
-                    imgEl.removeAttribute('src');
-                    imgEl.style.display = 'none';
-                }
-            }
+	                if (!titleEl || !imgEl || !iframeEl || !videoEl || !textEl) return;
+
+	                const cps = this.collectControlPoints();
+	                const total = cps.length;
+	                const idx = elem && elem.id != null
+	                    ? cps.findIndex((cp) => cp && cp.id != null && String(cp.id) === String(elem.id))
+	                    : -1;
+
+	                if (countEl && total > 0 && idx >= 0) {
+	                    countEl.textContent = `${idx + 1} / ${total}`;
+	                } else if (countEl) {
+	                    countEl.textContent = '';
+	                }
+	                if (prevBtn) prevBtn.disabled = !(idx > 0);
+	                if (nextBtn) nextBtn.disabled = !(idx >= 0 && idx < total - 1);
+
+	                const resetMedia = () => {
+	                    imgEl.removeAttribute('src');
+	                    imgEl.style.display = 'none';
+
+	                    try { videoEl.pause(); } catch {}
+	                    videoEl.removeAttribute('src');
+	                    videoEl.style.display = 'none';
+	                    try { videoEl.load(); } catch {}
+
+	                    iframeEl.removeAttribute('src');
+	                    iframeEl.style.display = 'none';
+	                };
+
+	                if (!elem) {
+	                    titleEl.textContent = '';
+	                    textEl.textContent = '';
+	                    resetMedia();
+	                    return;
+	                }
+
+	                const info = this.extractSlideInfo(elem);
+	                titleEl.textContent = info.title;
+	                textEl.textContent = info.text || '';
+
+	                resetMedia();
+
+	                const rawVideo = String(info.videoUrl || '').trim();
+	                if (rawVideo) {
+	                    const yt = this.toYouTubeEmbedUrl(rawVideo);
+	                    if (yt) {
+	                        iframeEl.src = yt;
+	                        iframeEl.style.display = 'block';
+	                        return;
+	                    }
+
+	                    videoEl.src = rawVideo;
+	                    videoEl.style.display = 'block';
+	                    return;
+	                }
+
+	                if (info.imageUrl) {
+	                    imgEl.src = info.imageUrl;
+	                    imgEl.style.display = 'block';
+	                }
+	            }
 
             getElementBounds(elem) {
                 if (!elem || typeof elem !== 'object') return null;
@@ -6523,16 +6897,50 @@
                     document.getElementById('prop-connection-status').value = elem.connectionStatus || 'none';
                     document.getElementById('prop-active').value = elem.active ? 'true' : 'false';
 
-                    const geoTools = document.getElementById('prop-geometry-tools');
-                    if (geoTools) {
-                        geoTools.style.display =
-                            (elem.type === 'rectangle' || elem.type === 'circle') ? 'block' : 'none';
-                    }
-                    
-                    document.getElementById('properties-panel').classList.add('show');
-                } else {
-                    this.hidePropertiesPanel();
-                }
+	                    const geoTools = document.getElementById('prop-geometry-tools');
+	                    if (geoTools) {
+	                        geoTools.style.display =
+	                            (elem.type === 'rectangle' || elem.type === 'circle') ? 'block' : 'none';
+	                    }
+
+	                    // Punto de Información (Lámina)
+	                    const cpGroup = document.getElementById('prop-control-point-group');
+	                    const cpEnabled = document.getElementById('prop-cp-enabled');
+	                    const cpDetails = document.getElementById('prop-cp-details');
+	                    const cpOrder = document.getElementById('prop-cp-order');
+	                    const slideTitle = document.getElementById('prop-slide-title');
+	                    const slideText = document.getElementById('prop-slide-text');
+	                    const slideImageUrl = document.getElementById('prop-slide-image-url');
+	                    const slideVideoUrl = document.getElementById('prop-slide-video-url');
+
+	                    if (cpGroup) cpGroup.style.display = 'block';
+
+	                    const isCp = this.isControlPoint(elem);
+	                    if (cpEnabled) cpEnabled.checked = Boolean(isCp);
+	                    if (cpDetails) cpDetails.style.display = isCp ? 'block' : 'none';
+
+	                    if (isCp) {
+	                        this.ensureControlPointOrders(this.elements);
+	                        const order = this.getControlPointOrder(elem);
+	                        if (cpOrder) cpOrder.value = order != null ? String(order) : '';
+
+	                        const info = this.extractSlideInfo(elem);
+	                        if (slideTitle) slideTitle.value = info.title || '';
+	                        if (slideText) slideText.value = info.text || '';
+	                        if (slideImageUrl) slideImageUrl.value = info.imageUrl || '';
+	                        if (slideVideoUrl) slideVideoUrl.value = info.videoUrl || '';
+	                    } else {
+	                        if (cpOrder) cpOrder.value = '';
+	                        if (slideTitle) slideTitle.value = '';
+	                        if (slideText) slideText.value = '';
+	                        if (slideImageUrl) slideImageUrl.value = '';
+	                        if (slideVideoUrl) slideVideoUrl.value = '';
+	                    }
+	                    
+	                    document.getElementById('properties-panel').classList.add('show');
+	                } else {
+	                    this.hidePropertiesPanel();
+	                }
                 this.updateLayersSelectionHighlight();
             }
             
@@ -6541,13 +6949,20 @@
                 this.updateLayersSelectionHighlight();
             }
             
-            updateSelectedProperties() {
-                const name = document.getElementById('prop-name').value;
-                const fillPicker = document.getElementById('prop-fill-color');
-                const strokePicker = document.getElementById('prop-stroke-color');
-                const fillCb = document.getElementById('prop-fill-transparent');
-                const strokeCb = document.getElementById('prop-stroke-transparent');
-                const conn = document.getElementById('prop-connection-status').value;
+	            updateSelectedProperties() {
+	                const name = document.getElementById('prop-name').value;
+	                const cpEnabledEl = document.getElementById('prop-cp-enabled');
+	                const cpOrderEl = document.getElementById('prop-cp-order');
+	                const slideTitleEl = document.getElementById('prop-slide-title');
+	                const slideTextEl = document.getElementById('prop-slide-text');
+	                const slideImageUrlEl = document.getElementById('prop-slide-image-url');
+	                const slideVideoUrlEl = document.getElementById('prop-slide-video-url');
+	                const cpEnabled = Boolean(cpEnabledEl && cpEnabledEl.checked);
+	                const fillPicker = document.getElementById('prop-fill-color');
+	                const strokePicker = document.getElementById('prop-stroke-color');
+	                const fillCb = document.getElementById('prop-fill-transparent');
+	                const strokeCb = document.getElementById('prop-stroke-transparent');
+	                const conn = document.getElementById('prop-connection-status').value;
                 const active = document.getElementById('prop-active').value === 'true';
 
                 const fillTransparent = Boolean(fillCb && fillCb.checked);
@@ -6557,11 +6972,11 @@
                 const lwValue = lw ? Number.parseInt(String(lw.value || ''), 10) : NaN;
                 const lineWidth = Number.isFinite(lwValue) ? Math.max(1, Math.min(20, lwValue)) : null;
 
-                this.selectedElements.forEach((elem) => {
-                    if (!elem || typeof elem !== 'object') return;
-                    elem.name = name;
+	                this.selectedElements.forEach((elem) => {
+	                    if (!elem || typeof elem !== 'object') return;
+	                    elem.name = name;
 
-                    if (fillTransparent) {
+	                    if (fillTransparent) {
                         elem.fillColor = 'transparent';
                     } else if (fillPicker && typeof fillPicker.value === 'string') {
                         elem.fillColor = fillPicker.value;
@@ -6580,12 +6995,61 @@
                     elem.connectionStatus = conn;
                     elem.active = active;
                     
-                    if (elem.type === 'line') {
-                        elem.animColor = document.getElementById('prop-anim-color').value;
-                        elem.flowDirection = document.getElementById('prop-flow-direction').value;
-                    }
-                });
-            }
+	                    if (elem.type === 'line') {
+	                        elem.animColor = document.getElementById('prop-anim-color').value;
+	                        elem.flowDirection = document.getElementById('prop-flow-direction').value;
+	                    }
+
+	                    // Punto de Información (Lámina)
+	                    if (cpEnabledEl) {
+	                        if (cpEnabled) {
+	                            const meta = this.ensureElementMeta(elem);
+	                            meta.controlPoint = true;
+	                            if (!meta.slide || typeof meta.slide !== 'object' || Array.isArray(meta.slide)) {
+	                                meta.slide = {};
+	                            }
+
+	                            // Orden
+	                            const parsedOrder = Number.parseInt(String(cpOrderEl && cpOrderEl.value || ''), 10);
+	                            if (Number.isFinite(parsedOrder) && parsedOrder > 0) {
+	                                meta.order = parsedOrder;
+	                            } else if (!Number.isFinite(Number(meta.order)) || Number(meta.order) <= 0) {
+	                                meta.order = this.getNextControlPointOrder(this.elements);
+	                            }
+
+	                            // Slide content
+	                            if (slideTitleEl) meta.slide.title = String(slideTitleEl.value || '');
+	                            if (slideTextEl) meta.slide.text = String(slideTextEl.value || '');
+	                            if (slideImageUrlEl) meta.slide.imageUrl = String(slideImageUrlEl.value || '');
+	                            if (slideVideoUrlEl) meta.slide.videoUrl = String(slideVideoUrlEl.value || '');
+
+	                            // Mantener defaults razonables
+	                            if (!String(meta.slide.title || '').trim() && meta.order) {
+	                                meta.slide.title = `Punto ${String(meta.order)}`;
+	                            }
+
+	                            this.ensureControlPointOrders(this.elements);
+	                        } else {
+	                            // Desactivar como punto (no borra otras metas ajenas)
+	                            if (elem.meta && typeof elem.meta === 'object' && !Array.isArray(elem.meta)) {
+	                                delete elem.meta.controlPoint;
+	                                delete elem.meta.isControlPoint;
+	                                delete elem.meta.order;
+	                                delete elem.meta.slide;
+	                                delete elem.meta.slideTitle;
+	                                delete elem.meta.slideText;
+	                                delete elem.meta.slideImageUrl;
+	                                delete elem.meta.slideVideoUrl;
+	                            }
+	                            delete elem.slide;
+	                            delete elem.slideTitle;
+	                            delete elem.slideText;
+	                            delete elem.slideImageUrl;
+	                            delete elem.slideVideoUrl;
+	                        }
+	                    }
+	                });
+	            }
 
             isTransparentColor(value) {
                 if (value === null || value === undefined) return true;
