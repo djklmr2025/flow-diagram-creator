@@ -594,6 +594,15 @@ Y ANTES de esa línea, AGREGAR:
 * Si un objeto no se puede mover, revisa si está **Fijado** (`locked`). Usa el botón **Fijar** o el panel **Objetos (O)** → **Desbloquear todo**.
 * Si un grupo viene de JSON viejo sin `x/y/width/height`, el sistema ahora calcula sus bounds automáticamente para poder seleccionarlo/eliminarlo.
 
+### BLOQUE 8: Selección por Marco (Marquee) (PRIORIDAD ALTA) 🖱️
+
+**Estado:** ✅ IMPLEMENTADO (2026-02-08)
+
+**Qué incluye:**
+1. En herramienta **Seleccionar**: click en vacío + arrastrar = marco de selección (se selecciona lo que queda encuadrado).
+2. `Ctrl` + arrastrar = **suma** a la selección actual.
+3. Se dibuja el rectángulo en el canvas mientras arrastras.
+
 ### BLOQUE 5: Animaciones Avanzadas (PRIORIDAD MEDIA) ⚡
 
 **Estado:** ❌ NO IMPLEMENTADO

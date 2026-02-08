@@ -1239,6 +1239,7 @@
                 this._touchMode = null; // null | 'mouse' | 'pinch'
                 this._touchMouseDown = false;
                 this._nudgeHistoryTimer = null; // Debounce para movimientos por teclado
+                this.selectionBox = null; // { start:{x,y}, end:{x,y}, additive:boolean, base:[] }
                 // Herramienta "Formas" (plantillas vectoriales)
                 this.shapeType = localStorage.getItem('flow-diagram-shape-type') || 'triangle';
                 // Panel Objetos (Capas)
@@ -2087,6 +2088,9 @@
             // ==================== EVENTOS DEL MOUSE ====================
             
             onMouseDown(e) {
+                // Si había un marco de selección activo, cancelarlo al iniciar otra interacción.
+                this.selectionBox = null;
+
                 const rect = this.canvas.getBoundingClientRect();
                 const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
@@ -2164,7 +2168,22 @@
                         this.dragStart = { x: worldPos.x, y: worldPos.y };
                         this.updatePropertiesPanel();
                     } else {
-                        if (!e.ctrlKey) {
+                        // Marco de selección (marquee) al arrastrar en vacío
+                        if (e.button === 0) {
+                            const additive = Boolean(e.ctrlKey);
+                            const base = additive ? (Array.isArray(this.selectedElements) ? [...this.selectedElements] : []) : [];
+                            this.selectionBox = {
+                                start: { x: worldPos.x, y: worldPos.y },
+                                end: { x: worldPos.x, y: worldPos.y },
+                                additive,
+                                base
+                            };
+                            if (!additive) {
+                                this.selectedElements = [];
+                                this.hidePropertiesPanel();
+                            }
+                            this.updateLayersSelectionHighlight();
+                        } else if (!e.ctrlKey) {
                             this.selectedElements = [];
                             this.hidePropertiesPanel();
                         }
@@ -2203,6 +2222,14 @@
                 // Actualizar posición del cursor
                 document.getElementById('cursor-pos').textContent = 
                     `X: ${Math.round(worldPos.x)}, Y: ${Math.round(worldPos.y)}`;
+
+                // Marco de selección (marquee)
+                if (this.selectionBox && !this.readOnly) {
+                    this.selectionBox.end = { x: worldPos.x, y: worldPos.y };
+                    this.updateBoxSelectionFromMarquee();
+                    this.canvas.style.cursor = 'crosshair';
+                    return;
+                }
                 
                 // Pan
                 if (this.isPanning) {
@@ -2296,6 +2323,14 @@
             }
             
             onMouseUp(e) {
+                // Finalizar marco de selección
+                if (this.selectionBox && !this.readOnly) {
+                    this.updateBoxSelectionFromMarquee({ finalize: true });
+                    this.selectionBox = null;
+                    // Mostrar panel solo si hay un elemento seleccionado.
+                    this.updatePropertiesPanel();
+                }
+
                 if (this.isPanning) {
                     this.isPanning = false;
                     document.getElementById('canvas-container').classList.remove('grabbing');
@@ -3459,6 +3494,29 @@
                 if (showSelection) {
                     // Dibujar selecciones (en deck también, para resaltar puntos de control)
                     this.selectedElements.forEach(elem => this.drawSelection(elem));
+                }
+
+                if (this.selectionBox && !this.readOnly) {
+                    const s = this.selectionBox.start;
+                    const e = this.selectionBox.end;
+                    const x1 = Math.min(s.x, e.x);
+                    const y1 = Math.min(s.y, e.y);
+                    const w = Math.abs(e.x - s.x);
+                    const h = Math.abs(e.y - s.y);
+
+                    this.ctx.save();
+                    this.ctx.shadowColor = 'transparent';
+                    this.ctx.shadowBlur = 0;
+                    this.ctx.shadowOffsetX = 0;
+                    this.ctx.shadowOffsetY = 0;
+                    this.ctx.strokeStyle = 'rgba(0, 212, 255, 0.85)';
+                    this.ctx.fillStyle = 'rgba(0, 212, 255, 0.10)';
+                    this.ctx.lineWidth = 1 / this.camera.zoom;
+                    this.ctx.setLineDash([6 / this.camera.zoom, 6 / this.camera.zoom]);
+                    this.ctx.strokeRect(x1, y1, w, h);
+                    this.ctx.fillRect(x1, y1, w, h);
+                    this.ctx.setLineDash([]);
+                    this.ctx.restore();
                 }
 
                 if (!this.readOnly) {
@@ -5906,6 +5964,106 @@
                 group.height = h;
 
                 return { x1: x, y1: y, x2: x + w, y2: y + h };
+            }
+
+            getElementBounds(elem) {
+                if (!elem || typeof elem !== 'object') return null;
+
+                if (elem.type === 'group' && Array.isArray(elem.elements)) {
+                    const b = this.ensureGroupBounds(elem);
+                    if (!b) return null;
+                    return { minX: b.x1, minY: b.y1, maxX: b.x2, maxY: b.y2 };
+                }
+
+                if (elem.type === 'line') {
+                    if (!Number.isFinite(elem.x) || !Number.isFinite(elem.y) || !Number.isFinite(elem.endX) || !Number.isFinite(elem.endY)) return null;
+                    return {
+                        minX: Math.min(elem.x, elem.endX),
+                        minY: Math.min(elem.y, elem.endY),
+                        maxX: Math.max(elem.x, elem.endX),
+                        maxY: Math.max(elem.y, elem.endY)
+                    };
+                }
+
+                if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points) && elem.points.length) {
+                    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                    elem.points.forEach((p) => {
+                        if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+                        minX = Math.min(minX, p.x);
+                        minY = Math.min(minY, p.y);
+                        maxX = Math.max(maxX, p.x);
+                        maxY = Math.max(maxY, p.y);
+                    });
+                    if (!Number.isFinite(minX)) return null;
+                    return { minX, minY, maxX, maxY };
+                }
+
+                if (Number.isFinite(elem.x) && Number.isFinite(elem.y) && Number.isFinite(elem.width) && Number.isFinite(elem.height)) {
+                    const x1 = Math.min(elem.x, elem.x + elem.width);
+                    const x2 = Math.max(elem.x, elem.x + elem.width);
+                    const y1 = Math.min(elem.y, elem.y + elem.height);
+                    const y2 = Math.max(elem.y, elem.y + elem.height);
+                    return { minX: x1, minY: y1, maxX: x2, maxY: y2 };
+                }
+
+                if (Number.isFinite(elem.x) && Number.isFinite(elem.y)) {
+                    return { minX: elem.x, minY: elem.y, maxX: elem.x, maxY: elem.y };
+                }
+
+                return null;
+            }
+
+            updateBoxSelectionFromMarquee(options) {
+                const opts = options && typeof options === 'object' ? options : {};
+                if (!this.selectionBox) return;
+
+                const s = this.selectionBox.start;
+                const e = this.selectionBox.end;
+
+                const x1 = Math.min(s.x, e.x);
+                const y1 = Math.min(s.y, e.y);
+                const x2 = Math.max(s.x, e.x);
+                const y2 = Math.max(s.y, e.y);
+
+                const inside = [];
+                (this.elements || []).forEach((elem) => {
+                    const b = this.getElementBounds(elem);
+                    if (!b) return;
+                    // Selección por contención (encuadrar): el elemento debe quedar dentro del marco.
+                    const contained =
+                        b.minX >= x1 && b.maxX <= x2 &&
+                        b.minY >= y1 && b.maxY <= y2;
+                    if (contained) inside.push(elem);
+                });
+
+                let next = inside;
+                if (this.selectionBox.additive) {
+                    const out = [];
+                    const seen = new Set();
+                    (this.selectionBox.base || []).forEach((el) => {
+                        if (!el || typeof el !== 'object') return;
+                        const id = String(el.id);
+                        if (seen.has(id)) return;
+                        seen.add(id);
+                        out.push(el);
+                    });
+                    inside.forEach((el) => {
+                        if (!el || typeof el !== 'object') return;
+                        const id = String(el.id);
+                        if (seen.has(id)) return;
+                        seen.add(id);
+                        out.push(el);
+                    });
+                    next = out;
+                }
+
+                this.selectedElements = next;
+                this.updateLayersSelectionHighlight();
+                this.updateStatusBar();
+
+                if (opts.finalize) {
+                    // Nada extra por ahora: el panel se decide fuera.
+                }
             }
 
             offsetElement(elem, dx, dy) {
