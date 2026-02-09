@@ -18,6 +18,9 @@ Actualmente, el sistema ha completado su **Fase A (Core Engine)**, lo que permit
 El archivo `CONTINUE_FOR_IA_BUILDER.md` es la guía oficial de continuidad (v1.3.0+): bloques, prioridades y checklist de pruebas.  
 Si vas a contribuir (humano o IA), úsalo como fuente de verdad para lo pendiente/hecho.
 
+## 📌 Implementation Update / Evolution Future
+Hay un documento de “estado real + pendientes + ruta de evolución” en `IMPLEMENTATION_UPDATE_EVOLUTION_FUTURE.md`.
+
 ### **Capacidades Actuales:**
 * **Carga de Imágenes:** Soporte para múltiples archivos PNG (con transparencia) y otros formatos.
 * **Herramientas de Dibujo:** Dibujo a mano alzada con lápiz y creación de formas básicas.
