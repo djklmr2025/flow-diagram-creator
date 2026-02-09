@@ -6301,16 +6301,16 @@
 	                };
 	            }
 
-	            toYouTubeEmbedUrl(rawUrl) {
-	                const s = String(rawUrl || '').trim();
-	                if (!s) return '';
+		            toYouTubeEmbedUrl(rawUrl) {
+		                const s = String(rawUrl || '').trim();
+		                if (!s) return '';
 
-	                // Soporta: youtu.be/ID, youtube.com/watch?v=ID, /embed/ID, /shorts/ID
-	                const m = s.match(/(?:youtube\\.com\\/(?:watch\\?v=|embed\\/|shorts\\/)|youtu\\.be\\/)([a-zA-Z0-9_-]{6,})/i);
-	                if (!m) return '';
-	                const id = m[1];
-	                return `https://www.youtube.com/embed/${encodeURIComponent(id)}`;
-	            }
+		                // Soporta: youtu.be/ID, youtube.com/watch?v=ID, /embed/ID, /shorts/ID
+		                const m = s.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/i);
+		                if (!m) return '';
+		                const id = m[1];
+		                return `https://www.youtube.com/embed/${encodeURIComponent(id)}`;
+		            }
 
 	            updateDeckSlideUI(elem) {
 	                if (this.viewerMode !== 'deck') return;
