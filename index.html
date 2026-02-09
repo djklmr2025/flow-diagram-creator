@@ -1288,6 +1288,167 @@
         // ==================== SISTEMA MODULAR ====================
         // Arquitectura base que permite agregar módulos sin romper el núcleo
 
+        // ==================== HARDENING / DIAGNOSTICO ====================
+        // Evita que un fallo de localStorage o un JSON corrupto "mate" toda la UI.
+
+        function safeLocalStorageGet(key, fallback = null) {
+            try {
+                const v = localStorage.getItem(String(key));
+                return v === null ? fallback : v;
+            } catch {
+                return fallback;
+            }
+        }
+
+        function safeLocalStorageSet(key, value) {
+            try {
+                localStorage.setItem(String(key), String(value));
+                return true;
+            } catch {
+                return false;
+            }
+        }
+
+        function safeLocalStorageRemove(key) {
+            try {
+                localStorage.removeItem(String(key));
+                return true;
+            } catch {
+                return false;
+            }
+        }
+
+        function safeLocalStorageGetJSON(key, fallback) {
+            const raw = safeLocalStorageGet(key, null);
+            if (raw === null || raw === undefined || raw === '') return fallback;
+            try {
+                return JSON.parse(raw);
+            } catch {
+                return fallback;
+            }
+        }
+
+        function safeLocalStorageSetJSON(key, value) {
+            try {
+                return safeLocalStorageSet(key, JSON.stringify(value));
+            } catch {
+                return false;
+            }
+        }
+
+        function installGlobalErrorOverlay() {
+            if (window.__flowGlobalErrorOverlayInstalled) return;
+            window.__flowGlobalErrorOverlayInstalled = true;
+
+            const ensureOverlay = () => {
+                let root = document.getElementById('fatal-error-overlay');
+                if (root) return root;
+
+                root = document.createElement('div');
+                root.id = 'fatal-error-overlay';
+                root.style.cssText =
+                    'position:fixed;left:0;right:0;bottom:0;max-height:45vh;overflow:auto;z-index:99999;' +
+                    'background:rgba(0,0,0,0.92);color:#eee;border-top:2px solid #e94560;' +
+                    'padding:12px;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace;' +
+                    'display:none;';
+
+                root.innerHTML = `
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+                        <strong style="color:#e94560">Error</strong>
+                        <span id="fatal-error-context" style="opacity:0.8"></span>
+                        <button id="fatal-error-copy" style="padding:6px 10px;border:0;border-radius:6px;background:#0f3460;color:#eee;cursor:pointer">Copiar</button>
+                        <button id="fatal-error-clear" style="padding:6px 10px;border:0;border-radius:6px;background:#0f3460;color:#eee;cursor:pointer">Limpiar storage</button>
+                        <button id="fatal-error-hide" style="padding:6px 10px;border:0;border-radius:6px;background:#0f3460;color:#eee;cursor:pointer">Cerrar</button>
+                    </div>
+                    <pre id="fatal-error-text" style="white-space:pre-wrap;margin:0"></pre>
+                `;
+
+                const parent = document.body || document.documentElement;
+                parent.appendChild(root);
+
+                const hideBtn = root.querySelector('#fatal-error-hide');
+                if (hideBtn) {
+                    hideBtn.addEventListener('click', () => {
+                        root.style.display = 'none';
+                    });
+                }
+
+                const copyBtn = root.querySelector('#fatal-error-copy');
+                if (copyBtn) {
+                    copyBtn.addEventListener('click', async () => {
+                        const pre = root.querySelector('#fatal-error-text');
+                        const txt = pre ? String(pre.textContent || '') : '';
+                        try {
+                            await navigator.clipboard.writeText(txt);
+                        } catch {
+                            const ta = document.createElement('textarea');
+                            ta.value = txt;
+                            ta.style.position = 'fixed';
+                            ta.style.left = '-9999px';
+                            (document.body || document.documentElement).appendChild(ta);
+                            ta.select();
+                            try {
+                                document.execCommand('copy');
+                            } catch {
+                                // Ignorar
+                            }
+                            ta.remove();
+                        }
+                    });
+                }
+
+                const clearBtn = root.querySelector('#fatal-error-clear');
+                if (clearBtn) {
+                    clearBtn.addEventListener('click', () => {
+                        const ok = confirm('Esto borra proyectos y settings guardados localmente en este navegador. ¿Continuar?');
+                        if (!ok) return;
+
+                        [
+                            'flow-diagrams',
+                            'flow-diagram-shape-type',
+                            'flow-diagram-layers-open',
+                            'flow-diagram-publish-key',
+                            'deck-panel-width',
+                            'deck-panel-height'
+                        ].forEach((k) => safeLocalStorageRemove(k));
+
+                        alert('Storage limpiado. Recarga la página.');
+                    });
+                }
+
+                return root;
+            };
+
+            window.showFatalError = (err, context) => {
+                const root = ensureOverlay();
+                const ctx = root.querySelector('#fatal-error-context');
+                const pre = root.querySelector('#fatal-error-text');
+
+                const msg = (err && (err.stack || err.message)) ? String(err.stack || err.message) : String(err);
+                if (ctx) ctx.textContent = context ? `(${String(context)})` : '';
+                if (pre) pre.textContent = msg;
+                root.style.display = 'block';
+            };
+
+            window.addEventListener('error', (e) => {
+                try {
+                    window.showFatalError(e && (e.error || e.message) ? (e.error || e.message) : 'Error', 'window.error');
+                } catch {
+                    // Ignorar
+                }
+            });
+
+            window.addEventListener('unhandledrejection', (e) => {
+                try {
+                    window.showFatalError(e && e.reason ? e.reason : 'Unhandled rejection', 'unhandledrejection');
+                } catch {
+                    // Ignorar
+                }
+            });
+        }
+
+        installGlobalErrorOverlay();
+
         class FlowDiagramSystem {
             constructor() {
                 this.canvas = document.getElementById('main-canvas');
@@ -1330,9 +1491,9 @@
                 this._nudgeHistoryTimer = null; // Debounce para movimientos por teclado
                 this.selectionBox = null; // { start:{x,y}, end:{x,y}, additive:boolean, base:[] }
                 // Herramienta "Formas" (plantillas vectoriales)
-                this.shapeType = localStorage.getItem('flow-diagram-shape-type') || 'triangle';
+                this.shapeType = safeLocalStorageGet('flow-diagram-shape-type', 'triangle') || 'triangle';
                 // Panel Objetos (Capas)
-                this.layersPanelOpen = (localStorage.getItem('flow-diagram-layers-open') || '1') !== '0';
+                this.layersPanelOpen = (safeLocalStorageGet('flow-diagram-layers-open', '1') || '1') !== '0';
                 this.layersFilter = '';
 
                 // Modo visor (IA/preview): sin edición, sin grid y con fondo transparente.
@@ -1367,18 +1528,37 @@
             }
             
             init() {
-                this.resizeCanvas();
-                this.setupEventListeners();
-                this.setupContextMenu();
-                this.setupLayersPanel();
-                this.loadFromLocalStorage();
-                this.startAnimationLoop();
-                
+                const safe = (label, fn, critical = false) => {
+                    try {
+                        fn();
+                        return true;
+                    } catch (err) {
+                        try {
+                            if (window.showFatalError) window.showFatalError(err, label);
+                        } catch {
+                            // Ignorar
+                        }
+                        console.error(err);
+                        if (critical) return false;
+                        return true;
+                    }
+                };
+
+                if (!safe('init.resizeCanvas', () => this.resizeCanvas(), true)) return;
+                if (!safe('init.setupEventListeners', () => this.setupEventListeners(), true)) return;
+                safe('init.setupContextMenu', () => this.setupContextMenu());
+                safe('init.setupLayersPanel', () => this.setupLayersPanel());
+                safe('init.loadFromLocalStorage', () => this.loadFromLocalStorage());
+                safe('init.startAnimationLoop', () => this.startAnimationLoop());
+
                 // Seleccionar herramienta por defecto
-                document.getElementById('btn-select').classList.add('active');
-                
+                safe('init.defaultTool', () => {
+                    const btn = document.getElementById('btn-select');
+                    if (btn) btn.classList.add('active');
+                });
+
                 // NUEVO: Cargar JSON desde parámetros de URL (si existen)
-                this.loadFromURLParameter();
+                safe('init.loadFromURLParameter', () => this.loadFromURLParameter());
             }
             
             resizeCanvas() {
@@ -1466,7 +1646,7 @@
 	                    shapeTypeSelect.value = this.shapeType || 'triangle';
 	                    shapeTypeSelect.addEventListener('change', () => {
                         this.shapeType = String(shapeTypeSelect.value || 'triangle');
-                        localStorage.setItem('flow-diagram-shape-type', this.shapeType);
+                        safeLocalStorageSet('flow-diagram-shape-type', this.shapeType);
                     });
                 }
                 document.getElementById('btn-line').addEventListener('click', () => this.setTool('line'));
@@ -1720,7 +1900,7 @@
                 document.body.classList.toggle('layers-open', v);
 
                 if (opts.persist !== false) {
-                    localStorage.setItem('flow-diagram-layers-open', v ? '1' : '0');
+                    safeLocalStorageSet('flow-diagram-layers-open', v ? '1' : '0');
                 }
 
                 this.resizeCanvas();
@@ -4751,10 +4931,11 @@
 	                    camera: safeCamera
 	                };
 	                
-	                // Guardar en localStorage
-	                const projects = JSON.parse(localStorage.getItem('flow-diagrams') || '[]');
+	                // Guardar en localStorage (tolerante a storage bloqueado o datos corruptos)
+	                const parsed = safeLocalStorageGetJSON('flow-diagrams', []);
+	                const projects = Array.isArray(parsed) ? parsed : [];
 	                projects.push(projectData);
-	                localStorage.setItem('flow-diagrams', JSON.stringify(projects));
+	                safeLocalStorageSetJSON('flow-diagrams', projects);
                 
                 alert(`Proyecto "${name}" guardado exitosamente`);
                 this.hideSaveModal();
@@ -4765,15 +4946,15 @@
                 const keyInput = document.getElementById('publish-key');
                 if (!keyInput) return;
 
-                const stored = localStorage.getItem('flow-diagram-publish-key') || '';
+                const stored = safeLocalStorageGet('flow-diagram-publish-key', '') || '';
                 keyInput.value = String(stored);
 
                 keyInput.addEventListener('input', () => {
                     const v = String(keyInput.value || '');
                     if (v) {
-                        localStorage.setItem('flow-diagram-publish-key', v);
+                        safeLocalStorageSet('flow-diagram-publish-key', v);
                     } else {
-                        localStorage.removeItem('flow-diagram-publish-key');
+                        safeLocalStorageRemove('flow-diagram-publish-key');
                     }
                 });
             }
@@ -4783,7 +4964,7 @@
                 const v = keyInput ? String(keyInput.value || '').trim() : '';
                 if (v) return v;
 
-                const stored = localStorage.getItem('flow-diagram-publish-key');
+                const stored = safeLocalStorageGet('flow-diagram-publish-key', null);
                 return stored ? String(stored).trim() : '';
             }
 
@@ -4797,7 +4978,7 @@
                 document.getElementById('publish-name').value = '';
                 document.getElementById('publish-folder').value = '';
                 const keyInput = document.getElementById('publish-key');
-                if (keyInput) keyInput.value = localStorage.getItem('flow-diagram-publish-key') || '';
+                if (keyInput) keyInput.value = safeLocalStorageGet('flow-diagram-publish-key', '') || '';
                 const modeHint = document.getElementById('publish-mode-hint');
                 if (modeHint) {
                     modeHint.innerHTML =
@@ -6369,12 +6550,12 @@
                         const minH = 220;
                         const maxH = Math.floor(window.innerHeight * 0.8);
                         const newH = Math.max(minH, Math.min(maxH, Math.floor(window.innerHeight - e.clientY)));
-                        localStorage.setItem('deck-panel-height', String(newH));
+                        safeLocalStorageSet('deck-panel-height', String(newH));
                     } else {
                         const minW = 280;
                         const maxW = Math.floor(window.innerWidth * 0.7);
                         const newW = Math.max(minW, Math.min(maxW, Math.floor(window.innerWidth - e.clientX)));
-                        localStorage.setItem('deck-panel-width', String(newW));
+                        safeLocalStorageSet('deck-panel-width', String(newW));
                     }
 
                     this.applyDeckSizing();
@@ -6417,7 +6598,7 @@
                 if (this.deckLayout === 'vertical') {
                     const minH = 220;
                     const maxH = Math.floor(window.innerHeight * 0.8);
-                    const stored = Number(localStorage.getItem('deck-panel-height') || '');
+                    const stored = Number(safeLocalStorageGet('deck-panel-height', '') || '');
                     const desired = Number.isFinite(stored) && stored > 0 ? stored : 380;
                     const panelH = Math.max(minH, Math.min(maxH, Math.floor(desired)));
 
@@ -6440,7 +6621,7 @@
                 } else {
                     const minW = 280;
                     const maxW = Math.floor(window.innerWidth * 0.7);
-                    const stored = Number(localStorage.getItem('deck-panel-width') || '');
+                    const stored = Number(safeLocalStorageGet('deck-panel-width', '') || '');
                     const desired = Number.isFinite(stored) && stored > 0 ? stored : 420;
                     const panelW = Math.max(minW, Math.min(maxW, Math.floor(desired)));
 
@@ -7016,7 +7197,8 @@
             
             loadFromLocalStorage() {
                 // Cargar último proyecto automáticamente
-                const projects = JSON.parse(localStorage.getItem('flow-diagrams') || '[]');
+                const parsed = safeLocalStorageGetJSON('flow-diagrams', []);
+                const projects = Array.isArray(parsed) ? parsed : [];
                 if (projects.length > 0) {
                     const lastProject = projects[projects.length - 1];
                     this.normalizeProjectInPlace(lastProject);
@@ -7541,46 +7723,61 @@
         
         // ==================== INICIALIZAR SISTEMA ====================
         
-        const system = new FlowDiagramSystem();
+        let system = null;
+        try {
+            system = new FlowDiagramSystem();
+            // Exponer para debug/manual (DevTools) y para integraciones IA.
+            window.system = system;
+        } catch (err) {
+            try {
+                if (window.showFatalError) window.showFatalError(err, 'boot');
+            } catch {
+                // Ignorar
+            }
+            console.error(err);
+        }
         
-        console.log('🚀 Sistema de Diagramas de Flujo v1.2.0 - FASE A Iniciado');
-        console.log('📚 Arquitectura modular lista para expansión');
-        console.log('');
-        console.log('✨ NUEVAS CARACTERÍSTICAS v1.2.0 - FASE A:');
-        console.log('   ✓ Insertar imágenes como capas base (PNG con transparencia)');
-        console.log('   ✓ Dibujar encima de imágenes con todas las herramientas');
-        console.log('   ✓ Convertir trazos en polígonos cerrados (cierra automático)');
-        console.log('   ✓ Sistema de capas Z-index (Menú contextual con botón derecho)');
-        console.log('   ✓ Traer al frente / Enviar atrás');
-        console.log('   ✓ Duplicar elementos con menú contextual');
-        console.log('');
-        console.log('🎨 DIBUJO CON LÁPIZ MEJORADO:');
-        console.log('   - Dibuja con lápiz (P)');
-        console.log('   - Acércate al punto inicial para CERRAR la figura automáticamente');
-        console.log('   - Los polígonos cerrados se rellenan con color');
-        console.log('   - Crea formas personalizadas trazando el contorno');
-        console.log('');
-        console.log('🖼️ TRABAJO CON IMÁGENES:');
-        console.log('   - Click en "Imagen" o presiona I');
-        console.log('   - Redimensiona manteniendo proporción');
-        console.log('   - Dibuja ENCIMA de la imagen para crear diagramas');
-        console.log('   - Soporta PNG, JPG, GIF, WEBP');
-        console.log('');
-        console.log('🗂️ CONTROL DE CAPAS:');
-        console.log('   - Botón derecho sobre elemento → Menú contextual');
-        console.log('   - Traer al frente de todo / Enviar al fondo');
-        console.log('   - Traer adelante / Enviar atrás (un nivel)');
-        console.log('   - Duplicar / Eliminar');
-        console.log('');
-        console.log('⌨️ ATAJOS DE TECLADO:');
-        console.log('   V = Seleccionar | R = Rectángulo | C = Círculo | T = Formas | L = Línea | P = Lápiz | I = Imagen');
-        console.log('   Espacio = Pan (mover canvas) | Ctrl+C/V = Copiar/Pegar');
-        console.log('   Doble clic en elemento = Activar/Desactivar animación');
-        console.log('   Botón derecho = Menú contextual de capas');
+        if (system) {
+            console.log('🚀 Sistema de Diagramas de Flujo v1.2.0 - FASE A Iniciado');
+            console.log('📚 Arquitectura modular lista para expansión');
+            console.log('');
+            console.log('✨ NUEVAS CARACTERÍSTICAS v1.2.0 - FASE A:');
+            console.log('   ✓ Insertar imágenes como capas base (PNG con transparencia)');
+            console.log('   ✓ Dibujar encima de imágenes con todas las herramientas');
+            console.log('   ✓ Convertir trazos en polígonos cerrados (cierra automático)');
+            console.log('   ✓ Sistema de capas Z-index (Menú contextual con botón derecho)');
+            console.log('   ✓ Traer al frente / Enviar atrás');
+            console.log('   ✓ Duplicar elementos con menú contextual');
+            console.log('');
+            console.log('🎨 DIBUJO CON LÁPIZ MEJORADO:');
+            console.log('   - Dibuja con lápiz (P)');
+            console.log('   - Acércate al punto inicial para CERRAR la figura automáticamente');
+            console.log('   - Los polígonos cerrados se rellenan con color');
+            console.log('   - Crea formas personalizadas trazando el contorno');
+            console.log('');
+            console.log('🖼️ TRABAJO CON IMÁGENES:');
+            console.log('   - Click en "Imagen" o presiona I');
+            console.log('   - Redimensiona manteniendo proporción');
+            console.log('   - Dibuja ENCIMA de la imagen para crear diagramas');
+            console.log('   - Soporta PNG, JPG, GIF, WEBP');
+            console.log('');
+            console.log('🗂️ CONTROL DE CAPAS:');
+            console.log('   - Botón derecho sobre elemento → Menú contextual');
+            console.log('   - Traer al frente de todo / Enviar al fondo');
+            console.log('   - Traer adelante / Enviar atrás (un nivel)');
+            console.log('   - Duplicar / Eliminar');
+            console.log('');
+            console.log('⌨️ ATAJOS DE TECLADO:');
+            console.log('   V = Seleccionar | R = Rectángulo | C = Círculo | T = Formas | L = Línea | P = Lápiz | I = Imagen');
+            console.log('   Espacio = Pan (mover canvas) | Ctrl+C/V = Copiar/Pegar');
+            console.log('   Doble clic en elemento = Activar/Desactivar animación');
+            console.log('   Botón derecho = Menú contextual de capas');
+        }
         
         // ==================== MODOS IA (PREVIEW / STICKER / DECK) ====================
 
         function applyIAmodes() {
+            if (!system) return;
             system.applyViewerModeFromUrl();
         }
 
