@@ -5725,11 +5725,11 @@
                 e.target.value = '';
             }
 
-	            walkElements(elements, visitor) {
-	                const stack = Array.isArray(elements) ? elements.slice() : [];
-	                while (stack.length) {
-	                    const elem = stack.pop();
-	                    if (!elem || typeof elem !== 'object') continue;
+            walkElements(elements, visitor) {
+                const stack = Array.isArray(elements) ? elements.slice() : [];
+                while (stack.length) {
+                    const elem = stack.pop();
+                    if (!elem || typeof elem !== 'object') continue;
 
                     // Si el visitor devuelve false, detenemos el recorrido.
                     if (visitor(elem) === false) return;
@@ -5737,17 +5737,17 @@
                     if (elem.type === 'group' && Array.isArray(elem.elements)) {
                         for (let i = elem.elements.length - 1; i >= 0; i--) {
                             stack.push(elem.elements[i]);
-	                }
-	            }
-
-	            ensureElementMeta(elem) {
-	                if (!elem || typeof elem !== 'object') return {};
-	                if (!elem.meta || typeof elem.meta !== 'object' || Array.isArray(elem.meta)) {
-	                    elem.meta = {};
-	                }
-	                return elem.meta;
-	            }
+                        }
+                    }
                 }
+            }
+
+            ensureElementMeta(elem) {
+                if (!elem || typeof elem !== 'object') return {};
+                if (!elem.meta || typeof elem.meta !== 'object' || Array.isArray(elem.meta)) {
+                    elem.meta = {};
+                }
+                return elem.meta;
             }
 
             hasImagesInElements(elements) {
