@@ -3,6 +3,15 @@ Fecha: 2026-02-09
 
 Este documento resume el estado real de implementación del repo (lo que ya existe y funciona), lo que quedó pendiente y la ruta sugerida de evolución. No reemplaza `CONTINUE_FOR_IA_BUILDER.md`; lo complementa.
 
+## Estado de Salud (Build/Arranque)
+
+- Producción (Vercel) ya está funcional. En el UI debe verse el tag de build en la barra inferior: `build: 2026-02-09-boot3`.
+- Se agregó un “boot screen” (modal **Cargando motor...**) que solo debe verse 2-3s. Si se queda pegado: es casi seguro un error de JavaScript (abrir F12 → Console).
+- Se agregó un overlay de error en pantalla (abajo) con botones:
+  - `Copiar` (stacktrace).
+  - `Limpiar storage` (borra `flow-diagrams` y settings locales si localStorage se corrompe/bloquea).
+- Hardening: accesos a `localStorage` están protegidos y `JSON.parse` ya no debería matar el arranque si hay datos corruptos.
+
 ## Estado Actual (Implementado)
 
 UI/Builder (Editor)
@@ -36,6 +45,12 @@ API (Vercel Functions)
   - `POST /api/publish-project` (proyecto) permite imágenes y genera URLs públicas para assets.
 
 ## Cambios Recientes Importantes
+
+Arranque/Errores (boot crash)
+- Se corrigieron 2 errores de sintaxis que mataban todo el JS (por eso “ningún botón servía”):
+  - `walkElements(...)` con llaves mal cerradas.
+  - Regex de YouTube mal escapada en `toYouTubeEmbedUrl(...)` (literal regex no usa doble escape `\\`).
+- Resultado: el motor vuelve a iniciar, se renderiza el grid/canvas y los botones responden.
 
 Undo / Ctrl+Z con imágenes
 - Se corrigió el bug donde `Ctrl+Z` “borraba” imágenes: era causado por serializar `imageData` a `{}` en el historial.
@@ -128,4 +143,3 @@ UX “modo demo”
 - Motor/UI principal: `index.html`.
 - Endpoints: `api/`.
 - Checklist técnico de continuidad: `CONTINUE_FOR_IA_BUILDER.md`.
-
