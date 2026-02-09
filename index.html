@@ -942,9 +942,12 @@
             <span>✏️</span> Lápiz
         </button>
         
-        <button class="btn" id="btn-image" title="Insertar Imagen (I)">
-            <span>🖼️</span> Imagen
-        </button>
+	        <button class="btn" id="btn-image" title="Insertar Imagen (I)">
+	            <span>🖼️</span> Imagen
+	        </button>
+	        <button class="btn" id="btn-video" title="Insertar Video (M)">
+	            <span>🎞️</span> Video
+	        </button>
         
         <div class="separator"></div>
         
@@ -1026,6 +1029,7 @@
         <input type="file" id="publish-file-input" accept=".json">
         <input type="file" id="library-upload-input" accept=".json">
         <input type="file" id="image-input" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp">
+        <input type="file" id="video-input" accept="video/mp4,video/webm,video/ogg">
     </div>
 
     <!-- Panel Objetos (Capas) -->
@@ -1202,6 +1206,9 @@
         <div class="context-menu-item" id="ctx-line-width">
             <span>📏</span> Cambiar Ancho...
         </div>
+        <div class="context-menu-item" id="ctx-crop">
+            <span>✂️</span> Recortar...
+        </div>
         <div class="context-menu-item" id="ctx-duplicate">
             <span>📋</span> Duplicar
         </div>
@@ -1312,6 +1319,7 @@
                 this.spacePressed = false;
                 this.contextMenuElement = null;
                 this.loadedImages = {}; // Cache de imágenes cargadas
+                this.loadedVideos = {}; // Cache de videos cargados (HTMLVideoElement)
                 this.autoClosePathDistance = 15; // Distancia para auto-cerrar paths
                 // Touch (mobile)
                 this.touches = [];
@@ -1464,6 +1472,7 @@
                 document.getElementById('btn-line').addEventListener('click', () => this.setTool('line'));
                 document.getElementById('btn-pencil').addEventListener('click', () => this.setTool('pencil'));
                 document.getElementById('btn-image').addEventListener('click', () => this.insertImage());
+                document.getElementById('btn-video').addEventListener('click', () => this.insertVideo());
                 
                 // Acciones
                 document.getElementById('btn-group').addEventListener('click', () => this.groupElements());
@@ -1522,6 +1531,7 @@
                 document.getElementById('publish-file-input').addEventListener('change', (e) => this.onPublishFileSelected(e));
                 document.getElementById('library-upload-input').addEventListener('change', (e) => this.onLibraryUploadSelected(e));
                 document.getElementById('image-input').addEventListener('change', (e) => this.loadImageFile(e));
+                document.getElementById('video-input').addEventListener('change', (e) => this.loadVideoFile(e));
 
                 // Deck (lámina informativa)
                 const deckList = document.getElementById('deck-control-points');
@@ -1590,6 +1600,14 @@
                 if (ctxLineWidth) {
                     ctxLineWidth.addEventListener('click', () => {
                         this.changeLineWidth();
+                        this.hideContextMenu();
+                    });
+                }
+
+                const ctxCrop = document.getElementById('ctx-crop');
+                if (ctxCrop) {
+                    ctxCrop.addEventListener('click', () => {
+                        this.cropSelectedElement();
                         this.hideContextMenu();
                     });
                 }
@@ -1723,6 +1741,7 @@
                     polygon: '⬠',
                     path: '✎',
                     image: '🖼️',
+                    video: '🎞️',
                     group: '⊞'
                 };
                 return icons[t] || '•';
@@ -1737,6 +1756,7 @@
                     polygon: 'Polígono',
                     path: 'Trazado',
                     image: 'Imagen',
+                    video: 'Video',
                     group: 'Grupo'
                 };
                 return labels[t] || t || 'Elemento';
@@ -2691,6 +2711,9 @@
                         case 'i':
                             this.insertImage();
                             break;
+                        case 'm':
+                            this.insertVideo();
+                            break;
                         case 'o':
                         case 'O':
                             this.toggleLayersPanel();
@@ -2770,6 +2793,122 @@
                 reader.readAsDataURL(file);
                 e.target.value = '';
             }
+
+            // ==================== INSERCIÓN DE VIDEO ====================
+
+            insertVideo() {
+                const raw = prompt(
+                    'Pega una URL directa a video (mp4/webm) o deja vacío para elegir un archivo local.\n' +
+                    'Nota: videos locales (blob:) no se conservan bien al exportar/publicar; para compartir usa URL.',
+                    ''
+                );
+                if (raw === null) return;
+                const s = String(raw || '').trim();
+                if (s) {
+                    const name = s.split('?')[0].split('#')[0].split('/').pop() || 'video';
+                    this.createVideoElementFromSrc(s, { name });
+                    return;
+                }
+                document.getElementById('video-input').click();
+            }
+
+            loadVideoFile(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const objectUrl = URL.createObjectURL(file);
+                this.createVideoElementFromSrc(objectUrl, { name: file.name, isObjectUrl: true });
+
+                // Permitir re-seleccionar el mismo archivo.
+                e.target.value = '';
+            }
+
+            createVideoElementFromSrc(src, options) {
+                const opts = options && typeof options === 'object' ? options : {};
+                const id = Date.now() + Math.random();
+
+                const vid = document.createElement('video');
+                vid.src = String(src || '');
+                vid.loop = true;
+                vid.muted = true;
+                vid.playsInline = true;
+                vid.preload = 'auto';
+
+                const x = -this.camera.x / this.camera.zoom;
+                const y = -this.camera.y / this.camera.zoom;
+
+                // Insertar de inmediato con tamaño placeholder (se ajusta al cargar metadata).
+                const placeholderW = 640;
+                const placeholderH = 360;
+                const videoElement = {
+                    type: 'video',
+                    id,
+                    x,
+                    y,
+                    width: placeholderW,
+                    height: placeholderH,
+                    originalWidth: placeholderW,
+                    originalHeight: placeholderH,
+                    videoSrc: String(src || ''),
+                    videoData: vid,
+                    loop: true,
+                    muted: true,
+                    autoplay: true,
+                    locked: false,
+                    active: true,
+                    connectionStatus: 'loading',
+                    fillColor: 'transparent',
+                    strokeColor: 'transparent',
+                    name: typeof opts.name === 'string' ? opts.name : 'video',
+                    opacity: 1,
+                    zIndex: this.elements.length
+                };
+
+                this.loadedVideos[videoElement.id] = vid;
+                this.elements.push(videoElement);
+                this.selectedElements = [videoElement];
+                this.saveHistory();
+                this.updatePropertiesPanel();
+                this.sortElementsByZIndex();
+
+                const tryPlay = () => {
+                    if (videoElement.active === false) return;
+                    if (vid.paused) {
+                        const p = vid.play();
+                        if (p && typeof p.catch === 'function') p.catch(() => {});
+                    }
+                };
+
+                let metaApplied = false;
+                const applyMeta = () => {
+                    if (metaApplied) return;
+                    metaApplied = true;
+
+                    const vw = Number(vid.videoWidth) || placeholderW;
+                    const vh = Number(vid.videoHeight) || placeholderH;
+
+                    videoElement.originalWidth = vw;
+                    videoElement.originalHeight = vh;
+
+                    // Si el usuario no lo redimensionó aún, ajustamos al tamaño real.
+                    if (videoElement.width === placeholderW && videoElement.height === placeholderH) {
+                        videoElement.width = vw;
+                        videoElement.height = vh;
+                    }
+
+                    videoElement.connectionStatus = 'connected';
+                    tryPlay();
+                };
+
+                vid.addEventListener('loadedmetadata', applyMeta, { once: true });
+                vid.addEventListener('canplay', tryPlay);
+                vid.addEventListener('error', () => {
+                    videoElement.connectionStatus = 'error';
+                });
+
+                // Algunos navegadores requieren load() explícito.
+                try { vid.load(); } catch {}
+            }
             
             sortElementsByZIndex() {
                 this.elements.sort((a, b) => {
@@ -2841,17 +2980,21 @@
                 this.saveHistory();
             }
             
-            duplicateSelected() {
-                if (this.selectedElements.length === 0) return;
-                
-                const duplicates = [];
-                this.selectedElements.forEach(elem => {
-                    const duplicate = JSON.parse(JSON.stringify(elem));
-                    const idMap = this.assignNewIdsRecursive(duplicate);
-                    
-                    // Copiar referencias de imágenes (si aplica)
-                    idMap.forEach((newId, oldId) => {
-                        if (this.loadedImages[oldId]) {
+	            duplicateSelected() {
+	                if (this.selectedElements.length === 0) return;
+	                
+	                const duplicates = [];
+	                this.selectedElements.forEach(elem => {
+	                    const duplicate = JSON.parse(JSON.stringify(elem, (key, value) => {
+	                        if (key === 'imageData') return undefined;
+	                        if (key === 'videoData') return undefined;
+	                        return value;
+	                    }));
+	                    const idMap = this.assignNewIdsRecursive(duplicate);
+	                    
+	                    // Copiar referencias de imágenes (si aplica)
+	                    idMap.forEach((newId, oldId) => {
+	                        if (this.loadedImages[oldId]) {
                             this.loadedImages[newId] = this.loadedImages[oldId];
                         }
                     });
@@ -2872,6 +3015,13 @@
                 const menu = document.getElementById('context-menu');
                 menu.style.left = x + 'px';
                 menu.style.top = y + 'px';
+
+                // Mostrar/ocultar items según el tipo seleccionado.
+                const sel = (this.selectedElements && this.selectedElements.length === 1) ? this.selectedElements[0] : null;
+                const canCrop = sel && (sel.type === 'image' || sel.type === 'video');
+                const cropItem = document.getElementById('ctx-crop');
+                if (cropItem) cropItem.style.display = canCrop ? 'block' : 'none';
+
                 menu.classList.add('show');
             }
             
@@ -2895,6 +3045,75 @@
                 });
                 this.updatePropertiesPanel();
             }
+
+            cropSelectedElement() {
+                if (this.readOnly) return;
+                if (!this.selectedElements || this.selectedElements.length !== 1) return;
+                const elem = this.selectedElements[0];
+                if (!elem || typeof elem !== 'object') return;
+                if (elem.type !== 'image' && elem.type !== 'video') return;
+
+                const cur = (elem.crop && typeof elem.crop === 'object' && !Array.isArray(elem.crop)) ? elem.crop : null;
+                const defX = cur && Number.isFinite(cur.x) ? cur.x : 0;
+                const defY = cur && Number.isFinite(cur.y) ? cur.y : 0;
+                const defW = cur && Number.isFinite(cur.w) ? cur.w : 1;
+                const defH = cur && Number.isFinite(cur.h) ? cur.h : 1;
+                const def = [
+                    Math.round(defX * 100),
+                    Math.round(defY * 100),
+                    Math.round(defW * 100),
+                    Math.round(defH * 100)
+                ].join(',');
+
+                const raw = prompt(
+                    'Recorte (x,y,w,h) en % (0-100). Ej: 0,0,100,100\n' +
+                    'Tip: deja vacío para resetear.',
+                    def
+                );
+                if (raw === null) return;
+                const s = String(raw || '').trim();
+                if (!s) {
+                    delete elem.crop;
+                    this.saveHistory();
+                    this.updatePropertiesPanel();
+                    return;
+                }
+
+                const parts = s.split(/[,\s]+/).filter(Boolean);
+                if (parts.length !== 4) {
+                    alert('Formato inválido. Usa 4 números: x,y,w,h');
+                    return;
+                }
+                const nums = parts.map((p) => Number.parseFloat(String(p)));
+                if (nums.some((n) => !Number.isFinite(n))) {
+                    alert('Valores inválidos. Usa números (ej: 0,0,100,100).');
+                    return;
+                }
+
+                let [x, y, w, h] = nums;
+                const looksLikeRatio = x >= 0 && x <= 1 && y >= 0 && y <= 1 && w >= 0 && w <= 1 && h >= 0 && h <= 1;
+                if (!looksLikeRatio) {
+                    x /= 100; y /= 100; w /= 100; h /= 100;
+                }
+
+                x = Math.max(0, Math.min(1, x));
+                y = Math.max(0, Math.min(1, y));
+                w = Math.max(0, Math.min(1, w));
+                h = Math.max(0, Math.min(1, h));
+
+                // Mantener el recorte dentro del rango [0..1]
+                if (x + w > 1) w = Math.max(0, 1 - x);
+                if (y + h > 1) h = Math.max(0, 1 - y);
+
+                if (w <= 0 || h <= 0) {
+                    alert('Recorte inválido (w/h <= 0).');
+                    return;
+                }
+
+                elem.crop = { x, y, w, h };
+                this.saveHistory();
+                this.updatePropertiesPanel();
+            }
             
             // ==================== REDIMENSIONAMIENTO ====================
             
@@ -2904,7 +3123,7 @@
                 const handles = [];
                 const handleSize = 8 / this.camera.zoom;
                 
-                if (elem.type === 'rectangle' || elem.type === 'circle' || elem.type === 'image') {
+                if (elem.type === 'rectangle' || elem.type === 'circle' || elem.type === 'image' || elem.type === 'video') {
                     // 8 handles: esquinas y puntos medios
                     handles.push(
                         { x: elem.x, y: elem.y, position: 'nw' },
@@ -3110,11 +3329,13 @@
                             elem.x = worldPos.x;
                             break;
                     }
-                } else if (elem.type === 'image') {
-                    // Redimensionar imagen manteniendo proporción
+                } else if (elem.type === 'image' || elem.type === 'video') {
+                    // Redimensionar imagen/video manteniendo proporción (en esquinas)
                     const originalRight = elem.x + elem.width;
                     const originalBottom = elem.y + elem.height;
-                    const aspectRatio = elem.originalHeight / elem.originalWidth;
+                    const ow = Number(elem.originalWidth) || 1;
+                    const oh = Number(elem.originalHeight) || 1;
+                    const aspectRatio = oh / ow;
                     
                     switch(handle) {
                         case 'se':
@@ -3171,7 +3392,7 @@
             normalizeBoxElementInPlace(elem) {
                 if (!elem || typeof elem !== 'object') return;
                 const t = elem.type ? String(elem.type) : '';
-                if (t !== 'rectangle' && t !== 'circle' && t !== 'image' && t !== 'group') return;
+                if (t !== 'rectangle' && t !== 'circle' && t !== 'image' && t !== 'video' && t !== 'group') return;
 
                 if (!Number.isFinite(elem.x) || !Number.isFinite(elem.y) ||
                     !Number.isFinite(elem.width) || !Number.isFinite(elem.height)) {
@@ -3463,7 +3684,7 @@
                         }
                     }
 
-                    if (elem.type === 'image' || elem.type === 'rectangle') {
+                    if (elem.type === 'image' || elem.type === 'video' || elem.type === 'rectangle') {
                         if (typeof elem.x === 'number' && typeof elem.y === 'number' &&
                             typeof elem.width === 'number' && typeof elem.height === 'number') {
                             const x1 = Math.min(elem.x, elem.x + elem.width);
@@ -3762,7 +3983,8 @@
                     this.depthFx &&
                     this.readOnly &&
                     this.viewerMode &&
-                    elem.type !== 'image';
+                    elem.type !== 'image' &&
+                    elem.type !== 'video';
 
                 if (useDepthFx) {
                     this.ctx.save();
@@ -3772,14 +3994,22 @@
                     this.ctx.shadowOffsetY = 14 / this.camera.zoom;
                 }
 
-                if (elem.type === 'image') {
-                    // Dibujar imagen
-                    let img = elem.imageData;
-                    
-                    // Si no tenemos la imagen en memoria, intentar cargarla
-                    if (!img && this.loadedImages[elem.id]) {
-                        img = this.loadedImages[elem.id];
-                        elem.imageData = img;
+	                if (elem.type === 'image') {
+	                    // Dibujar imagen
+	                    let img = elem.imageData;
+	                    const isHtmlImage =
+	                        (v) => v && typeof HTMLImageElement !== 'undefined' && v instanceof HTMLImageElement;
+	
+	                    // Si viene de JSON/undo, puede ser `imageData: {}` (rompe el render). Lo limpiamos.
+	                    if (img && !isHtmlImage(img)) {
+	                        img = null;
+	                        try { delete elem.imageData; } catch {}
+	                    }
+	                    
+	                    // Si no tenemos la imagen en memoria, intentar cargarla
+	                    if (!img && this.loadedImages[elem.id]) {
+	                        img = this.loadedImages[elem.id];
+	                        elem.imageData = img;
                     } else if (!img && elem.imageSrc) {
                         // Cargar imagen desde base64
                         img = new Image();
@@ -3793,7 +4023,20 @@
                     
                     if (img && img.complete) {
                         this.ctx.globalAlpha = elem.opacity || 1;
-                        this.ctx.drawImage(img, elem.x, elem.y, elem.width, elem.height);
+                        const crop = (elem.crop && typeof elem.crop === 'object' && !Array.isArray(elem.crop)) ? elem.crop : null;
+                        if (crop && Number.isFinite(crop.x) && Number.isFinite(crop.y) &&
+                            Number.isFinite(crop.w) && Number.isFinite(crop.h) &&
+                            crop.w > 0 && crop.h > 0) {
+                            const sw = Number(img.naturalWidth) || Number(img.width) || 1;
+                            const sh = Number(img.naturalHeight) || Number(img.height) || 1;
+                            const sx = Math.max(0, Math.min(sw, crop.x * sw));
+                            const sy = Math.max(0, Math.min(sh, crop.y * sh));
+                            const sww = Math.max(1, Math.min(sw - sx, crop.w * sw));
+                            const shh = Math.max(1, Math.min(sh - sy, crop.h * sh));
+                            this.ctx.drawImage(img, sx, sy, sww, shh, elem.x, elem.y, elem.width, elem.height);
+                        } else {
+                            this.ctx.drawImage(img, elem.x, elem.y, elem.width, elem.height);
+                        }
                         this.ctx.globalAlpha = 1;
                         
                         // Borde de selección si está seleccionado
@@ -3804,6 +4047,111 @@
                         }
                     }
                     
+                } else if (elem.type === 'video') {
+                    // Dibujar video (HTMLVideoElement) como capa dentro del canvas
+                    let vid = elem.videoData;
+                    const isHtmlVideo =
+                        (v) => v && typeof HTMLVideoElement !== 'undefined' && v instanceof HTMLVideoElement;
+
+                    // Si viene de JSON/undo puede ser `videoData: {}`.
+                    if (vid && !isHtmlVideo(vid)) {
+                        vid = null;
+                        try { delete elem.videoData; } catch {}
+                    }
+
+                    if (!vid && this.loadedVideos[elem.id]) {
+                        vid = this.loadedVideos[elem.id];
+                        elem.videoData = vid;
+                    } else if (!vid && elem.videoSrc) {
+                        vid = document.createElement('video');
+                        vid.src = elem.videoSrc;
+                        vid.loop = elem.loop !== false;
+                        vid.muted = elem.muted !== false;
+                        vid.playsInline = true;
+                        vid.preload = 'auto';
+
+                        // Cachear antes para evitar recreación por frame.
+                        this.loadedVideos[elem.id] = vid;
+                        elem.videoData = vid;
+
+                        vid.addEventListener('loadedmetadata', () => {
+                            const vw = Number(vid.videoWidth) || 1;
+                            const vh = Number(vid.videoHeight) || 1;
+                            if (!Number.isFinite(Number(elem.originalWidth)) || Number(elem.originalWidth) <= 0) elem.originalWidth = vw;
+                            if (!Number.isFinite(Number(elem.originalHeight)) || Number(elem.originalHeight) <= 0) elem.originalHeight = vh;
+                            if (!Number.isFinite(Number(elem.width)) || Number(elem.width) <= 0) elem.width = vw;
+                            if (!Number.isFinite(Number(elem.height)) || Number(elem.height) <= 0) elem.height = vh;
+
+                            // Autoplay muted suele estar permitido.
+                            if (elem.active !== false && (elem.autoplay !== false)) {
+                                const p = vid.play();
+                                if (p && typeof p.catch === 'function') p.catch(() => {});
+                            }
+                        }, { once: true });
+
+                        vid.addEventListener('ended', () => { vid._flowPlayRequested = false; });
+                        vid.addEventListener('error', () => {
+                            elem.connectionStatus = 'error';
+                            vid._flowPlayRequested = false;
+                        });
+
+                        try { vid.load(); } catch {}
+                    }
+
+                    if (vid) {
+                        const shouldPlay = elem.active !== false;
+                        if (!shouldPlay) {
+                            try { if (!vid.paused) vid.pause(); } catch {}
+                            vid._flowPlayRequested = false;
+                        } else if (vid.paused && !vid._flowPlayRequested && elem.autoplay !== false) {
+                            vid._flowPlayRequested = true;
+                            const p = vid.play();
+                            if (p && typeof p.catch === 'function') {
+                                p.catch(() => { vid._flowPlayRequested = false; });
+                            }
+                        }
+
+                        // Dibujar frame si ya hay data suficiente
+                        if (vid.readyState >= 2) { // HAVE_CURRENT_DATA
+                            this.ctx.globalAlpha = elem.opacity || 1;
+                            const crop = (elem.crop && typeof elem.crop === 'object' && !Array.isArray(elem.crop)) ? elem.crop : null;
+                            if (crop && Number.isFinite(crop.x) && Number.isFinite(crop.y) &&
+                                Number.isFinite(crop.w) && Number.isFinite(crop.h) &&
+                                crop.w > 0 && crop.h > 0) {
+                                const sw = Number(vid.videoWidth) || 1;
+                                const sh = Number(vid.videoHeight) || 1;
+                                const sx = Math.max(0, Math.min(sw, crop.x * sw));
+                                const sy = Math.max(0, Math.min(sh, crop.y * sh));
+                                const sww = Math.max(1, Math.min(sw - sx, crop.w * sw));
+                                const shh = Math.max(1, Math.min(sh - sy, crop.h * sh));
+                                this.ctx.drawImage(vid, sx, sy, sww, shh, elem.x, elem.y, elem.width, elem.height);
+                            } else {
+                                this.ctx.drawImage(vid, elem.x, elem.y, elem.width, elem.height);
+                            }
+                            this.ctx.globalAlpha = 1;
+                        } else {
+                            // Placeholder mientras carga
+                            this.ctx.save();
+                            this.ctx.globalAlpha = 0.9;
+                            this.ctx.fillStyle = 'rgba(15, 52, 96, 0.6)';
+                            this.ctx.fillRect(elem.x, elem.y, elem.width, elem.height);
+                            this.ctx.strokeStyle = '#e94560';
+                            this.ctx.lineWidth = 2 / this.camera.zoom;
+                            this.ctx.strokeRect(elem.x, elem.y, elem.width, elem.height);
+                            this.ctx.fillStyle = '#ffffff';
+                            this.ctx.font = `${12 / this.camera.zoom}px Arial`;
+                            this.ctx.fillText('Video (cargando...)', elem.x + 10 / this.camera.zoom, elem.y + 20 / this.camera.zoom);
+                            this.ctx.restore();
+                        }
+
+                        // Borde de selección si está seleccionado
+                        if (this.selectedElements.includes(elem)) {
+                            this.ctx.strokeStyle = '#e94560';
+                            this.ctx.lineWidth = 2 / this.camera.zoom;
+                            this.ctx.strokeRect(elem.x, elem.y, elem.width, elem.height);
+                        }
+                    }
+
                 } else if (elem.type === 'rectangle') {
                     const fillColor = this.normalizeCanvasColor(elem.fillColor);
                     const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
@@ -3919,9 +4267,9 @@
 	                }
 	                
 	                // Dibujar nombre si existe
-	                if (elem.name && elem.type !== 'image') {
-	                    this.ctx.fillStyle = '#ffffff';
-	                    this.ctx.font = `${12 / this.camera.zoom}px Arial`;
+                if (elem.name && elem.type !== 'image' && elem.type !== 'video') {
+                    this.ctx.fillStyle = '#ffffff';
+                    this.ctx.font = `${12 / this.camera.zoom}px Arial`;
                     const textX = elem.x || (elem.points ? elem.points[0].x : 0);
                     const textY = elem.y || (elem.points ? elem.points[0].y : 0);
                     this.ctx.fillText(elem.name, textX, textY - 10 / this.camera.zoom);
@@ -4261,11 +4609,15 @@
                 this.updateStatusBar();
             }
             
-            copyElements() {
-                if (this.selectedElements.length > 0) {
-                    this.clipboard = JSON.parse(JSON.stringify(this.selectedElements));
-                }
-            }
+	            copyElements() {
+	                if (this.selectedElements.length > 0) {
+	                    this.clipboard = JSON.parse(JSON.stringify(this.selectedElements, (key, value) => {
+	                        if (key === 'imageData') return undefined;
+	                        if (key === 'videoData') return undefined;
+	                        return value;
+	                    }));
+	                }
+	            }
             
             pasteElements() {
                 if (!this.clipboard) return;
@@ -4322,13 +4674,18 @@
             
             // ==================== HISTORIAL ====================
             
-            saveHistory() {
-                const state = JSON.stringify(this.elements);
-                
-                // Eliminar historia futura si estamos en medio
-                if (this.historyIndex < this.history.length - 1) {
-                    this.history = this.history.slice(0, this.historyIndex + 1);
-                }
+	            saveHistory() {
+	                // Importante: quitar campos runtime/no-serializables (ej: imageData) o se rompe undo/guardar.
+	                const state = JSON.stringify(this.elements, (key, value) => {
+	                    if (key === 'imageData') return undefined;
+	                    if (key === 'videoData') return undefined;
+	                    return value;
+	                });
+	                
+	                // Eliminar historia futura si estamos en medio
+	                if (this.historyIndex < this.history.length - 1) {
+	                    this.history = this.history.slice(0, this.historyIndex + 1);
+	                }
                 
                 this.history.push(state);
                 this.historyIndex++;
@@ -4352,17 +4709,19 @@
                 }, 250);
             }
             
-            undo() {
-                if (this.historyIndex > 0) {
-                    this.historyIndex--;
-                    this.elements = JSON.parse(this.history[this.historyIndex]);
-                    this.selectedElements = [];
-                    this.hidePropertiesPanel();
-                    this.updateStatusBar();
-                    this.refreshDeckUI();
-                    this.refreshLayersPanel();
-                }
-            }
+	            undo() {
+	                if (this.historyIndex > 0) {
+	                    this.historyIndex--;
+	                    this.elements = JSON.parse(this.history[this.historyIndex]);
+	                    // Re-normalizar (quita basura como imageData:{} y repara defaults).
+	                    this.normalizeProjectInPlace({ elements: this.elements, camera: this.camera });
+	                    this.selectedElements = [];
+	                    this.hidePropertiesPanel();
+	                    this.updateStatusBar();
+	                    this.refreshDeckUI();
+	                    this.refreshLayersPanel();
+	                }
+	            }
             
             // ==================== PERSISTENCIA ====================
             
@@ -4375,20 +4734,27 @@
                 document.getElementById('save-modal').classList.remove('show');
             }
             
-            saveProject() {
-                const name = document.getElementById('project-name').value || 'proyecto-sin-nombre';
-                
-                const projectData = {
-                    name: name,
-                    date: new Date().toISOString(),
-                    elements: this.elements,
-                    camera: this.camera
-                };
-                
-                // Guardar en localStorage
-                const projects = JSON.parse(localStorage.getItem('flow-diagrams') || '[]');
-                projects.push(projectData);
-                localStorage.setItem('flow-diagrams', JSON.stringify(projects));
+	            saveProject() {
+	                const name = document.getElementById('project-name').value || 'proyecto-sin-nombre';
+
+	                const safeElements = JSON.parse(JSON.stringify(this.elements, (key, value) => {
+	                    if (key === 'imageData') return undefined;
+	                    if (key === 'videoData') return undefined;
+	                    return value;
+	                }));
+	                const safeCamera = JSON.parse(JSON.stringify(this.camera || { x: 0, y: 0, zoom: 1 }));
+	                
+	                const projectData = {
+	                    name: name,
+	                    date: new Date().toISOString(),
+	                    elements: safeElements,
+	                    camera: safeCamera
+	                };
+	                
+	                // Guardar en localStorage
+	                const projects = JSON.parse(localStorage.getItem('flow-diagrams') || '[]');
+	                projects.push(projectData);
+	                localStorage.setItem('flow-diagrams', JSON.stringify(projects));
                 
                 alert(`Proyecto "${name}" guardado exitosamente`);
                 this.hideSaveModal();
@@ -5118,7 +5484,12 @@
             hasImagesInElements(elements) {
                 let found = false;
                 this.walkElements(elements, (elem) => {
-                    if (elem.type === 'image' || typeof elem.imageSrc === 'string' || elem.imageData != null) {
+                    if (elem.type === 'image' ||
+                        elem.type === 'video' ||
+                        typeof elem.imageSrc === 'string' ||
+                        elem.imageData != null ||
+                        typeof elem.videoSrc === 'string' ||
+                        elem.videoData != null) {
                         found = true;
                         return false;
                     }
@@ -5194,20 +5565,87 @@
                         if (!Number.isFinite(elem.height)) elem.height = 0;
                         if (typeof elem.fillColor !== 'string') elem.fillColor = '#0f3460';
                         if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#e94560';
-                    } else if (elem.type === 'image') {
-                        if (!Number.isFinite(elem.x)) elem.x = 0;
-                        if (!Number.isFinite(elem.y)) elem.y = 0;
-                        if (!Number.isFinite(elem.width)) elem.width = 0;
-                        if (!Number.isFinite(elem.height)) elem.height = 0;
-                        if (!Number.isFinite(elem.originalWidth)) elem.originalWidth = Math.abs(elem.width) || 1;
-                        if (!Number.isFinite(elem.originalHeight)) elem.originalHeight = Math.abs(elem.height) || 1;
-                        if (typeof elem.fillColor !== 'string') elem.fillColor = 'transparent';
-                        if (typeof elem.strokeColor !== 'string') elem.strokeColor = 'transparent';
-                    } else if (elem.type === 'polygon' || elem.type === 'path') {
-                        if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#e94560';
-                        if (typeof elem.fillColor !== 'string') elem.fillColor = '#0f3460';
-                        if (!Number.isFinite(elem.lineWidth)) elem.lineWidth = 3;
-                    }
+		                    } else if (elem.type === 'image') {
+		                        if (!Number.isFinite(elem.x)) elem.x = 0;
+		                        if (!Number.isFinite(elem.y)) elem.y = 0;
+		                        if (!Number.isFinite(elem.width)) elem.width = 0;
+		                        if (!Number.isFinite(elem.height)) elem.height = 0;
+		                        if (!Number.isFinite(elem.originalWidth)) elem.originalWidth = Math.abs(elem.width) || 1;
+		                        if (!Number.isFinite(elem.originalHeight)) elem.originalHeight = Math.abs(elem.height) || 1;
+		                        if (typeof elem.fillColor !== 'string') elem.fillColor = 'transparent';
+		                        if (typeof elem.strokeColor !== 'string') elem.strokeColor = 'transparent';
+		
+		                        // No serializable: siempre eliminar (se re-hidrata desde imageSrc/cache).
+		                        if (elem.imageData != null) {
+		                            try { delete elem.imageData; } catch {}
+		                        }
+
+		                        // Normalizar crop (0..1)
+		                        if (elem.crop && typeof elem.crop === 'object' && !Array.isArray(elem.crop)) {
+		                            const c = elem.crop;
+		                            const x = Number(c.x);
+		                            const y = Number(c.y);
+		                            const w = Number(c.w);
+		                            const h = Number(c.h);
+		                            if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+		                                c.x = Math.max(0, Math.min(1, x));
+		                                c.y = Math.max(0, Math.min(1, y));
+		                                c.w = Math.max(0, Math.min(1, w));
+		                                c.h = Math.max(0, Math.min(1, h));
+		                                if (c.x + c.w > 1) c.w = Math.max(0, 1 - c.x);
+		                                if (c.y + c.h > 1) c.h = Math.max(0, 1 - c.y);
+		                                if (!(c.w > 0 && c.h > 0)) delete elem.crop;
+		                            } else {
+		                                delete elem.crop;
+		                            }
+		                        } else if (elem.crop != null) {
+		                            delete elem.crop;
+		                        }
+		                    } else if (elem.type === 'video') {
+		                        if (!Number.isFinite(elem.x)) elem.x = 0;
+		                        if (!Number.isFinite(elem.y)) elem.y = 0;
+		                        if (!Number.isFinite(elem.width)) elem.width = 640;
+		                        if (!Number.isFinite(elem.height)) elem.height = 360;
+		                        if (!Number.isFinite(elem.originalWidth)) elem.originalWidth = Math.abs(elem.width) || 1;
+		                        if (!Number.isFinite(elem.originalHeight)) elem.originalHeight = Math.abs(elem.height) || 1;
+		                        if (typeof elem.videoSrc !== 'string') elem.videoSrc = '';
+		                        if (typeof elem.loop !== 'boolean') elem.loop = true;
+		                        if (typeof elem.muted !== 'boolean') elem.muted = true;
+		                        if (typeof elem.autoplay !== 'boolean') elem.autoplay = true;
+		                        if (typeof elem.fillColor !== 'string') elem.fillColor = 'transparent';
+		                        if (typeof elem.strokeColor !== 'string') elem.strokeColor = 'transparent';
+
+		                        // No serializable: siempre eliminar (se re-hidrata desde videoSrc/cache).
+		                        if (elem.videoData != null) {
+		                            try { delete elem.videoData; } catch {}
+		                        }
+
+		                        // Normalizar crop (0..1)
+		                        if (elem.crop && typeof elem.crop === 'object' && !Array.isArray(elem.crop)) {
+		                            const c = elem.crop;
+		                            const x = Number(c.x);
+		                            const y = Number(c.y);
+		                            const w = Number(c.w);
+		                            const h = Number(c.h);
+		                            if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+		                                c.x = Math.max(0, Math.min(1, x));
+		                                c.y = Math.max(0, Math.min(1, y));
+		                                c.w = Math.max(0, Math.min(1, w));
+		                                c.h = Math.max(0, Math.min(1, h));
+		                                if (c.x + c.w > 1) c.w = Math.max(0, 1 - c.x);
+		                                if (c.y + c.h > 1) c.h = Math.max(0, 1 - c.y);
+		                                if (!(c.w > 0 && c.h > 0)) delete elem.crop;
+		                            } else {
+		                                delete elem.crop;
+		                            }
+		                        } else if (elem.crop != null) {
+		                            delete elem.crop;
+		                        }
+		                    } else if (elem.type === 'polygon' || elem.type === 'path') {
+		                        if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#e94560';
+		                        if (typeof elem.fillColor !== 'string') elem.fillColor = '#0f3460';
+		                        if (!Number.isFinite(elem.lineWidth)) elem.lineWidth = 3;
+		                    }
 
                     if (typeof elem.name !== 'string') elem.name = '';
                     if (typeof elem.locked !== 'boolean') elem.locked = false;
@@ -6735,19 +7173,23 @@
                 }
             }
             
-            exportProject() {
-                const projectData = {
-                    name: 'proyecto-exportado',
-                    date: new Date().toISOString(),
-                    elements: this.elements,
-                    camera: this.camera
-                };
-                
-                const blob = new Blob([JSON.stringify(projectData, null, 2)], 
-                                     { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
+	            exportProject() {
+	                const projectData = {
+	                    name: 'proyecto-exportado',
+	                    date: new Date().toISOString(),
+	                    elements: this.elements,
+	                    camera: this.camera
+	                };
+	                
+	                const blob = new Blob([JSON.stringify(projectData, (key, value) => {
+	                    if (key === 'imageData') return undefined;
+	                    if (key === 'videoData') return undefined;
+	                    return value;
+	                }, 2)], 
+	                                     { type: 'application/json' });
+	                const url = URL.createObjectURL(blob);
+	                const a = document.createElement('a');
+	                a.href = url;
                 a.download = `flow-diagram-${Date.now()}.json`;
                 a.click();
                 URL.revokeObjectURL(url);
@@ -7082,7 +7524,7 @@
                 const v = (typeof raw === 'number') ? raw : Number.parseFloat(String(raw));
                 if (Number.isFinite(v) && v > 0) return v;
                 // Defaults históricos del editor: rect/circle = 2, líneas = 3
-                if (t === 'rectangle' || t === 'circle' || t === 'image') return 2;
+                if (t === 'rectangle' || t === 'circle' || t === 'image' || t === 'video') return 2;
                 return 3;
             }
             
