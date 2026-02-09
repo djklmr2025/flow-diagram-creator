@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-build="2026-02-09-boot2">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -37,6 +37,57 @@
 
         body.viewer-bg-studio #canvas-container {
             background: transparent;
+        }
+
+        /* ==================== BOOT SCREEN (DIAGNOSTICO) ==================== */
+        #boot-screen {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(5, 7, 18, 0.92);
+            z-index: 99998;
+            padding: 16px;
+        }
+
+        #boot-screen.hidden {
+            display: none;
+        }
+
+        #boot-screen .boot-card {
+            width: min(560px, 92vw);
+            background: rgba(22, 33, 62, 0.96);
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            border-radius: 16px;
+            padding: 16px 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+        }
+
+        #boot-screen .boot-title {
+            font-weight: 800;
+            color: #00d4ff;
+            margin-bottom: 6px;
+            font-size: 16px;
+            letter-spacing: 0.2px;
+        }
+
+        #boot-screen .boot-sub {
+            opacity: 0.88;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        #boot-screen .boot-code {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 10px;
+            background: rgba(15, 52, 96, 0.55);
+            color: rgba(255, 255, 255, 0.9);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            user-select: text;
         }
 
         /* ==================== PANEL OBJETOS (CAPAS) ==================== */
@@ -388,6 +439,12 @@
             border-top: 2px solid #0f3460;
             display: flex;
             justify-content: space-between;
+        }
+
+        #build-tag {
+            opacity: 0.65;
+            font-size: 11px;
+            user-select: text;
         }
 
         .connection-indicator {
@@ -907,6 +964,19 @@
     </style>
 </head>
 <body>
+    <!-- Boot screen: si se queda visible, el motor JS no arranco -->
+    <div id="boot-screen">
+        <div class="boot-card">
+            <div class="boot-title">Cargando motor...</div>
+            <div class="boot-sub">
+                Si esto no desaparece en 2-3 segundos, hubo un error de JavaScript.
+                Abre F12 &rarr; Console y copia el error.
+                Tip: prueba en modo incognito para descartar extensiones.
+            </div>
+            <div class="boot-code" id="boot-build">build: 2026-02-09-boot2</div>
+        </div>
+    </div>
+
     <!-- Toolbar -->
     <div id="toolbar">
         <!-- Herramientas de dibujo -->
@@ -1185,6 +1255,7 @@
     <!-- Barra de Estado -->
     <div id="status-bar">
         <span id="status-text">Listo | Elementos: 0 | Seleccionados: 0</span>
+        <span id="build-tag">build: 2026-02-09-boot2</span>
         <span id="cursor-pos">X: 0, Y: 0</span>
     </div>
 
@@ -1336,6 +1407,19 @@
             }
         }
 
+        function setBuildLabelsFromHtmlAttr() {
+            const build = (document.documentElement && document.documentElement.getAttribute('data-build')) || '';
+            const bootEl = document.getElementById('boot-build');
+            if (bootEl && build) bootEl.textContent = `build: ${build}`;
+            const tagEl = document.getElementById('build-tag');
+            if (tagEl && build) tagEl.textContent = `build: ${build}`;
+        }
+
+        function hideBootScreen() {
+            const el = document.getElementById('boot-screen');
+            if (el) el.classList.add('hidden');
+        }
+
         function installGlobalErrorOverlay() {
             if (window.__flowGlobalErrorOverlayInstalled) return;
             window.__flowGlobalErrorOverlayInstalled = true;
@@ -1447,6 +1531,7 @@
             });
         }
 
+        setBuildLabelsFromHtmlAttr();
         installGlobalErrorOverlay();
 
         class FlowDiagramSystem {
@@ -1559,6 +1644,9 @@
 
                 // NUEVO: Cargar JSON desde parámetros de URL (si existen)
                 safe('init.loadFromURLParameter', () => this.loadFromURLParameter());
+
+                // Boot OK: ocultar pantalla de carga.
+                safe('init.hideBootScreen', () => hideBootScreen());
             }
             
             resizeCanvas() {
