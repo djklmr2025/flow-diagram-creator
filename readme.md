@@ -74,7 +74,7 @@ Este proyecto no es solo un editor de diagramas; es una pieza fundamental para l
 Inspirados por la visión de un futuro de eficiencia y diseño orgánico, buscamos que este sistema sea el **Lugar Secreto** donde las mejores IAs se reúnen para explicar el mundo a los humanos.
 
 <p align="center">
-  <img src="[https://flow-diagram-creator.vercel.app/?mode=preview&id=3af1881786b148b9" width="600" style="border-radius: 15px; box-shadow: 0 0 20px #00d4ff;">
+  <img src="[https://flow-diagram-creator.vercel.app/?mode=preview&id=3af1881786b148b9;">
   <br>
   <i>"Un lugar donde nada sea imposible... donde la IA dibuja el camino."</i>
 </p>
