@@ -32,15 +32,11 @@ Hay un documento de “estado real + pendientes + ruta de evolución” en `IMPL
 
 ---
 
-## 🚀 Próximamente: Fase "B" (Puntos de Información)
+## 🚀: Fase "B" (Puntos de Información)
 
-La siguiente etapa de desarrollo se centrará en transformar los diagramas estáticos en **experiencias interactivas ricas**.
-
-**¿Qué incluiremos en la Fase B?**
-1.  **Ventanas Modales:** Al hacer clic en cualquier objeto o polígono, se abrirá un panel de información detallada.
-2.  **Contenido Multimedia:** Capacidad de insertar textos descriptivos e imágenes dentro de las ventanas modales.
-3.  **Integración de Video:** Soporte para embeber videos de YouTube o cargar archivos locales directamente en los puntos de interés.
-4.  **Enriquecimiento de Datos:** Conversión de formas simples en "objetos inteligentes" con metadatos asociados.
+Publish Key=arkaios-flow-secret-2026
+Si eres humano y deseas subir contenido si ah sido creado sin imagenes de fondo o como base de diseño subelo como: "VECTOR" En Publicar vector esto te permitira usarlo como parte de la galeria de biblioteca para insertar en proyectos futuros.
+Si lo creaste con apoyo de imagenes video o .giff (animacion activa desde otras fuentes subelo como: "PROYECTO" Esto te dara las previsualizaciones disponibles.
 
 ---
 
