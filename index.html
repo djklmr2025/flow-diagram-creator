@@ -1259,11 +1259,11 @@
         <span id="cursor-pos">X: 0, Y: 0</span>
     </div>
 
-    <!-- Menú Contextual -->
-    <div id="context-menu">
-        <div class="context-menu-item" id="ctx-bring-to-front">
-            <span>⬆️</span> Traer al Frente de Todo
-        </div>
+	    <!-- Menú Contextual -->
+	    <div id="context-menu">
+	        <div class="context-menu-item" id="ctx-bring-to-front">
+	            <span>⬆️</span> Traer al Frente de Todo
+	        </div>
         <div class="context-menu-item" id="ctx-bring-forward">
             <span>↑</span> Traer Adelante
         </div>
@@ -1274,16 +1274,27 @@
             <span>⬇️</span> Enviar al Fondo
         </div>
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item" id="ctx-line-width">
-            <span>📏</span> Cambiar Ancho...
-        </div>
-        <div class="context-menu-item" id="ctx-crop">
-            <span>✂️</span> Recortar...
-        </div>
-        <div class="context-menu-item" id="ctx-duplicate">
-            <span>📋</span> Duplicar
-        </div>
-        <div class="context-menu-item" id="ctx-delete">
+	        <div class="context-menu-item" id="ctx-line-width">
+	            <span>📏</span> Cambiar Ancho...
+	        </div>
+	        <div class="context-menu-item" id="ctx-crop">
+	            <span>✂️</span> Recortar...
+	        </div>
+	        <div class="context-menu-separator"></div>
+	        <div class="context-menu-item" id="ctx-rotate-left">
+	            <span>↺</span> Girar -15°
+	        </div>
+	        <div class="context-menu-item" id="ctx-rotate-right">
+	            <span>↻</span> Girar +15°
+	        </div>
+	        <div class="context-menu-item" id="ctx-flip-x">
+	            <span>⇋</span> Voltear (Espejo)
+	        </div>
+	        <div class="context-menu-separator"></div>
+	        <div class="context-menu-item" id="ctx-duplicate">
+	            <span>📋</span> Duplicar
+	        </div>
+	        <div class="context-menu-item" id="ctx-delete">
             <span>🗑️</span> Eliminar
         </div>
     </div>
@@ -1503,32 +1514,51 @@
                 return root;
             };
 
-            window.showFatalError = (err, context) => {
-                const root = ensureOverlay();
-                const ctx = root.querySelector('#fatal-error-context');
-                const pre = root.querySelector('#fatal-error-text');
+	            window.showFatalError = (err, context) => {
+	                const root = ensureOverlay();
+	                const ctx = root.querySelector('#fatal-error-context');
+	                const pre = root.querySelector('#fatal-error-text');
 
-                const msg = (err && (err.stack || err.message)) ? String(err.stack || err.message) : String(err);
-                if (ctx) ctx.textContent = context ? `(${String(context)})` : '';
-                if (pre) pre.textContent = msg;
-                root.style.display = 'block';
-            };
+	                const msg = (err && (err.stack || err.message)) ? String(err.stack || err.message) : String(err);
+	                if (ctx) ctx.textContent = context ? `(${String(context)})` : '';
+	                if (pre) pre.textContent = msg;
+	                root.style.display = 'block';
+	            };
 
-            window.addEventListener('error', (e) => {
-                try {
-                    window.showFatalError(e && (e.error || e.message) ? (e.error || e.message) : 'Error', 'window.error');
-                } catch {
-                    // Ignorar
-                }
-            });
+	            const shouldIgnoreGlobalError = (payload, meta) => {
+	                const raw = (payload && (payload.stack || payload.message)) ? String(payload.stack || payload.message) : String(payload || '');
+	                const msg = raw.toLowerCase();
+	                const m = String(meta || '').toLowerCase();
 
-            window.addEventListener('unhandledrejection', (e) => {
-                try {
-                    window.showFatalError(e && e.reason ? e.reason : 'Unhandled rejection', 'unhandledrejection');
-                } catch {
-                    // Ignorar
-                }
-            });
+	                // Extensiones del navegador (ej. MetaMask) inyectan scripts y a veces lanzan errores/rejections.
+	                if (msg.includes('chrome-extension://') || msg.includes('moz-extension://') || msg.includes('safari-extension://')) return true;
+	                if (m.startsWith('chrome-extension://') || m.startsWith('moz-extension://') || m.startsWith('safari-extension://')) return true;
+
+	                // Caso común: MetaMask no conectado (no es un bug del editor).
+	                if (msg.includes('metamask')) return true;
+	                return false;
+	            };
+
+	            window.addEventListener('error', (e) => {
+	                try {
+	                    const payload = e && (e.error || e.message) ? (e.error || e.message) : 'Error';
+	                    const meta = e && e.filename ? String(e.filename) : '';
+	                    if (shouldIgnoreGlobalError(payload, meta)) return;
+	                    window.showFatalError(payload, 'window.error');
+	                } catch {
+	                    // Ignorar
+	                }
+	            });
+
+	            window.addEventListener('unhandledrejection', (e) => {
+	                try {
+	                    const payload = e && e.reason ? e.reason : 'Unhandled rejection';
+	                    if (shouldIgnoreGlobalError(payload, '')) return;
+	                    window.showFatalError(payload, 'unhandledrejection');
+	                } catch {
+	                    // Ignorar
+	                }
+	            });
         }
 
         setBuildLabelsFromHtmlAttr();
@@ -1833,11 +1863,11 @@
 	                this.setupDeckResizer();
 	            }
             
-            setupContextMenu() {
-                document.getElementById('ctx-bring-to-front').addEventListener('click', () => {
-                    this.bringToFrontComplete();
-                    this.hideContextMenu();
-                });
+	            setupContextMenu() {
+	                document.getElementById('ctx-bring-to-front').addEventListener('click', () => {
+	                    this.bringToFrontComplete();
+	                    this.hideContextMenu();
+	                });
                 
                 document.getElementById('ctx-bring-forward').addEventListener('click', () => {
                     this.bringToFront();
@@ -1872,14 +1902,38 @@
                     });
                 }
 
-                const ctxCrop = document.getElementById('ctx-crop');
-                if (ctxCrop) {
-                    ctxCrop.addEventListener('click', () => {
-                        this.cropSelectedElement();
-                        this.hideContextMenu();
-                    });
-                }
-            }
+	                const ctxCrop = document.getElementById('ctx-crop');
+	                if (ctxCrop) {
+	                    ctxCrop.addEventListener('click', () => {
+	                        this.cropSelectedElement();
+	                        this.hideContextMenu();
+	                    });
+	                }
+
+	                const ctxRotateLeft = document.getElementById('ctx-rotate-left');
+	                if (ctxRotateLeft) {
+	                    ctxRotateLeft.addEventListener('click', () => {
+	                        this.rotateSelectedElements(-15);
+	                        this.hideContextMenu();
+	                    });
+	                }
+
+	                const ctxRotateRight = document.getElementById('ctx-rotate-right');
+	                if (ctxRotateRight) {
+	                    ctxRotateRight.addEventListener('click', () => {
+	                        this.rotateSelectedElements(15);
+	                        this.hideContextMenu();
+	                    });
+	                }
+
+	                const ctxFlipX = document.getElementById('ctx-flip-x');
+	                if (ctxFlipX) {
+	                    ctxFlipX.addEventListener('click', () => {
+	                        this.flipSelectedElementsX();
+	                        this.hideContextMenu();
+	                    });
+	                }
+	            }
             
 	            setupPropertiesPanel() {
 	                const inputs = [
@@ -2473,14 +2527,87 @@
                 };
             }
             
-            worldToScreen(x, y) {
-                return {
-                    x: x * this.camera.zoom + this.camera.x,
-                    y: y * this.camera.zoom + this.camera.y
-                };
-            }
-            
-            // ==================== EVENTOS DEL MOUSE ====================
+	            worldToScreen(x, y) {
+	                return {
+	                    x: x * this.camera.zoom + this.camera.x,
+	                    y: y * this.camera.zoom + this.camera.y
+	                };
+	            }
+
+	            // ==================== TRANSFORMACIONES DE ELEMENTO (ROTAR/VOLTEAR) ====================
+
+	            getElementRotationDegrees(elem) {
+	                const v = Number(elem && elem.rotation);
+	                return Number.isFinite(v) ? v : 0;
+	            }
+
+	            elementHasBoxTransform(elem) {
+	                if (!elem || typeof elem !== 'object') return false;
+	                if (!(elem.type === 'image' || elem.type === 'video' || elem.type === 'rectangle' || elem.type === 'circle')) return false;
+	                const rot = this.getElementRotationDegrees(elem);
+	                const flipX = elem.flipX === true;
+	                const flipY = elem.flipY === true;
+	                return rot !== 0 || flipX || flipY;
+	            }
+
+	            applyElementBoxTransformToContext(elem) {
+	                if (!this.ctx) return false;
+	                if (!this.elementHasBoxTransform(elem)) return false;
+	                if (!Number.isFinite(elem.x) || !Number.isFinite(elem.y) || !Number.isFinite(elem.width) || !Number.isFinite(elem.height)) return false;
+
+	                const rotDeg = this.getElementRotationDegrees(elem);
+	                const flipX = elem.flipX === true;
+	                const flipY = elem.flipY === true;
+	                if (rotDeg === 0 && !flipX && !flipY) return false;
+
+	                const cx = elem.x + elem.width / 2;
+	                const cy = elem.y + elem.height / 2;
+
+	                this.ctx.save();
+	                this.ctx.translate(cx, cy);
+	                if (rotDeg) this.ctx.rotate((rotDeg * Math.PI) / 180);
+	                this.ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+	                this.ctx.translate(-cx, -cy);
+	                return true;
+	            }
+
+	            restoreElementBoxTransform(applied) {
+	                if (applied) this.ctx.restore();
+	            }
+
+	            transformPointToElementBoxLocal(elem, x, y) {
+	                if (!elem || typeof elem !== 'object') return { x, y };
+	                if (!this.elementHasBoxTransform(elem)) return { x, y };
+	                if (!Number.isFinite(elem.x) || !Number.isFinite(elem.y) || !Number.isFinite(elem.width) || !Number.isFinite(elem.height)) return { x, y };
+
+	                const rotDeg = this.getElementRotationDegrees(elem);
+	                const flipX = elem.flipX === true;
+	                const flipY = elem.flipY === true;
+	                if (rotDeg === 0 && !flipX && !flipY) return { x, y };
+
+	                const cx = elem.x + elem.width / 2;
+	                const cy = elem.y + elem.height / 2;
+
+	                let dx = x - cx;
+	                let dy = y - cy;
+
+	                // Inversa de rotación (pasar del mundo -> espacio local no rotado).
+	                const a = (-rotDeg * Math.PI) / 180;
+	                const cos = Math.cos(a);
+	                const sin = Math.sin(a);
+	                let rx = dx * cos - dy * sin;
+	                let ry = dx * sin + dy * cos;
+
+	                // Inversa de escala (flip). Como es +/-1, dividir es seguro.
+	                const sx = flipX ? -1 : 1;
+	                const sy = flipY ? -1 : 1;
+	                rx /= sx;
+	                ry /= sy;
+
+	                return { x: rx + cx, y: ry + cy };
+	            }
+	            
+	            // ==================== EVENTOS DEL MOUSE ====================
             
             onMouseDown(e) {
                 // Si había un marco de selección activo, cancelarlo al iniciar otra interacción.
@@ -3314,12 +3441,12 @@
                 this.updatePropertiesPanel();
             }
 
-            cropSelectedElement() {
-                if (this.readOnly) return;
-                if (!this.selectedElements || this.selectedElements.length !== 1) return;
-                const elem = this.selectedElements[0];
-                if (!elem || typeof elem !== 'object') return;
-                if (elem.type !== 'image' && elem.type !== 'video') return;
+	            cropSelectedElement() {
+	                if (this.readOnly) return;
+	                if (!this.selectedElements || this.selectedElements.length !== 1) return;
+	                const elem = this.selectedElements[0];
+	                if (!elem || typeof elem !== 'object') return;
+	                if (elem.type !== 'image' && elem.type !== 'video') return;
 
                 const cur = (elem.crop && typeof elem.crop === 'object' && !Array.isArray(elem.crop)) ? elem.crop : null;
                 const defX = cur && Number.isFinite(cur.x) ? cur.x : 0;
@@ -3378,12 +3505,197 @@
                     return;
                 }
 
-                elem.crop = { x, y, w, h };
-                this.saveHistory();
-                this.updatePropertiesPanel();
-            }
-            
-            // ==================== REDIMENSIONAMIENTO ====================
+	                elem.crop = { x, y, w, h };
+	                this.saveHistory();
+	                this.updatePropertiesPanel();
+	            }
+
+	            // ==================== ROTAR / VOLTEAR (ESPEJO) ====================
+
+	            getElementCenterPoint(elem) {
+	                if (!elem || typeof elem !== 'object') return { x: 0, y: 0 };
+
+	                if (elem.type === 'group' && Array.isArray(elem.elements)) {
+	                    const b = this.ensureGroupBounds(elem);
+	                    if (b) return { x: (b.x1 + b.x2) / 2, y: (b.y1 + b.y2) / 2 };
+	                    return { x: 0, y: 0 };
+	                }
+
+	                if (elem.type === 'line') {
+	                    const x1 = Number(elem.x);
+	                    const y1 = Number(elem.y);
+	                    const x2 = Number(elem.endX);
+	                    const y2 = Number(elem.endY);
+	                    if (Number.isFinite(x1) && Number.isFinite(y1) && Number.isFinite(x2) && Number.isFinite(y2)) {
+	                        return { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
+	                    }
+	                    return { x: 0, y: 0 };
+	                }
+
+	                if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points) && elem.points.length) {
+	                    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+	                    elem.points.forEach((p) => {
+	                        if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+	                        minX = Math.min(minX, p.x);
+	                        minY = Math.min(minY, p.y);
+	                        maxX = Math.max(maxX, p.x);
+	                        maxY = Math.max(maxY, p.y);
+	                    });
+	                    if (Number.isFinite(minX)) return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+	                    return { x: 0, y: 0 };
+	                }
+
+	                if (Number.isFinite(elem.x) && Number.isFinite(elem.y) && Number.isFinite(elem.width) && Number.isFinite(elem.height)) {
+	                    return { x: elem.x + elem.width / 2, y: elem.y + elem.height / 2 };
+	                }
+
+	                if (Number.isFinite(elem.x) && Number.isFinite(elem.y)) {
+	                    return { x: elem.x, y: elem.y };
+	                }
+
+	                return { x: 0, y: 0 };
+	            }
+
+	            rotatePointAround(px, py, cx, cy, angleRad) {
+	                const dx = px - cx;
+	                const dy = py - cy;
+	                const cos = Math.cos(angleRad);
+	                const sin = Math.sin(angleRad);
+	                return {
+	                    x: cx + (dx * cos - dy * sin),
+	                    y: cy + (dx * sin + dy * cos)
+	                };
+	            }
+
+	            rotateElementAroundPoint(elem, deltaDeg, pivot) {
+	                if (!elem || typeof elem !== 'object') return;
+	                if (!pivot || !Number.isFinite(pivot.x) || !Number.isFinite(pivot.y)) return;
+	                const delta = Number(deltaDeg) || 0;
+	                if (!delta) return;
+
+	                const angle = (delta * Math.PI) / 180;
+
+	                if (elem.type === 'group' && Array.isArray(elem.elements)) {
+	                    elem.elements.forEach((child) => this.rotateElementAroundPoint(child, delta, pivot));
+	                    this.ensureGroupBounds(elem);
+	                    return;
+	                }
+
+	                if (elem.type === 'line') {
+	                    const p1 = this.rotatePointAround(Number(elem.x) || 0, Number(elem.y) || 0, pivot.x, pivot.y, angle);
+	                    const p2 = this.rotatePointAround(Number(elem.endX) || 0, Number(elem.endY) || 0, pivot.x, pivot.y, angle);
+	                    elem.x = p1.x;
+	                    elem.y = p1.y;
+	                    elem.endX = p2.x;
+	                    elem.endY = p2.y;
+	                    return;
+	                }
+
+	                if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points)) {
+	                    elem.points.forEach((p) => {
+	                        if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+	                        const np = this.rotatePointAround(p.x, p.y, pivot.x, pivot.y, angle);
+	                        p.x = np.x;
+	                        p.y = np.y;
+	                    });
+	                    return;
+	                }
+
+	                // Elementos con caja (x,y,width,height): rotación por propiedad + mover el centro alrededor del pivote.
+	                if (Number.isFinite(elem.x) && Number.isFinite(elem.y) && Number.isFinite(elem.width) && Number.isFinite(elem.height)) {
+	                    const cx = elem.x + elem.width / 2;
+	                    const cy = elem.y + elem.height / 2;
+	                    const nc = this.rotatePointAround(cx, cy, pivot.x, pivot.y, angle);
+	                    elem.x = nc.x - elem.width / 2;
+	                    elem.y = nc.y - elem.height / 2;
+
+	                    if (elem.type === 'image' || elem.type === 'video' || elem.type === 'rectangle' || elem.type === 'circle') {
+	                        const prev = Number(elem.rotation);
+	                        const base = Number.isFinite(prev) ? prev : 0;
+	                        elem.rotation = base + delta;
+	                    }
+
+	                    this.normalizeBoxElementInPlace(elem);
+	                }
+	            }
+
+	            flipElementXAroundAxis(elem, axisX) {
+	                if (!elem || typeof elem !== 'object') return;
+	                const ax = Number(axisX);
+	                if (!Number.isFinite(ax)) return;
+
+	                if (elem.type === 'group' && Array.isArray(elem.elements)) {
+	                    elem.elements.forEach((child) => this.flipElementXAroundAxis(child, ax));
+	                    this.ensureGroupBounds(elem);
+	                    return;
+	                }
+
+	                if (elem.type === 'line') {
+	                    elem.x = (2 * ax) - (Number(elem.x) || 0);
+	                    elem.endX = (2 * ax) - (Number(elem.endX) || 0);
+	                    return;
+	                }
+
+	                if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points)) {
+	                    elem.points.forEach((p) => {
+	                        if (!p || !Number.isFinite(p.x)) return;
+	                        p.x = (2 * ax) - p.x;
+	                    });
+	                    return;
+	                }
+
+	                if (Number.isFinite(elem.x) && Number.isFinite(elem.y) && Number.isFinite(elem.width) && Number.isFinite(elem.height)) {
+	                    const cx = elem.x + elem.width / 2;
+	                    const ncx = (2 * ax) - cx;
+	                    elem.x = ncx - elem.width / 2;
+
+	                    if (elem.type === 'image' || elem.type === 'video' || elem.type === 'rectangle' || elem.type === 'circle') {
+	                        elem.flipX = !(elem.flipX === true);
+	                    }
+
+	                    this.normalizeBoxElementInPlace(elem);
+	                }
+	            }
+
+	            rotateSelectedElements(deltaDeg) {
+	                if (this.readOnly) return;
+	                if (!this.selectedElements || this.selectedElements.length === 0) return;
+	                const delta = Number(deltaDeg) || 0;
+	                if (!delta) return;
+
+	                this.selectedElements.forEach((elem) => {
+	                    if (!elem || typeof elem !== 'object') return;
+	                    if (elem.locked) return;
+
+	                    const pivot = this.getElementCenterPoint(elem);
+	                    this.rotateElementAroundPoint(elem, delta, pivot);
+	                });
+
+	                this.saveHistory();
+	                this.updatePropertiesPanel();
+	                this.updateStatusBar();
+	                this.refreshLayersPanel();
+	            }
+
+	            flipSelectedElementsX() {
+	                if (this.readOnly) return;
+	                if (!this.selectedElements || this.selectedElements.length === 0) return;
+
+	                this.selectedElements.forEach((elem) => {
+	                    if (!elem || typeof elem !== 'object') return;
+	                    if (elem.locked) return;
+
+	                    const pivot = this.getElementCenterPoint(elem);
+	                    this.flipElementXAroundAxis(elem, pivot.x);
+	                });
+
+	                this.saveHistory();
+	                this.updatePropertiesPanel();
+	                this.updateStatusBar();
+	                this.refreshLayersPanel();
+	            }
+	            
+	            // ==================== REDIMENSIONAMIENTO ====================
             
             getResizeHandles(elem) {
                 if (elem.type === 'group' || elem.locked) return [];
@@ -3952,29 +4264,35 @@
                         }
                     }
 
-                    if (elem.type === 'image' || elem.type === 'video' || elem.type === 'rectangle') {
-                        if (typeof elem.x === 'number' && typeof elem.y === 'number' &&
-                            typeof elem.width === 'number' && typeof elem.height === 'number') {
-                            const x1 = Math.min(elem.x, elem.x + elem.width);
-                            const x2 = Math.max(elem.x, elem.x + elem.width);
-                            const y1 = Math.min(elem.y, elem.y + elem.height);
-                            const y2 = Math.max(elem.y, elem.y + elem.height);
-                            if (x >= x1 && x <= x2 && y >= y1 && y <= y2) {
-                                return elem;
-                            }
-                        }
-                    } else if (elem.type === 'circle') {
-                        const centerX = elem.x + elem.width / 2;
-                        const centerY = elem.y + elem.height / 2;
-                        const radiusX = Math.abs(elem.width / 2);
-                        const radiusY = Math.abs(elem.height / 2);
-                        
-                        const normalized = Math.pow((x - centerX) / radiusX, 2) + 
-                                         Math.pow((y - centerY) / radiusY, 2);
-                        
-                        if (normalized <= 1) {
-                            return elem;
-                        }
+	                    if (elem.type === 'image' || elem.type === 'video' || elem.type === 'rectangle') {
+	                        if (typeof elem.x === 'number' && typeof elem.y === 'number' &&
+	                            typeof elem.width === 'number' && typeof elem.height === 'number') {
+	                            const p = this.transformPointToElementBoxLocal(elem, x, y);
+	                            const tx = p.x;
+	                            const ty = p.y;
+	                            const x1 = Math.min(elem.x, elem.x + elem.width);
+	                            const x2 = Math.max(elem.x, elem.x + elem.width);
+	                            const y1 = Math.min(elem.y, elem.y + elem.height);
+	                            const y2 = Math.max(elem.y, elem.y + elem.height);
+	                            if (tx >= x1 && tx <= x2 && ty >= y1 && ty <= y2) {
+	                                return elem;
+	                            }
+	                        }
+	                    } else if (elem.type === 'circle') {
+	                        const p = this.transformPointToElementBoxLocal(elem, x, y);
+	                        const tx = p.x;
+	                        const ty = p.y;
+	                        const centerX = elem.x + elem.width / 2;
+	                        const centerY = elem.y + elem.height / 2;
+	                        const radiusX = Math.abs(elem.width / 2);
+	                        const radiusY = Math.abs(elem.height / 2);
+	                        
+	                        const normalized = Math.pow((tx - centerX) / radiusX, 2) + 
+	                                         Math.pow((ty - centerY) / radiusY, 2);
+	                        
+	                        if (normalized <= 1) {
+	                            return elem;
+	                        }
                     } else if (elem.type === 'line') {
                         // Detección simple de línea (con margen)
                         const dist = this.distanceToLineSegment(x, y, elem.x, elem.y, elem.endX, elem.endY);
@@ -4289,12 +4607,13 @@
                         return; // Esperar a que cargue
                     }
                     
-                    if (img && img.complete) {
-                        this.ctx.globalAlpha = elem.opacity || 1;
-                        const crop = (elem.crop && typeof elem.crop === 'object' && !Array.isArray(elem.crop)) ? elem.crop : null;
-                        if (crop && Number.isFinite(crop.x) && Number.isFinite(crop.y) &&
-                            Number.isFinite(crop.w) && Number.isFinite(crop.h) &&
-                            crop.w > 0 && crop.h > 0) {
+	                    if (img && img.complete) {
+	                        const didTransform = this.applyElementBoxTransformToContext(elem);
+	                        this.ctx.globalAlpha = elem.opacity || 1;
+	                        const crop = (elem.crop && typeof elem.crop === 'object' && !Array.isArray(elem.crop)) ? elem.crop : null;
+	                        if (crop && Number.isFinite(crop.x) && Number.isFinite(crop.y) &&
+	                            Number.isFinite(crop.w) && Number.isFinite(crop.h) &&
+	                            crop.w > 0 && crop.h > 0) {
                             const sw = Number(img.naturalWidth) || Number(img.width) || 1;
                             const sh = Number(img.naturalHeight) || Number(img.height) || 1;
                             const sx = Math.max(0, Math.min(sw, crop.x * sw));
@@ -4308,12 +4627,13 @@
                         this.ctx.globalAlpha = 1;
                         
                         // Borde de selección si está seleccionado
-                        if (this.selectedElements.includes(elem)) {
-                            this.ctx.strokeStyle = '#e94560';
-                            this.ctx.lineWidth = 2 / this.camera.zoom;
-                            this.ctx.strokeRect(elem.x, elem.y, elem.width, elem.height);
-                        }
-                    }
+	                        if (this.selectedElements.includes(elem)) {
+	                            this.ctx.strokeStyle = '#e94560';
+	                            this.ctx.lineWidth = 2 / this.camera.zoom;
+	                            this.ctx.strokeRect(elem.x, elem.y, elem.width, elem.height);
+	                        }
+	                        this.restoreElementBoxTransform(didTransform);
+	                    }
                     
                 } else if (elem.type === 'video') {
                     // Dibujar video (HTMLVideoElement) como capa dentro del canvas
@@ -4366,12 +4686,13 @@
                         try { vid.load(); } catch {}
                     }
 
-                    if (vid) {
-                        const shouldPlay = elem.active !== false;
-                        if (!shouldPlay) {
-                            try { if (!vid.paused) vid.pause(); } catch {}
-                            vid._flowPlayRequested = false;
-                        } else if (vid.paused && !vid._flowPlayRequested && elem.autoplay !== false) {
+	                    if (vid) {
+	                        const didTransform = this.applyElementBoxTransformToContext(elem);
+	                        const shouldPlay = elem.active !== false;
+	                        if (!shouldPlay) {
+	                            try { if (!vid.paused) vid.pause(); } catch {}
+	                            vid._flowPlayRequested = false;
+	                        } else if (vid.paused && !vid._flowPlayRequested && elem.autoplay !== false) {
                             vid._flowPlayRequested = true;
                             const p = vid.play();
                             if (p && typeof p.catch === 'function') {
@@ -4413,18 +4734,20 @@
                         }
 
                         // Borde de selección si está seleccionado
-                        if (this.selectedElements.includes(elem)) {
-                            this.ctx.strokeStyle = '#e94560';
-                            this.ctx.lineWidth = 2 / this.camera.zoom;
-                            this.ctx.strokeRect(elem.x, elem.y, elem.width, elem.height);
-                        }
-                    }
+	                        if (this.selectedElements.includes(elem)) {
+	                            this.ctx.strokeStyle = '#e94560';
+	                            this.ctx.lineWidth = 2 / this.camera.zoom;
+	                            this.ctx.strokeRect(elem.x, elem.y, elem.width, elem.height);
+	                        }
+	                        this.restoreElementBoxTransform(didTransform);
+	                    }
 
-                } else if (elem.type === 'rectangle') {
-                    const fillColor = this.normalizeCanvasColor(elem.fillColor);
-                    const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
-                    const doFill = !this.isTransparentColor(fillColor);
-                    const doStroke = !this.isTransparentColor(strokeColor);
+	                } else if (elem.type === 'rectangle') {
+	                    const didTransform = this.applyElementBoxTransformToContext(elem);
+	                    const fillColor = this.normalizeCanvasColor(elem.fillColor);
+	                    const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
+	                    const doFill = !this.isTransparentColor(fillColor);
+	                    const doStroke = !this.isTransparentColor(strokeColor);
 
                     this.ctx.lineWidth = this.getElementLineWidth(elem) / this.camera.zoom;
                     if (doFill) {
@@ -4436,14 +4759,16 @@
                         this.ctx.strokeRect(elem.x, elem.y, elem.width, elem.height);
                     }
                     
-                    // Indicador de conexión
-                    this.drawConnectionIndicator(elem, elem.x + elem.width, elem.y);
-                    
-                } else if (elem.type === 'circle') {
-                    const centerX = elem.x + elem.width / 2;
-                    const centerY = elem.y + elem.height / 2;
-                    const radiusX = Math.abs(elem.width / 2);
-                    const radiusY = Math.abs(elem.height / 2);
+	                    // Indicador de conexión
+	                    this.drawConnectionIndicator(elem, elem.x + elem.width, elem.y);
+	                    this.restoreElementBoxTransform(didTransform);
+	                    
+	                } else if (elem.type === 'circle') {
+	                    const didTransform = this.applyElementBoxTransformToContext(elem);
+	                    const centerX = elem.x + elem.width / 2;
+	                    const centerY = elem.y + elem.height / 2;
+	                    const radiusX = Math.abs(elem.width / 2);
+	                    const radiusY = Math.abs(elem.height / 2);
 
                     const fillColor = this.normalizeCanvasColor(elem.fillColor);
                     const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
@@ -4462,10 +4787,11 @@
                         this.ctx.stroke();
                     }
                     
-                    // Indicador de conexión
-                    this.drawConnectionIndicator(elem, centerX + radiusX, centerY);
-                    
-                } else if (elem.type === 'line') {
+	                    // Indicador de conexión
+	                    this.drawConnectionIndicator(elem, centerX + radiusX, centerY);
+	                    this.restoreElementBoxTransform(didTransform);
+	                    
+	                } else if (elem.type === 'line') {
                     // Dibujar línea
                     const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
                     const doStroke = !this.isTransparentColor(strokeColor);
