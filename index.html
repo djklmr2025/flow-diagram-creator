@@ -8112,9 +8112,73 @@
                 this.updateZoomIndicator();
                 this.refreshDeckUI();
             }
+
+            getWelcomeDeckProject() {
+                // Proyecto por defecto (solo para `mode=deck` cuando no hay `id/data/project`).
+                // Mantenerlo simple y sin dependencias externas.
+                return {
+                    name: 'Bienvenida al Futuro',
+                    date: new Date().toISOString(),
+                    camera: { x: 0, y: 0, zoom: 1 },
+                    elements: [
+                        {
+                            id: 'welcome_core',
+                            type: 'circle',
+                            x: 400,
+                            y: 300,
+                            radius: 50,
+                            color: '#00d4ff',
+                            isAnim: true,
+                            meta: {
+                                controlPoint: true,
+                                order: 1,
+                                slide: {
+                                    title: '🚀 Bienvenido a Flow Diagram Creator',
+                                    text: 'Estás en el Visual Nexus. Aquí puedes crear diagramas animados, planos interactivos y experiencias 3D superpuestas.',
+                                    // Archivo incluido en el repo (sirve en Vercel como /FHLL.gif).
+                                    imageUrl: '/FHLL.gif'
+                                }
+                            }
+                        },
+                        {
+                            id: 'tool_guide',
+                            type: 'rectangle',
+                            x: 600,
+                            y: 200,
+                            width: 60,
+                            height: 60,
+                            color: '#48ea79',
+                            isAnim: true,
+                            meta: {
+                                controlPoint: true,
+                                order: 2,
+                                slide: {
+                                    title: '🛠️ Herramientas de Precision',
+                                    text: 'Usa el lápiz para dibujar a mano alzada o los polígonos inteligentes para crear regiones clickeables con metadatos.',
+                                    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+                                }
+                            }
+                        }
+                    ]
+                };
+            }
+
+            loadWelcomeDeckProject() {
+                const data = this.getWelcomeDeckProject();
+                this.normalizeProjectInPlace(data);
+                this.elements = data.elements || [];
+                this.camera = data.camera || { x: 0, y: 0, zoom: 1 };
+                this.selectedElements = [];
+                this.saveHistory();
+                this.updateZoomIndicator();
+                this.maybeAutoFitViewerCamera();
+                this.refreshDeckUI();
+            }
             
             loadFromURLParameter() {
                 const urlParams = new URLSearchParams(window.location.search);
+                const mode = String(urlParams.get('mode') || '').trim().toLowerCase();
+                const isDeck = mode === 'deck';
 
                 // 0) Modo escucha (canal vivo): ?listen=SESSION
                 const listenSession = urlParams.get('listen') || urlParams.get('session');
@@ -8173,6 +8237,17 @@
                         })
                         .catch(error => {
                             console.error('❌ Error al cargar proyecto desde ID:', error);
+                            if (isDeck) {
+                                console.log('ℹ️ Fallback (deck): cargando lámina de bienvenida.');
+                                try {
+                                    const url = new URL(window.location.href);
+                                    url.searchParams.delete('id');
+                                    history.replaceState(null, '', url.toString());
+                                } catch {
+                                    // Ignorar
+                                }
+                                this.loadWelcomeDeckProject();
+                            }
                         });
                     return;
                 }
@@ -8202,6 +8277,11 @@
                             console.error('❌ Error al cargar proyecto desde URL:', error);
                         });
                     return;
+                }
+
+                // 3.5) Fallback: en `mode=deck` sin `id/data/project`, mostrar una lámina de bienvenida.
+                if (isDeck) {
+                    this.loadWelcomeDeckProject();
                 }
 
                 // 4) Auto-carga opcional: buscar ./project.json (misma carpeta)

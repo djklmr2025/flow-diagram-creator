@@ -168,6 +168,7 @@ Video soportado:
 * URL directa: `.mp4/.webm` (se renderiza con `<video>`).
 
 URLs:
+* `?mode=deck` (sin `id/data/project`): carga una **lámina de bienvenida** embebida (fallback).
 * `?mode=deck&id=...` (deck desde un ID publicado).
 * `?mode=deck&data=...` / `?mode=deck&project=...` (deck desde JSON).
 * `?mode=deck&cp=ELEMENT_ID` (fija el punto activo por `id`).
