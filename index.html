@@ -33,10 +33,42 @@
 
         body.viewer-bg-studio {
             background: var(--viewer-studio-bg) !important;
+            position: relative;
+            isolation: isolate;
         }
 
         body.viewer-bg-studio #canvas-container {
             background: transparent;
+        }
+
+        /* Fondo con "profundidad" (2.5D): glow + grid suave (solo en modos visor) */
+        body.viewer-bg-studio::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: -1;
+            background:
+                radial-gradient(900px 560px at 50% 18%, rgba(255, 255, 255, 0.08), transparent 62%),
+                radial-gradient(1100px 700px at 50% 92%, rgba(0, 0, 0, 0.42), transparent 60%);
+        }
+
+        body.viewer-bg-studio::after {
+            content: '';
+            position: fixed;
+            left: -35%;
+            right: -35%;
+            top: 42%;
+            bottom: -40%;
+            pointer-events: none;
+            z-index: -1;
+            background:
+                repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.065) 0 1px, transparent 1px 46px),
+                repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.055) 0 1px, transparent 1px 46px);
+            transform-origin: center bottom;
+            transform: perspective(980px) rotateX(66deg);
+            opacity: 0.20;
+            mask-image: radial-gradient(closest-side, rgba(0,0,0,1), transparent 70%);
         }
 
         /* ==================== BOOT SCREEN (DIAGNOSTICO) ==================== */
@@ -568,6 +600,153 @@
             box-shadow: 0 24px 80px rgba(0,0,0,0.55);
         }
 
+        /* Columna intermedia (navegación de diapositivas) para evitar el "hueco" en pantallas anchas. */
+        #deck-nav {
+            position: fixed;
+            top: 0;
+            right: 440px; /* JS recalcula según el ancho del panel derecho */
+            bottom: 0;
+            width: 300px;
+            background: rgba(255, 255, 255, 0.92);
+            color: #0b1020;
+            border-left: 1px solid rgba(15, 52, 96, 0.18);
+            box-shadow: -10px 0 40px rgba(0,0,0,0.22);
+            z-index: 1490;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #deck-nav.show {
+            display: flex;
+        }
+
+        .deck-nav-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 14px 14px 10px 14px;
+            border-bottom: 1px solid rgba(15, 52, 96, 0.12);
+        }
+
+        .deck-nav-title {
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            color: rgba(15, 52, 96, 0.85);
+        }
+
+        #deck-nav-count {
+            font-size: 12px;
+            font-weight: 800;
+            color: rgba(11, 16, 32, 0.7);
+        }
+
+        #deck-nav-list {
+            flex: 1;
+            overflow: auto;
+            padding: 12px 14px 14px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+	        .deck-nav-item {
+	            width: 100%;
+	            display: grid;
+	            grid-template-columns: 26px 1fr 56px;
+	            gap: 10px;
+	            align-items: start;
+	            padding: 10px;
+	            border-radius: 12px;
+	            background: rgba(15, 52, 96, 0.06);
+            border: 1px solid rgba(15, 52, 96, 0.14);
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .deck-nav-item:hover {
+            border-color: rgba(233, 69, 96, 0.55);
+        }
+
+        .deck-nav-item.active {
+            border-color: #e94560;
+            box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.14) inset;
+        }
+
+        .deck-nav-badge {
+            width: 24px;
+            height: 24px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #e94560;
+            border: 1px solid rgba(233, 69, 96, 0.55);
+            font-size: 12px;
+            font-weight: 900;
+            color: #fff;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.10);
+        }
+
+	        .deck-nav-main {
+	            display: flex;
+	            flex-direction: column;
+	            gap: 6px;
+	            min-width: 0;
+	        }
+
+	        .deck-nav-thumb {
+	            width: 56px;
+	            height: 42px;
+	            border-radius: 10px;
+	            background: rgba(15, 52, 96, 0.10);
+	            border: 1px solid rgba(15, 52, 96, 0.12);
+	            display: flex;
+	            align-items: center;
+	            justify-content: center;
+	            overflow: hidden;
+	            color: rgba(11, 16, 32, 0.55);
+	            font-weight: 900;
+	            font-size: 14px;
+	        }
+
+	        .deck-nav-thumb img {
+	            width: 100%;
+	            height: 100%;
+	            object-fit: cover;
+	            display: block;
+	        }
+
+	        .deck-nav-name {
+	            font-size: 13px;
+	            font-weight: 800;
+	            color: rgba(11, 16, 32, 0.94);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .deck-nav-meta {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            font-size: 11px;
+            color: rgba(15, 52, 96, 0.72);
+        }
+
+        .deck-nav-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.85);
+            border: 1px solid rgba(15, 52, 96, 0.12);
+        }
+
         .deck-header {
             display: flex;
             align-items: center;
@@ -691,17 +870,30 @@
 
 	        #deck-slide-title {
 	            font-size: 14px;
-	            font-weight: 700;
-	            margin-bottom: 10px;
+	            font-weight: 900;
+	            margin-bottom: 6px;
 	            color: #0b1020;
+	        }
+
+	        #deck-slide {
+	            display: flex;
+	            flex-direction: column;
+	            gap: 10px;
+	        }
+
+	        .deck-slide-media {
+	            border-radius: 12px;
+	            background: rgba(15, 52, 96, 0.06);
+	            border: 1px solid rgba(15, 52, 96, 0.12);
+	            padding: 10px;
 	        }
 
 	        #deck-slide-image {
 	            width: 100%;
-	            max-height: 220px;
+	            max-height: 320px;
 	            object-fit: contain;
 	            border-radius: 10px;
-	            background: rgba(15, 52, 96, 0.06);
+	            background: rgba(255, 255, 255, 0.8);
 	            display: none;
 	        }
 
@@ -715,20 +907,35 @@
 
 	        #deck-slide-iframe {
 	            border: 0;
-	            height: 220px;
+	            height: 240px;
 	        }
 
 	        #deck-slide-video {
 	            max-height: 240px;
 	        }
 
+	        .deck-slide-info {
+	            border-radius: 12px;
+	            background: rgba(255, 255, 255, 0.92);
+	            border: 1px solid rgba(15, 52, 96, 0.12);
+	            padding: 10px 10px 12px 10px;
+	        }
+
+	        .deck-slide-info-title {
+	            font-weight: 900;
+	            letter-spacing: 0.6px;
+	            color: rgba(15, 52, 96, 0.88);
+	            text-transform: uppercase;
+	            font-size: 12px;
+	            margin-bottom: 8px;
+	        }
+
 	        #deck-slide-text {
-	            margin-top: 10px;
 	            font-size: 13px;
-	            line-height: 1.35;
+	            line-height: 1.45;
 	            color: rgba(11, 16, 32, 0.92);
-            white-space: pre-wrap;
-        }
+	            white-space: pre-wrap;
+	        }
 
         .deck-share-row {
             display: flex;
@@ -1018,8 +1225,11 @@
 	        <button class="btn" id="btn-video" title="Insertar Video (M)">
 	            <span>🎞️</span> Video
 	        </button>
-        
-        <div class="separator"></div>
+	        <button class="btn" id="btn-bucket" title="Bote de pintura (B)">
+	            <span>🎨</span> Pintar
+	        </button>
+	        
+	        <div class="separator"></div>
         
         <!-- Acciones -->
         <button class="btn" id="btn-group" title="Agrupar (Ctrl+G)">
@@ -1121,15 +1331,24 @@
         <div id="layers-list"></div>
     </div>
 
-    <!-- Canvas Container -->
-    <div id="canvas-container">
-        <canvas id="main-canvas"></canvas>
-    </div>
+	    <!-- Canvas Container -->
+	    <div id="canvas-container">
+	        <canvas id="main-canvas"></canvas>
+	    </div>
 
-    <!-- Deck Panel (Modo Lámina / Informativo) -->
-    <div id="deck-panel">
-        <div id="deck-resize-handle" title="Redimensionar panel"></div>
-        <div class="deck-header">
+	    <!-- Deck Nav (Modo Lámina: columna intermedia para navegar diapositivas) -->
+	    <div id="deck-nav">
+	        <div class="deck-nav-header">
+	            <div class="deck-nav-title">Diapositivas</div>
+	            <div id="deck-nav-count"></div>
+	        </div>
+	        <div id="deck-nav-list"></div>
+	    </div>
+
+	    <!-- Deck Panel (Modo Lámina / Informativo) -->
+	    <div id="deck-panel">
+	        <div id="deck-resize-handle" title="Redimensionar panel"></div>
+	        <div class="deck-header">
             <div class="deck-title">Lámina</div>
             <div class="deck-actions">
                 <button class="btn small" id="btn-deck-copy-link" title="Copiar enlace de la lámina">Copiar Link</button>
@@ -1149,15 +1368,20 @@
 	                    <button class="btn small" id="btn-deck-prev" title="Anterior">◀</button>
 	                    <div id="deck-slide-count"></div>
 	                    <button class="btn small" id="btn-deck-next" title="Siguiente">▶</button>
-	                </div>
-	                <div id="deck-slide-title"></div>
-	                <img id="deck-slide-image" alt="Diapositiva">
-	                <iframe id="deck-slide-iframe" title="Video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
-	                <video id="deck-slide-video" controls></video>
-	                <div id="deck-slide-text"></div>
-	            </div>
-	        </div>
-	        </div>
+		                </div>
+		                <div id="deck-slide-title"></div>
+		                <div class="deck-slide-media">
+		                    <img id="deck-slide-image" alt="Diapositiva">
+		                    <iframe id="deck-slide-iframe" title="Video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+		                    <video id="deck-slide-video" controls></video>
+		                </div>
+		                <div class="deck-slide-info">
+		                    <div class="deck-slide-info-title">+INFO</div>
+		                    <div id="deck-slide-text"></div>
+		                </div>
+		            </div>
+		        </div>
+		        </div>
 
         <div class="deck-footer">
             <div class="deck-share-row">
@@ -1194,13 +1418,25 @@
 	                <input type="text" id="prop-slide-video-url" placeholder="YouTube o mp4/webm">
 	            </div>
 	        </div>
-		        <div class="property-group">
-		            <label>Color de Relleno:</label>
-		            <input type="color" id="prop-fill-color" class="color-picker" value="#0f3460">
-		            <label class="property-checkbox">
-		                <input type="checkbox" id="prop-fill-transparent"> Transparente
-	            </label>
-	        </div>
+			        <div class="property-group">
+			            <label>Color de Relleno:</label>
+			            <input type="color" id="prop-fill-color" class="color-picker" value="#0f3460">
+			            <label class="property-checkbox">
+			                <input type="checkbox" id="prop-fill-transparent"> Transparente
+		            </label>
+			            <label class="property-checkbox" style="margin-top: 8px;">
+			                <input type="checkbox" id="prop-fill-gradient-enabled"> Degradado (lineal)
+			            </label>
+			            <div id="prop-fill-gradient-controls" style="display:none; margin-top: 8px;">
+			                <label>Color A:</label>
+			                <input type="color" id="prop-fill-gradient-a" class="color-picker" value="#00d4ff">
+			                <label>Color B:</label>
+			                <input type="color" id="prop-fill-gradient-b" class="color-picker" value="#e94560">
+			                <label>Ángulo:</label>
+			                <input type="range" id="prop-fill-gradient-angle" min="0" max="360" step="15" value="90">
+			                <div id="prop-fill-gradient-angle-value" style="margin-top: 4px; font-size: 12px; color: #aaa;">90°</div>
+			            </div>
+			        </div>
 	        <div class="property-group">
 	            <label>Color de Borde:</label>
 	            <input type="color" id="prop-stroke-color" class="color-picker" value="#e94560">
@@ -1771,6 +2007,7 @@
                 document.getElementById('btn-pencil').addEventListener('click', () => this.setTool('pencil'));
                 document.getElementById('btn-image').addEventListener('click', () => this.insertImage());
                 document.getElementById('btn-video').addEventListener('click', () => this.insertVideo());
+                document.getElementById('btn-bucket').addEventListener('click', () => this.setTool('bucket'));
                 
                 // Acciones
                 document.getElementById('btn-group').addEventListener('click', () => this.groupElements());
@@ -1832,14 +2069,18 @@
                 document.getElementById('video-input').addEventListener('change', (e) => this.loadVideoFile(e));
 
                 // Deck (lámina informativa)
-                const deckList = document.getElementById('deck-control-points');
-                if (deckList) {
-                    deckList.addEventListener('click', (e) => this.onDeckControlPointClick(e));
-                }
-                const deckWhatsapp = document.getElementById('btn-deck-whatsapp');
-                if (deckWhatsapp) {
-                    deckWhatsapp.addEventListener('click', () => this.shareDeckToWhatsApp());
-                }
+	                const deckList = document.getElementById('deck-control-points');
+	                if (deckList) {
+	                    deckList.addEventListener('click', (e) => this.onDeckControlPointClick(e));
+	                }
+	                const deckNavList = document.getElementById('deck-nav-list');
+	                if (deckNavList) {
+	                    deckNavList.addEventListener('click', (e) => this.onDeckControlPointClick(e));
+	                }
+	                const deckWhatsapp = document.getElementById('btn-deck-whatsapp');
+	                if (deckWhatsapp) {
+	                    deckWhatsapp.addEventListener('click', () => this.shareDeckToWhatsApp());
+	                }
                 const deckShare = document.getElementById('btn-deck-share');
                 if (deckShare) {
                     deckShare.addEventListener('click', () => this.shareDeckNative());
@@ -1935,30 +2176,76 @@
 	                }
 	            }
             
-	            setupPropertiesPanel() {
-	                const inputs = [
-	                    'prop-name',
-	                    'prop-cp-enabled',
-	                    'prop-cp-order',
-	                    'prop-slide-title',
-	                    'prop-slide-text',
-	                    'prop-slide-image-url',
-	                    'prop-slide-video-url',
-	                    'prop-fill-color',
-	                    'prop-stroke-color',
-	                    'prop-anim-color',
-	                    'prop-flow-direction',
-	                    'prop-connection-status',
-	                    'prop-active',
-	                    'prop-fill-transparent',
-	                    'prop-stroke-transparent',
-	                ];
+		            setupPropertiesPanel() {
+		                const inputs = [
+		                    'prop-name',
+		                    'prop-cp-enabled',
+		                    'prop-cp-order',
+		                    'prop-slide-title',
+		                    'prop-slide-text',
+		                    'prop-slide-image-url',
+		                    'prop-slide-video-url',
+		                    'prop-fill-color',
+		                    'prop-stroke-color',
+		                    'prop-anim-color',
+		                    'prop-flow-direction',
+		                    'prop-connection-status',
+		                    'prop-active',
+		                    'prop-stroke-transparent',
+		                ];
 	                
-	                inputs.forEach(id => {
-	                    const el = document.getElementById(id);
-	                    if (!el) return;
-	                    el.addEventListener('change', () => this.updateSelectedProperties());
-	                });
+		                inputs.forEach(id => {
+		                    const el = document.getElementById(id);
+		                    if (!el) return;
+		                    el.addEventListener('change', () => this.updateSelectedProperties());
+		                });
+
+		                // Fill: Transparente vs Degradado (lineal)
+		                const fillCb = document.getElementById('prop-fill-transparent');
+		                const fgEnabled = document.getElementById('prop-fill-gradient-enabled');
+		                const fgControls = document.getElementById('prop-fill-gradient-controls');
+		                const fgA = document.getElementById('prop-fill-gradient-a');
+		                const fgB = document.getElementById('prop-fill-gradient-b');
+		                const fgAngle = document.getElementById('prop-fill-gradient-angle');
+		                const fgAngleValue = document.getElementById('prop-fill-gradient-angle-value');
+
+		                const syncFillGradientUI = () => {
+		                    const on = Boolean(fgEnabled && fgEnabled.checked);
+		                    if (fgControls) fgControls.style.display = on ? 'block' : 'none';
+		                    if (fgAngle && fgAngleValue) {
+		                        const v = String(fgAngle.value || '0');
+		                        fgAngleValue.textContent = `${v}°`;
+		                    }
+		                };
+
+		                if (fillCb) {
+		                    fillCb.addEventListener('change', () => {
+		                        if (fillCb.checked && fgEnabled) fgEnabled.checked = false;
+		                        syncFillGradientUI();
+		                        this.updateSelectedProperties();
+		                    });
+		                }
+
+		                if (fgEnabled) {
+		                    fgEnabled.addEventListener('change', () => {
+		                        if (fgEnabled.checked && fillCb) fillCb.checked = false;
+		                        syncFillGradientUI();
+		                        this.updateSelectedProperties();
+		                    });
+		                }
+
+		                if (fgA) fgA.addEventListener('change', () => this.updateSelectedProperties());
+		                if (fgB) fgB.addEventListener('change', () => this.updateSelectedProperties());
+		                if (fgAngle) {
+		                    const onAngle = () => {
+		                        syncFillGradientUI();
+		                        this.updateSelectedProperties();
+		                    };
+		                    fgAngle.addEventListener('input', onAngle);
+		                    fgAngle.addEventListener('change', onAngle);
+		                }
+
+		                syncFillGradientUI();
 
 	                const lw = document.getElementById('prop-line-width');
 	                const lwVal = document.getElementById('prop-line-width-value');
@@ -2366,15 +2653,16 @@
 
 	                this.tool = tool;
 	                
-	                const btnMap = {
-	                    'select': 'btn-select',
-	                    'rectangle': 'btn-rectangle',
-	                    'circle': 'btn-circle',
-	                    'poi': 'btn-poi',
-	                    'shape': 'btn-shape',
-	                    'line': 'btn-line',
-	                    'pencil': 'btn-pencil'
-	                };
+                const btnMap = {
+                    'select': 'btn-select',
+                    'rectangle': 'btn-rectangle',
+                    'circle': 'btn-circle',
+                    'poi': 'btn-poi',
+                    'shape': 'btn-shape',
+                    'bucket': 'btn-bucket',
+                    'line': 'btn-line',
+                    'pencil': 'btn-pencil'
+                };
 
                 // Actualizar UI (solo botones de herramientas, no toda la toolbar)
                 Object.values(btnMap).forEach((id) => {
@@ -2672,6 +2960,19 @@
 	                    this.updatePropertiesPanel();
 	                    this.updateStatusBar();
 	                    this.setTool('select');
+	                    return;
+	                }
+
+	                // Herramienta Pintar (bote): click para aplicar relleno al elemento bajo el cursor.
+	                if (this.tool === 'bucket' && e.button === 0) {
+	                    const clicked = this.getElementAt(worldPos.x, worldPos.y);
+	                    if (clicked && !clicked.locked) {
+	                        this.selectedElements = [clicked];
+	                        this.applyBucketFillToElement(clicked);
+	                        this.saveHistory();
+	                        this.updatePropertiesPanel();
+	                        this.updateStatusBar();
+	                    }
 	                    return;
 	                }
 	                
@@ -3106,13 +3407,16 @@
                         case 'i':
                             this.insertImage();
                             break;
-                        case 'm':
-                            this.insertVideo();
-                            break;
-                        case 'o':
-                        case 'O':
-                            this.toggleLayersPanel();
-                            break;
+	                        case 'm':
+	                            this.insertVideo();
+	                            break;
+	                        case 'b':
+	                            this.setTool('bucket');
+	                            break;
+	                        case 'o':
+	                        case 'O':
+	                            this.toggleLayersPanel();
+	                            break;
                         case '+':
                         case '=':
                             this.zoomIn();
@@ -4232,24 +4536,27 @@
                     }
                 }
 
-                const poly = {
-                    id: elem.id,
-                    type: 'polygon',
-                    points,
-                    lineWidth: 3,
-                    fillColor: elem.fillColor,
-                    strokeColor: elem.strokeColor,
-                    locked: false,
-                    active: elem.active,
-                    connectionStatus: elem.connectionStatus || 'none',
-                    name: elem.name || '',
-                    closed: true
-                };
+	                const poly = {
+	                    id: elem.id,
+	                    type: 'polygon',
+	                    points,
+	                    lineWidth: 3,
+	                    fillColor: elem.fillColor,
+	                    strokeColor: elem.strokeColor,
+	                    locked: false,
+	                    active: elem.active,
+	                    connectionStatus: elem.connectionStatus || 'none',
+	                    name: elem.name || '',
+	                    closed: true
+	                };
 
-                this.elements[idx] = poly;
-                this.selectedElements = [poly];
-                this.saveHistory();
-                this.updatePropertiesPanel();
+	                const fg = this.normalizeFillGradientSpec(elem.fillGradient);
+	                if (fg) poly.fillGradient = fg;
+
+	                this.elements[idx] = poly;
+	                this.selectedElements = [poly];
+	                this.saveHistory();
+	                this.updatePropertiesPanel();
             }
             
             getElementAt(x, y) {
@@ -4742,50 +5049,72 @@
 	                        this.restoreElementBoxTransform(didTransform);
 	                    }
 
-	                } else if (elem.type === 'rectangle') {
-	                    const didTransform = this.applyElementBoxTransformToContext(elem);
-	                    const fillColor = this.normalizeCanvasColor(elem.fillColor);
-	                    const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
-	                    const doFill = !this.isTransparentColor(fillColor);
-	                    const doStroke = !this.isTransparentColor(strokeColor);
+		                } else if (elem.type === 'rectangle') {
+		                    const didTransform = this.applyElementBoxTransformToContext(elem);
+		                    const fillColor = this.normalizeCanvasColor(elem.fillColor);
+		                    const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
+		                    const doFill = !this.isTransparentColor(fillColor);
+		                    const doStroke = !this.isTransparentColor(strokeColor);
+		                    const fg = this.normalizeFillGradientSpec(elem.fillGradient);
 
-                    this.ctx.lineWidth = this.getElementLineWidth(elem) / this.camera.zoom;
-                    if (doFill) {
-                        this.ctx.fillStyle = fillColor;
-                        this.ctx.fillRect(elem.x, elem.y, elem.width, elem.height);
-                    }
-                    if (doStroke) {
-                        this.ctx.strokeStyle = strokeColor;
-                        this.ctx.strokeRect(elem.x, elem.y, elem.width, elem.height);
-                    }
+	                    this.ctx.lineWidth = this.getElementLineWidth(elem) / this.camera.zoom;
+	                    if (fg) {
+	                        const bounds = { minX: elem.x, minY: elem.y, maxX: elem.x + elem.width, maxY: elem.y + elem.height };
+	                        const grad = this.createLinearGradientForBounds(bounds, fg.angle, fg.a, fg.b);
+	                        if (grad) {
+	                            this.ctx.fillStyle = grad;
+	                            this.ctx.fillRect(elem.x, elem.y, elem.width, elem.height);
+	                        } else if (doFill) {
+	                            this.ctx.fillStyle = fillColor;
+	                            this.ctx.fillRect(elem.x, elem.y, elem.width, elem.height);
+	                        }
+	                    } else if (doFill) {
+	                        this.ctx.fillStyle = fillColor;
+	                        this.ctx.fillRect(elem.x, elem.y, elem.width, elem.height);
+	                    }
+	                    if (doStroke) {
+	                        this.ctx.strokeStyle = strokeColor;
+	                        this.ctx.strokeRect(elem.x, elem.y, elem.width, elem.height);
+	                    }
                     
 	                    // Indicador de conexión
 	                    this.drawConnectionIndicator(elem, elem.x + elem.width, elem.y);
 	                    this.restoreElementBoxTransform(didTransform);
 	                    
-	                } else if (elem.type === 'circle') {
-	                    const didTransform = this.applyElementBoxTransformToContext(elem);
-	                    const centerX = elem.x + elem.width / 2;
-	                    const centerY = elem.y + elem.height / 2;
-	                    const radiusX = Math.abs(elem.width / 2);
-	                    const radiusY = Math.abs(elem.height / 2);
+		                } else if (elem.type === 'circle') {
+		                    const didTransform = this.applyElementBoxTransformToContext(elem);
+		                    const centerX = elem.x + elem.width / 2;
+		                    const centerY = elem.y + elem.height / 2;
+		                    const radiusX = Math.abs(elem.width / 2);
+		                    const radiusY = Math.abs(elem.height / 2);
 
-                    const fillColor = this.normalizeCanvasColor(elem.fillColor);
-                    const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
-                    const doFill = !this.isTransparentColor(fillColor);
-                    const doStroke = !this.isTransparentColor(strokeColor);
-                    this.ctx.lineWidth = this.getElementLineWidth(elem) / this.camera.zoom;
-                    
-                    this.ctx.beginPath();
-                    this.ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
-                    if (doFill) {
-                        this.ctx.fillStyle = fillColor;
-                        this.ctx.fill();
-                    }
-                    if (doStroke) {
-                        this.ctx.strokeStyle = strokeColor;
-                        this.ctx.stroke();
-                    }
+	                    const fillColor = this.normalizeCanvasColor(elem.fillColor);
+	                    const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
+	                    const doFill = !this.isTransparentColor(fillColor);
+	                    const doStroke = !this.isTransparentColor(strokeColor);
+	                    const fg = this.normalizeFillGradientSpec(elem.fillGradient);
+	                    this.ctx.lineWidth = this.getElementLineWidth(elem) / this.camera.zoom;
+	                    
+	                    this.ctx.beginPath();
+	                    this.ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+	                    if (fg) {
+	                        const bounds = { minX: elem.x, minY: elem.y, maxX: elem.x + elem.width, maxY: elem.y + elem.height };
+	                        const grad = this.createLinearGradientForBounds(bounds, fg.angle, fg.a, fg.b);
+	                        if (grad) {
+	                            this.ctx.fillStyle = grad;
+	                            this.ctx.fill();
+	                        } else if (doFill) {
+	                            this.ctx.fillStyle = fillColor;
+	                            this.ctx.fill();
+	                        }
+	                    } else if (doFill) {
+	                        this.ctx.fillStyle = fillColor;
+	                        this.ctx.fill();
+	                    }
+	                    if (doStroke) {
+	                        this.ctx.strokeStyle = strokeColor;
+	                        this.ctx.stroke();
+	                    }
                     
 	                    // Indicador de conexión
 	                    this.drawConnectionIndicator(elem, centerX + radiusX, centerY);
@@ -4813,18 +5142,19 @@
                     // Indicador de conexión
                     this.drawConnectionIndicator(elem, elem.endX, elem.endY);
                     
-                } else if (elem.type === 'path' || elem.type === 'polygon') {
-                    // Dibujar trazado libre o polígono cerrado
-                    if (elem.points && elem.points.length > 1) {
-                        const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
-                        const fillColor = this.normalizeCanvasColor(elem.fillColor);
-                        const doStroke = !this.isTransparentColor(strokeColor);
-                        const doFill = !this.isTransparentColor(fillColor);
+	                } else if (elem.type === 'path' || elem.type === 'polygon') {
+	                    // Dibujar trazado libre o polígono cerrado
+	                    if (elem.points && elem.points.length > 1) {
+	                        const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
+	                        const fillColor = this.normalizeCanvasColor(elem.fillColor);
+	                        const doStroke = !this.isTransparentColor(strokeColor);
+	                        const doFill = !this.isTransparentColor(fillColor);
+	                        const fg = this.normalizeFillGradientSpec(elem.fillGradient);
 
-                        this.ctx.strokeStyle = strokeColor;
-                        this.ctx.lineWidth = this.getElementLineWidth(elem) / this.camera.zoom;
-                        this.ctx.lineCap = 'round';
-                        this.ctx.lineJoin = 'round';
+	                        this.ctx.strokeStyle = strokeColor;
+	                        this.ctx.lineWidth = this.getElementLineWidth(elem) / this.camera.zoom;
+	                        this.ctx.lineCap = 'round';
+	                        this.ctx.lineJoin = 'round';
                         
                         this.ctx.beginPath();
                         this.ctx.moveTo(elem.points[0].x, elem.points[0].y);
@@ -4833,19 +5163,28 @@
                             this.ctx.lineTo(elem.points[i].x, elem.points[i].y);
                         }
                         
-                        // Si es polígono cerrado, cerrar y rellenar
-                        if (elem.type === 'polygon' || elem.closed) {
-                            this.ctx.closePath();
-                            
-                            if (doFill) {
-                                this.ctx.fillStyle = fillColor;
-                                this.ctx.fill();
-                            }
-                        }
-                        
-                        if (doStroke) this.ctx.stroke();
-                    }
-                }
+	                        // Si es polígono cerrado, cerrar y rellenar
+	                        if (elem.type === 'polygon' || elem.closed) {
+	                            this.ctx.closePath();
+	                            if (fg) {
+	                                const bounds = this.getElementBounds(elem);
+	                                const grad = bounds ? this.createLinearGradientForBounds(bounds, fg.angle, fg.a, fg.b) : null;
+	                                if (grad) {
+	                                    this.ctx.fillStyle = grad;
+	                                    this.ctx.fill();
+	                                } else if (doFill) {
+	                                    this.ctx.fillStyle = fillColor;
+	                                    this.ctx.fill();
+	                                }
+	                            } else if (doFill) {
+	                                this.ctx.fillStyle = fillColor;
+	                                this.ctx.fill();
+	                            }
+	                        }
+	                        
+	                        if (doStroke) this.ctx.stroke();
+	                    }
+	                }
 
                 // Etiquetas sin sombra (solo el "volumen" del elemento).
 	                if (useDepthFx) {
@@ -6236,16 +6575,28 @@
 		                        } else if (elem.crop != null) {
 		                            delete elem.crop;
 		                        }
-		                    } else if (elem.type === 'polygon' || elem.type === 'path') {
-		                        if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#e94560';
-		                        if (typeof elem.fillColor !== 'string') elem.fillColor = '#0f3460';
-		                        if (!Number.isFinite(elem.lineWidth)) elem.lineWidth = 3;
-		                    }
+			                    } else if (elem.type === 'polygon' || elem.type === 'path') {
+			                        if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#e94560';
+			                        if (typeof elem.fillColor !== 'string') elem.fillColor = '#0f3460';
+			                        if (!Number.isFinite(elem.lineWidth)) elem.lineWidth = 3;
+			                    }
 
-                    if (typeof elem.name !== 'string') elem.name = '';
-                    if (typeof elem.locked !== 'boolean') elem.locked = false;
-                    if (typeof elem.active !== 'boolean') elem.active = true;
-                    if (typeof elem.connectionStatus !== 'string') elem.connectionStatus = 'none';
+	                    // Normalizar degradado de relleno (si existe).
+	                    if (this.elementSupportsFillGradient(elem)) {
+	                        const fg = this.normalizeFillGradientSpec(elem.fillGradient);
+	                        if (fg) {
+	                            elem.fillGradient = fg;
+	                        } else if (elem.fillGradient != null) {
+	                            try { delete elem.fillGradient; } catch {}
+	                        }
+	                    } else if (elem.fillGradient != null) {
+	                        try { delete elem.fillGradient; } catch {}
+	                    }
+
+	                    if (typeof elem.name !== 'string') elem.name = '';
+	                    if (typeof elem.locked !== 'boolean') elem.locked = false;
+	                    if (typeof elem.active !== 'boolean') elem.active = true;
+	                    if (typeof elem.connectionStatus !== 'string') elem.connectionStatus = 'none';
 
                     this.normalizeBoxElementInPlace(elem);
                 };
@@ -6285,6 +6636,7 @@
             refreshDeckUI() {
                 if (this.viewerMode !== 'deck') return;
                 this.updateDeckControlPointsUI();
+                this.updateDeckNavUI();
                 this.applyDeckStateFromUrl();
                 this.updateDeckShareStatus();
             }
@@ -6452,10 +6804,10 @@
 	                    return;
 	                }
 
-	                cps.forEach((elem) => {
-	                    const btn = document.createElement('button');
-	                    btn.type = 'button';
-	                    btn.className = 'deck-cp';
+		                cps.forEach((elem) => {
+		                    const btn = document.createElement('button');
+		                    btn.type = 'button';
+		                    btn.className = 'deck-cp';
 	                    btn.dataset.cpId = elem.id != null ? String(elem.id) : '';
 	                    if (this.activeControlPointId != null && String(this.activeControlPointId) === String(elem.id)) {
 	                        btn.classList.add('active');
@@ -6477,12 +6829,108 @@
 	                    btn.appendChild(badge);
 	                    btn.appendChild(name);
 	                    btn.appendChild(id);
-	                    listEl.appendChild(btn);
-	                });
-	            }
+		                    listEl.appendChild(btn);
+		                });
+		            }
 
-            onDeckControlPointClick(e) {
-                if (this.viewerMode !== 'deck') return;
+		            updateDeckNavUI() {
+		                if (this.viewerMode !== 'deck') return;
+
+		                const navPanel = document.getElementById('deck-nav');
+		                if (!navPanel || !navPanel.classList.contains('show')) return;
+
+		                const listEl = document.getElementById('deck-nav-list');
+		                const countEl = document.getElementById('deck-nav-count');
+		                if (!listEl) return;
+
+		                this.ensureControlPointOrders(this.elements);
+		                const cps = this.collectControlPoints();
+
+		                if (countEl) {
+		                    countEl.textContent = cps.length ? `${cps.length}` : '0';
+		                }
+
+		                listEl.innerHTML = '';
+
+		                if (cps.length === 0) {
+		                    const empty = document.createElement('div');
+		                    empty.style.color = 'rgba(11, 16, 32, 0.65)';
+		                    empty.style.fontSize = '13px';
+		                    empty.textContent = '(No hay diapositivas)';
+		                    listEl.appendChild(empty);
+		                    return;
+		                }
+
+		                cps.forEach((elem) => {
+		                    const btn = document.createElement('button');
+		                    btn.type = 'button';
+		                    btn.className = 'deck-nav-item';
+		                    btn.dataset.cpId = elem.id != null ? String(elem.id) : '';
+		                    if (this.activeControlPointId != null && String(this.activeControlPointId) === String(elem.id)) {
+		                        btn.classList.add('active');
+		                    }
+
+		                    const badge = document.createElement('span');
+		                    badge.className = 'deck-nav-badge';
+		                    const order = this.getControlPointOrder(elem);
+		                    badge.textContent = order != null ? String(order) : '';
+
+		                    const main = document.createElement('span');
+		                    main.className = 'deck-nav-main';
+
+		                    const name = document.createElement('span');
+		                    name.className = 'deck-nav-name';
+		                    name.textContent = this.getControlPointLabel(elem);
+
+		                    const meta = document.createElement('span');
+		                    meta.className = 'deck-nav-meta';
+		                    const info = this.extractSlideInfo(elem);
+		                    const hasImage = Boolean(String(info.imageUrl || '').trim());
+		                    const hasVideo = Boolean(String(info.videoUrl || '').trim());
+		                    const hasText = Boolean(String(info.text || '').trim());
+
+		                    const addPill = (label) => {
+		                        const pill = document.createElement('span');
+		                        pill.className = 'deck-nav-pill';
+		                        pill.textContent = label;
+		                        meta.appendChild(pill);
+		                    };
+
+		                    if (hasImage) addPill('🖼️ Imagen');
+		                    if (hasVideo) addPill('🎥 Video');
+		                    if (hasText) addPill('📝 Info');
+		                    if (!hasImage && !hasVideo && !hasText) addPill('Sin contenido');
+
+			                    main.appendChild(name);
+			                    main.appendChild(meta);
+
+			                    const thumb = document.createElement('span');
+			                    thumb.className = 'deck-nav-thumb';
+			                    if (hasImage) {
+			                        const img = document.createElement('img');
+			                        img.alt = '';
+			                        img.loading = 'lazy';
+			                        img.decoding = 'async';
+			                        img.referrerPolicy = 'no-referrer';
+			                        img.src = String(info.imageUrl || '').trim();
+			                        thumb.appendChild(img);
+			                    } else if (hasVideo) {
+			                        thumb.textContent = '▶';
+			                    } else if (hasText) {
+			                        thumb.textContent = '📝';
+			                    } else {
+			                        thumb.textContent = '—';
+			                    }
+
+			                    btn.appendChild(badge);
+			                    btn.appendChild(main);
+			                    btn.appendChild(thumb);
+			                    listEl.appendChild(btn);
+			                });
+			            }
+
+	            onDeckControlPointClick(e) {
+	                if (this.viewerMode !== 'deck') return;
 
                 const btn = e.target.closest('button[data-cp-id]');
                 if (!btn) return;
@@ -6554,12 +7002,13 @@
                     this.focusCameraOnElement(elem);
                 }
 
-                this.updateDeckSlideUI(elem);
-                this.updateDeckControlPointsUI();
+	                this.updateDeckSlideUI(elem);
+	                this.updateDeckControlPointsUI();
+	                this.updateDeckNavUI();
 
-                if (updateUrl) {
-                    this.updateDeckUrlParam('cp', String(elem.id));
-                }
+	                if (updateUrl) {
+	                    this.updateDeckUrlParam('cp', String(elem.id));
+	                }
 
                 this.updateDeckShareStatus();
             }
@@ -6646,6 +7095,8 @@
 	                const iframeEl = document.getElementById('deck-slide-iframe');
 	                const videoEl = document.getElementById('deck-slide-video');
 	                const textEl = document.getElementById('deck-slide-text');
+	                const mediaWrap = imgEl ? imgEl.closest('.deck-slide-media') : null;
+	                const infoWrap = textEl ? textEl.closest('.deck-slide-info') : null;
 	                const countEl = document.getElementById('deck-slide-count');
 	                const prevBtn = document.getElementById('btn-deck-prev');
 	                const nextBtn = document.getElementById('btn-deck-next');
@@ -6677,11 +7128,14 @@
 
 	                    iframeEl.removeAttribute('src');
 	                    iframeEl.style.display = 'none';
+
+	                    if (mediaWrap) mediaWrap.style.display = 'none';
 	                };
 
 	                if (!elem) {
 	                    titleEl.textContent = '';
 	                    textEl.textContent = '';
+	                    if (infoWrap) infoWrap.style.display = 'none';
 	                    resetMedia();
 	                    return;
 	                }
@@ -6689,6 +7143,7 @@
 	                const info = this.extractSlideInfo(elem);
 	                titleEl.textContent = info.title;
 	                textEl.textContent = info.text || '';
+	                if (infoWrap) infoWrap.style.display = String(info.text || '').trim() ? 'block' : 'none';
 
 	                resetMedia();
 
@@ -6698,17 +7153,20 @@
 	                    if (yt) {
 	                        iframeEl.src = yt;
 	                        iframeEl.style.display = 'block';
+	                        if (mediaWrap) mediaWrap.style.display = 'block';
 	                        return;
 	                    }
 
 	                    videoEl.src = rawVideo;
 	                    videoEl.style.display = 'block';
+	                    if (mediaWrap) mediaWrap.style.display = 'block';
 	                    return;
 	                }
 
 	                if (info.imageUrl) {
 	                    imgEl.src = info.imageUrl;
 	                    imgEl.style.display = 'block';
+	                    if (mediaWrap) mediaWrap.style.display = 'block';
 	                }
 	            }
 
@@ -7001,15 +7459,22 @@
                 if (this.viewerMode !== 'deck') return;
 
                 const deckPanel = document.getElementById('deck-panel');
+                const deckNav = document.getElementById('deck-nav');
                 const container = document.getElementById('canvas-container');
                 if (!deckPanel || !container) return;
 
+                const gutter = Math.max(10, Math.min(24, Math.floor(Math.min(window.innerWidth, window.innerHeight) * 0.02)));
+
+                // Reset base styles del canvas en modo deck.
                 container.style.position = 'fixed';
-                container.style.right = 'auto';
-                container.style.bottom = 'auto';
                 container.style.background = 'transparent';
+                container.style.width = '';
+                container.style.height = '';
+                container.style.maxWidth = '';
+                container.style.maxHeight = '';
 
                 if (this.deckLayout === 'vertical') {
+                    if (deckNav) deckNav.classList.remove('show');
                     const minH = 220;
                     const maxH = Math.floor(window.innerHeight * 0.8);
                     const stored = Number(safeLocalStorageGet('deck-panel-height', '') || '');
@@ -7023,15 +7488,11 @@
                     deckPanel.style.width = '100vw';
                     deckPanel.style.height = `${panelH}px`;
 
-                    const availableH = Math.max(0, window.innerHeight - panelH);
-                    const side = Math.max(240, Math.floor(Math.min(window.innerWidth, availableH)));
-                    const left = Math.max(0, Math.floor((window.innerWidth - side) / 2));
-                    const top = Math.max(0, Math.floor((availableH - side) / 2));
-
-                    container.style.width = `${side}px`;
-                    container.style.height = `${side}px`;
-                    container.style.left = `${left}px`;
-                    container.style.top = `${top}px`;
+                    // El canvas ocupa el area superior completa (sin forzar "cuadrado" que deja huecos).
+                    container.style.left = `${gutter}px`;
+                    container.style.top = `${gutter}px`;
+                    container.style.right = `${gutter}px`;
+                    container.style.bottom = `${panelH + gutter}px`;
                 } else {
                     const minW = 280;
                     const maxW = Math.floor(window.innerWidth * 0.7);
@@ -7046,14 +7507,34 @@
                     deckPanel.style.width = `${panelW}px`;
                     deckPanel.style.height = '100vh';
 
-                    const availableW = Math.max(0, window.innerWidth - panelW);
-                    const side = Math.max(240, Math.floor(Math.min(window.innerHeight, availableW)));
-                    const top = Math.max(0, Math.floor((window.innerHeight - side) / 2));
+                    // Columna intermedia (navegación de diapositivas).
+                    let navW = 300;
+                    // Si el viewport es estrecho, reducir/ocultar la columna.
+                    const availableForNav = Math.max(0, window.innerWidth - panelW - 420);
+                    navW = Math.max(0, Math.min(navW, availableForNav));
 
-                    container.style.width = `${side}px`;
-                    container.style.height = `${side}px`;
-                    container.style.left = '0';
-                    container.style.top = `${top}px`;
+                    const navShown = Boolean(deckNav && navW >= 220);
+                    if (deckNav) {
+                        if (navShown) {
+                            deckNav.classList.add('show');
+                            deckNav.style.top = '0';
+                            deckNav.style.left = 'auto';
+                            deckNav.style.right = `${panelW}px`;
+                            deckNav.style.bottom = '0';
+                            deckNav.style.width = `${navW}px`;
+                            deckNav.style.height = '100vh';
+                        } else {
+                            deckNav.classList.remove('show');
+                        }
+                    }
+
+                    const rightInset = panelW + (navShown ? navW : 0);
+
+                    // Canvas ocupa el espacio restante, con un borde "sheet" (gutter).
+                    container.style.left = `${gutter}px`;
+                    container.style.top = `${gutter}px`;
+                    container.style.bottom = `${gutter}px`;
+                    container.style.right = `${rightInset + gutter}px`;
                 }
             }
 
@@ -7088,23 +7569,26 @@
                 return Boolean(defaultOn);
             }
 
-            shouldAutoFitForViewer() {
-                const urlParams = new URLSearchParams(window.location.search);
-                const mode = String(urlParams.get('mode') || '').toLowerCase();
-                const fitParam = String(urlParams.get('fit') || '').toLowerCase();
+	            shouldAutoFitForViewer() {
+	                const urlParams = new URLSearchParams(window.location.search);
+	                const mode = String(urlParams.get('mode') || '').toLowerCase();
+	                const fitParam = String(urlParams.get('fit') || '').toLowerCase();
 
-                if (fitParam === '0' || fitParam === 'false' || fitParam === 'no') return false;
-                if (fitParam === '1' || fitParam === 'true' || fitParam === 'yes') return true;
+	                if (fitParam === '0' || fitParam === 'false' || fitParam === 'no') return false;
+	                if (fitParam === '1' || fitParam === 'true' || fitParam === 'yes') return true;
 
-                // Default: solo auto-fit en modos visor si la cámara parece "default".
-                if (!(mode === 'preview' || mode === 'sticker' || mode === 'deck')) return false;
+	                // Default: solo auto-fit en modos visor si la cámara parece "default".
+	                if (!(mode === 'preview' || mode === 'sticker' || mode === 'deck')) return false;
 
-                const cam = this.camera || {};
-                const x = Number(cam.x);
-                const y = Number(cam.y);
-                const z = Number(cam.zoom);
-                const isDefault =
-                    Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) &&
+	                // En modo deck, el auto-fit por defecto evita "huecos" cuando la cámara quedó guardada en una posición rara.
+	                if (mode === 'deck') return true;
+
+	                const cam = this.camera || {};
+	                const x = Number(cam.x);
+	                const y = Number(cam.y);
+	                const z = Number(cam.zoom);
+	                const isDefault =
+	                    Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) &&
                     Math.abs(x) < 1e-6 && Math.abs(y) < 1e-6 && Math.abs(z - 1) < 1e-6;
 
                 return isDefault;
@@ -7152,7 +7636,9 @@
                 // Ocultar deck
                 const deckPanel = document.getElementById('deck-panel');
                 if (deckPanel) deckPanel.classList.remove('show');
-                document.body.classList.remove('deck-mode', 'deck-horizontal', 'deck-vertical');
+	                const deckNav = document.getElementById('deck-nav');
+	                if (deckNav) deckNav.classList.remove('show');
+	                document.body.classList.remove('deck-mode', 'deck-horizontal', 'deck-vertical');
 
                 // Ocultar UI
                 document.getElementById('toolbar').style.display = 'none';
@@ -7203,9 +7689,11 @@
                 document.getElementById('context-menu').style.display = 'none';
                 document.getElementById('close-path-hint').style.display = 'none';
 
-                // Mostrar panel deck
-                const deckPanel = document.getElementById('deck-panel');
-                if (deckPanel) deckPanel.classList.add('show');
+	                // Mostrar panel deck
+	                const deckPanel = document.getElementById('deck-panel');
+	                if (deckPanel) deckPanel.classList.add('show');
+	                const deckNav = document.getElementById('deck-nav');
+	                if (deckNav) deckNav.classList.add('show');
 
                 this.applyViewerBackground('studio');
                 this.depthFx = this.getViewerFxEnabled(true);
@@ -7907,17 +8395,41 @@
                             fillPicker.value = '#0f3460';
                         }
                     }
-                    if (strokePicker) {
-                        if (!strokeTransparent && this.isHexColor(elem.strokeColor)) {
-                            strokePicker.value = elem.strokeColor;
-                        } else if (!this.isHexColor(strokePicker.value)) {
-                            strokePicker.value = '#e94560';
-                        }
-                    }
+	                    if (strokePicker) {
+	                        if (!strokeTransparent && this.isHexColor(elem.strokeColor)) {
+	                            strokePicker.value = elem.strokeColor;
+	                        } else if (!this.isHexColor(strokePicker.value)) {
+	                            strokePicker.value = '#e94560';
+	                        }
+	                    }
 
-                    const lwGroup = document.getElementById('prop-line-width-group');
-                    const lw = document.getElementById('prop-line-width');
-                    const lwVal = document.getElementById('prop-line-width-value');
+	                    // Degradado (lineal) para relleno
+	                    const fgEnabled = document.getElementById('prop-fill-gradient-enabled');
+	                    const fgControls = document.getElementById('prop-fill-gradient-controls');
+	                    const fgA = document.getElementById('prop-fill-gradient-a');
+	                    const fgB = document.getElementById('prop-fill-gradient-b');
+	                    const fgAngle = document.getElementById('prop-fill-gradient-angle');
+	                    const fgAngleValue = document.getElementById('prop-fill-gradient-angle-value');
+
+	                    const supportsGradient = this.elementSupportsFillGradient(elem);
+	                    const fg = supportsGradient ? this.normalizeFillGradientSpec(elem.fillGradient) : null;
+	                    const gradientOn = Boolean(fg && !fillTransparent);
+
+	                    if (fgEnabled) {
+	                        fgEnabled.disabled = !supportsGradient || fillTransparent;
+	                        fgEnabled.checked = gradientOn;
+	                    }
+	                    if (fgControls) {
+	                        fgControls.style.display = (fgEnabled && fgEnabled.checked) ? 'block' : 'none';
+	                    }
+	                    if (fg && fgA && this.isHexColor(fg.a)) fgA.value = fg.a;
+	                    if (fg && fgB && this.isHexColor(fg.b)) fgB.value = fg.b;
+	                    if (fg && fgAngle) fgAngle.value = String(fg.angle);
+	                    if (fgAngle && fgAngleValue) fgAngleValue.textContent = `${String(fgAngle.value || '0')}°`;
+
+	                    const lwGroup = document.getElementById('prop-line-width-group');
+	                    const lw = document.getElementById('prop-line-width');
+	                    const lwVal = document.getElementById('prop-line-width-value');
                     const supportsLW = this.elementSupportsLineWidth(elem);
                     if (lwGroup) lwGroup.style.display = supportsLW ? 'block' : 'none';
                     if (supportsLW && lw) {
@@ -7987,44 +8499,62 @@
                 this.updateLayersSelectionHighlight();
             }
             
-	            updateSelectedProperties() {
-	                const name = document.getElementById('prop-name').value;
-	                const cpEnabledEl = document.getElementById('prop-cp-enabled');
-	                const cpOrderEl = document.getElementById('prop-cp-order');
-	                const slideTitleEl = document.getElementById('prop-slide-title');
-	                const slideTextEl = document.getElementById('prop-slide-text');
-	                const slideImageUrlEl = document.getElementById('prop-slide-image-url');
-	                const slideVideoUrlEl = document.getElementById('prop-slide-video-url');
-	                const cpEnabled = Boolean(cpEnabledEl && cpEnabledEl.checked);
-	                const fillPicker = document.getElementById('prop-fill-color');
-	                const strokePicker = document.getElementById('prop-stroke-color');
-	                const fillCb = document.getElementById('prop-fill-transparent');
-	                const strokeCb = document.getElementById('prop-stroke-transparent');
-	                const conn = document.getElementById('prop-connection-status').value;
-                const active = document.getElementById('prop-active').value === 'true';
+		            updateSelectedProperties() {
+		                const name = document.getElementById('prop-name').value;
+		                const cpEnabledEl = document.getElementById('prop-cp-enabled');
+		                const cpOrderEl = document.getElementById('prop-cp-order');
+		                const slideTitleEl = document.getElementById('prop-slide-title');
+		                const slideTextEl = document.getElementById('prop-slide-text');
+		                const slideImageUrlEl = document.getElementById('prop-slide-image-url');
+		                const slideVideoUrlEl = document.getElementById('prop-slide-video-url');
+		                const cpEnabled = Boolean(cpEnabledEl && cpEnabledEl.checked);
+		                const fillPicker = document.getElementById('prop-fill-color');
+		                const strokePicker = document.getElementById('prop-stroke-color');
+		                const fillCb = document.getElementById('prop-fill-transparent');
+		                const strokeCb = document.getElementById('prop-stroke-transparent');
+		                const fgEnabledEl = document.getElementById('prop-fill-gradient-enabled');
+		                const fgAEl = document.getElementById('prop-fill-gradient-a');
+		                const fgBEl = document.getElementById('prop-fill-gradient-b');
+		                const fgAngleEl = document.getElementById('prop-fill-gradient-angle');
+		                const conn = document.getElementById('prop-connection-status').value;
+	                const active = document.getElementById('prop-active').value === 'true';
 
-                const fillTransparent = Boolean(fillCb && fillCb.checked);
-                const strokeTransparent = Boolean(strokeCb && strokeCb.checked);
+	                const fillTransparent = Boolean(fillCb && fillCb.checked);
+	                const strokeTransparent = Boolean(strokeCb && strokeCb.checked);
+	                const fillGradientEnabled = Boolean(fgEnabledEl && fgEnabledEl.checked);
+	                const fillGradientSpec = fillGradientEnabled
+	                    ? this.normalizeFillGradientSpec({
+	                        a: fgAEl ? fgAEl.value : '',
+	                        b: fgBEl ? fgBEl.value : '',
+	                        angle: fgAngleEl ? fgAngleEl.value : 0
+	                    })
+	                    : null;
 
-                const lw = document.getElementById('prop-line-width');
-                const lwValue = lw ? Number.parseInt(String(lw.value || ''), 10) : NaN;
-                const lineWidth = Number.isFinite(lwValue) ? Math.max(1, Math.min(20, lwValue)) : null;
+	                const lw = document.getElementById('prop-line-width');
+	                const lwValue = lw ? Number.parseInt(String(lw.value || ''), 10) : NaN;
+	                const lineWidth = Number.isFinite(lwValue) ? Math.max(1, Math.min(20, lwValue)) : null;
 
 	                this.selectedElements.forEach((elem) => {
-	                    if (!elem || typeof elem !== 'object') return;
-	                    elem.name = name;
+		                    if (!elem || typeof elem !== 'object') return;
+		                    elem.name = name;
 
-	                    if (fillTransparent) {
-                        elem.fillColor = 'transparent';
-                    } else if (fillPicker && typeof fillPicker.value === 'string') {
-                        elem.fillColor = fillPicker.value;
-                    }
+		                    if (fillTransparent) {
+	                        elem.fillColor = 'transparent';
+	                        try { delete elem.fillGradient; } catch {}
+	                    } else if (fillPicker && typeof fillPicker.value === 'string') {
+	                        elem.fillColor = fillPicker.value;
+	                        if (fillGradientSpec && this.elementSupportsFillGradient(elem)) {
+	                            elem.fillGradient = fillGradientSpec;
+	                        } else {
+	                            try { delete elem.fillGradient; } catch {}
+	                        }
+	                    }
 
-                    if (strokeTransparent) {
-                        elem.strokeColor = 'transparent';
-                    } else if (strokePicker && typeof strokePicker.value === 'string') {
-                        elem.strokeColor = strokePicker.value;
-                    }
+	                    if (strokeTransparent) {
+	                        elem.strokeColor = 'transparent';
+	                    } else if (strokePicker && typeof strokePicker.value === 'string') {
+	                        elem.strokeColor = strokePicker.value;
+	                    }
 
                     if (lineWidth !== null && this.elementSupportsLineWidth(elem)) {
                         elem.lineWidth = lineWidth;
@@ -8101,6 +8631,134 @@
 
             normalizeCanvasColor(value) {
                 return this.isTransparentColor(value) ? 'rgba(0,0,0,0)' : String(value);
+            }
+
+            elementSupportsFillGradient(elem) {
+                if (!elem || typeof elem !== 'object') return false;
+                const t = String(elem.type || '');
+                return t === 'rectangle' || t === 'circle' || t === 'polygon' || t === 'path';
+            }
+
+            normalizeFillGradientSpec(spec) {
+                if (!spec || typeof spec !== 'object' || Array.isArray(spec)) return null;
+
+                const hasAny =
+                    spec.a != null || spec.b != null ||
+                    spec.from != null || spec.to != null ||
+                    spec.colorA != null || spec.colorB != null ||
+                    spec.start != null || spec.end != null ||
+                    spec.color1 != null || spec.color2 != null ||
+                    spec.angle != null || spec.deg != null ||
+                    spec.rotation != null || spec.rot != null || spec.theta != null;
+
+                if (!hasAny) return null;
+
+                const aRaw = spec.a ?? spec.from ?? spec.colorA ?? spec.start ?? spec.color1;
+                const bRaw = spec.b ?? spec.to ?? spec.colorB ?? spec.end ?? spec.color2;
+
+                const a = this.normalizeCanvasColor(aRaw != null ? aRaw : '#00d4ff');
+                const b = this.normalizeCanvasColor(bRaw != null ? bRaw : '#e94560');
+
+                const angleRaw = spec.angle ?? spec.deg ?? spec.rotation ?? spec.rot ?? spec.theta;
+                let angle = Number.parseFloat(String(angleRaw != null ? angleRaw : '90'));
+                if (!Number.isFinite(angle)) angle = 90;
+                angle = ((angle % 360) + 360) % 360;
+
+                // Snap a pasos de 15 grados (consistente con el UI) para evitar drift.
+                angle = Math.round(angle / 15) * 15;
+                angle = ((angle % 360) + 360) % 360;
+
+                return { a, b, angle };
+            }
+
+            createLinearGradientForBounds(bounds, angleDeg, colorA, colorB) {
+                if (!this.ctx) return null;
+                if (!bounds || typeof bounds !== 'object') return null;
+
+                const minX = Number(bounds.minX);
+                const minY = Number(bounds.minY);
+                const maxX = Number(bounds.maxX);
+                const maxY = Number(bounds.maxY);
+                if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) return null;
+
+                const w = Math.max(1, maxX - minX);
+                const h = Math.max(1, maxY - minY);
+                const cx = (minX + maxX) / 2;
+                const cy = (minY + maxY) / 2;
+
+                let angle = Number(angleDeg);
+                if (!Number.isFinite(angle)) angle = 90;
+                angle = ((angle % 360) + 360) % 360;
+
+                const theta = (angle * Math.PI) / 180;
+                const ux = Math.cos(theta);
+                const uy = Math.sin(theta);
+                const half = Math.abs(ux) * (w / 2) + Math.abs(uy) * (h / 2);
+
+                const x0 = cx - ux * half;
+                const y0 = cy - uy * half;
+                const x1 = cx + ux * half;
+                const y1 = cy + uy * half;
+
+                const grad = this.ctx.createLinearGradient(x0, y0, x1, y1);
+                grad.addColorStop(0, this.normalizeCanvasColor(colorA));
+                grad.addColorStop(1, this.normalizeCanvasColor(colorB));
+                return grad;
+            }
+
+            applyBucketFillToElement(elem) {
+                if (!elem || typeof elem !== 'object') return;
+
+                const fillCb = document.getElementById('prop-fill-transparent');
+                const fillPicker = document.getElementById('prop-fill-color');
+
+                const fgEnabledEl = document.getElementById('prop-fill-gradient-enabled');
+                const fgAEl = document.getElementById('prop-fill-gradient-a');
+                const fgBEl = document.getElementById('prop-fill-gradient-b');
+                const fgAngleEl = document.getElementById('prop-fill-gradient-angle');
+
+                const fillTransparent = Boolean(fillCb && fillCb.checked);
+
+                const fillColorValue =
+                    (fillPicker && typeof fillPicker.value === 'string') ? fillPicker.value : '#0f3460';
+
+                const fillGradientEnabled = Boolean(fgEnabledEl && fgEnabledEl.checked);
+                const fillGradientSpec = fillGradientEnabled
+                    ? this.normalizeFillGradientSpec({
+                        a: fgAEl ? fgAEl.value : '',
+                        b: fgBEl ? fgBEl.value : '',
+                        angle: fgAngleEl ? fgAngleEl.value : 90
+                    })
+                    : null;
+
+                const applyTo = (target) => {
+                    if (!target || typeof target !== 'object') return;
+                    if (target.locked) return;
+
+                    if (target.type === 'group' && Array.isArray(target.elements)) {
+                        target.elements.forEach((child) => applyTo(child));
+                        return;
+                    }
+
+                    const t = String(target.type || '');
+                    const supportsFill = t === 'rectangle' || t === 'circle' || t === 'polygon' || t === 'path';
+                    if (!supportsFill) return;
+
+                    if (fillTransparent) {
+                        target.fillColor = 'transparent';
+                        try { delete target.fillGradient; } catch {}
+                        return;
+                    }
+
+                    target.fillColor = fillColorValue;
+                    if (fillGradientSpec && this.elementSupportsFillGradient(target)) {
+                        target.fillGradient = fillGradientSpec;
+                    } else {
+                        try { delete target.fillGradient; } catch {}
+                    }
+                };
+
+                applyTo(elem);
             }
 
             isHexColor(value) {

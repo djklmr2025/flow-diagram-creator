@@ -17,6 +17,7 @@ Este documento resume el estado real de implementación del repo (lo que ya exis
 UI/Builder (Editor)
 - `index.html` contiene todo el motor (clase `FlowDiagramSystem`) y la UI (toolbar, panel propiedades, modales).
 - Herramientas: seleccionar, rectángulo, círculo, línea animada, lápiz, formas (triángulo/trapecio/rombo/estrellas/engrane), punto de información (K).
+- Pintura: **Bote de pintura** (`B`) aplica relleno al elemento bajo el cursor. Soporta **degradado lineal** en relleno para `rectangle/circle/polygon/path` (`elem.fillGradient = {a,b,angle}`).
 - Imágenes: insertar PNG/JPG/GIF/WEBP (`I`). Los GIF se animan (se redibuja el canvas en loop).
 - Video en canvas: botón **Video** (`M`) crea un elemento `type:"video"` que se dibuja en el canvas usando `HTMLVideoElement` (mejor con URLs directas `.mp4/.webm`).
 - Edición: selección múltiple, marco de selección (marquee), agrupar/desagrupar, copiar/pegar, capas (Z), fijar/bloquear, panel **Objetos** (lista izquierda) para forzar selección/ir/borrar/desbloquear.
@@ -32,9 +33,11 @@ Viewer (Modo visor / para IA)
 - Modos por URL: `mode=sticker`, `mode=preview`, `mode=deck`.
 - Carga por URL: `?id=...` (publicado), `?data=...` (JSON embebido), `?project=...` (JSON remoto).
 - Opciones viewer: `bg=transparent|studio`, `fit=1|0`, `pad=...`, `fx=1|0`.
+  - Nota: en `mode=deck` el **auto-fit** está **activado por defecto**. Usa `fit=0` si quieres respetar la cámara guardada en el proyecto.
 
 Deck (Lámina tipo Genially)
 - `mode=deck` divide canvas (izquierda) y panel Lámina (derecha).
+- Incluye columna intermedia **Diapositivas** (lista de puntos de control con miniatura + etiquetas de contenido) para navegar rápido sin dejar un “hueco” en pantallas anchas.
 - Puntos de control: se guardan en `meta.controlPoint`, `meta.order`, `meta.slide{title,text,imageUrl,videoUrl}`.
 - Diapositiva soporta: texto, imagen por URL, video por URL (YouTube iframe o mp4/webm).
 
