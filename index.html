@@ -20,10 +20,11 @@
 
         :root {
             --viewer-studio-bg:
-                radial-gradient(1200px 700px at 50% 32%, rgba(0, 212, 255, 0.18), transparent 55%),
-                radial-gradient(1000px 700px at 20% 85%, rgba(233, 69, 96, 0.10), transparent 60%),
-                radial-gradient(1000px 700px at 80% 85%, rgba(72, 234, 121, 0.10), transparent 60%),
-                linear-gradient(180deg, #050712 0%, #0a1022 55%, #050712 100%);
+                radial-gradient(1200px 760px at 50% 38%, rgba(0, 212, 255, 0.16), transparent 58%),
+                radial-gradient(980px 680px at 18% 78%, rgba(233, 69, 96, 0.10), transparent 62%),
+                radial-gradient(980px 680px at 82% 78%, rgba(72, 234, 121, 0.10), transparent 62%),
+                radial-gradient(1100px 720px at 50% 92%, rgba(0, 0, 0, 0.55), transparent 62%),
+                linear-gradient(180deg, #050712 0%, #0f172a 55%, #050712 100%);
         }
 
         html.viewer-bg-transparent,
@@ -35,6 +36,7 @@
             background: var(--viewer-studio-bg) !important;
             position: relative;
             isolation: isolate;
+            perspective: 1200px;
         }
 
         body.viewer-bg-studio #canvas-container {
@@ -65,12 +67,18 @@
             background:
                 repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.065) 0 1px, transparent 1px 46px),
                 repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.055) 0 1px, transparent 1px 46px);
+            background-position: 0 0, 0 0;
             transform-origin: center bottom;
             transform: perspective(980px) rotateX(66deg);
             opacity: 0.20;
             mask-image: radial-gradient(closest-side, rgba(0,0,0,1), transparent 70%);
+            animation: viewerGridDrift 24s linear infinite;
         }
 
+        @keyframes viewerGridDrift {
+            0%   { background-position: 0 0, 0 0; }
+            100% { background-position: 46px 46px, 46px 46px; }
+        }
         /* ==================== BOOT SCREEN (DIAGNOSTICO) ==================== */
         #boot-screen {
             position: fixed;
@@ -572,13 +580,16 @@
         }
 
         /* ==================== DECK MODE (LÁMINA) ==================== */
+
         #deck-panel {
             position: fixed;
             top: 0;
             right: 0;
             bottom: 0;
             width: 440px;
-            background: rgba(255, 255, 255, 0.96);
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             color: #0b1020;
             border-left: 1px solid rgba(15, 52, 96, 0.25);
             box-shadow: -18px 0 60px rgba(0,0,0,0.35);
@@ -587,6 +598,7 @@
             flex-direction: column;
             gap: 0;
             overflow: hidden;
+            min-height: 0; /* Fix flex overflow: permite que .deck-content pueda scrollear */
         }
 
         #deck-panel.show {
@@ -601,13 +613,16 @@
         }
 
         /* Columna intermedia (navegación de diapositivas) para evitar el "hueco" en pantallas anchas. */
+
         #deck-nav {
             position: fixed;
             top: 0;
             right: 440px; /* JS recalcula según el ancho del panel derecho */
             bottom: 0;
             width: 300px;
-            background: rgba(255, 255, 255, 0.92);
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             color: #0b1020;
             border-left: 1px solid rgba(15, 52, 96, 0.18);
             box-shadow: -10px 0 40px rgba(0,0,0,0.22);
@@ -615,6 +630,7 @@
             display: none;
             flex-direction: column;
             overflow: hidden;
+            min-height: 0; /* Fix flex overflow: permite que #deck-nav-list pueda scrollear */
         }
 
         #deck-nav.show {
@@ -647,6 +663,9 @@
         #deck-nav-list {
             flex: 1;
             overflow: auto;
+            min-height: 0; /* Permite que la lista sea scrollable dentro del layout flex */
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
             padding: 12px 14px 14px 14px;
             display: flex;
             flex-direction: column;
@@ -776,6 +795,9 @@
             gap: 12px;
             padding: 12px 14px;
             overflow: auto;
+            min-height: 0; /* Importante: permite scroll dentro de flex + overflow:hidden */
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
         }
 
         .deck-block {
@@ -4881,10 +4903,10 @@
 
                 if (useDepthFx) {
                     this.ctx.save();
-                    this.ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
-                    this.ctx.shadowBlur = 22 / this.camera.zoom;
+                    this.ctx.shadowColor = 'rgba(0, 0, 0, 0.42)';
+                    this.ctx.shadowBlur = 26 / this.camera.zoom;
                     this.ctx.shadowOffsetX = 0;
-                    this.ctx.shadowOffsetY = 14 / this.camera.zoom;
+                    this.ctx.shadowOffsetY = 16 / this.camera.zoom;
                 }
 
 	                if (elem.type === 'image') {
