@@ -8196,11 +8196,96 @@
                 this.maybeAutoFitViewerCamera();
                 this.refreshDeckUI();
             }
+
+            resolveProjectPayload(raw, depth = 0, seen = null) {
+                if (raw == null) return null;
+                if (depth > 6) return null;
+
+                if (!seen) seen = new Set();
+
+                let value = raw;
+                if (typeof value === 'string') {
+                    const trimmed = value.trim();
+                    if (!trimmed) return null;
+                    try {
+                        value = JSON.parse(trimmed);
+                    } catch {
+                        return null;
+                    }
+                }
+
+                if (!value || typeof value !== 'object') return null;
+
+                if (Array.isArray(value)) {
+                    return {
+                        elements: value,
+                        camera: { x: 0, y: 0, zoom: 1 }
+                    };
+                }
+
+                if (seen.has(value)) return null;
+                seen.add(value);
+
+                if (Array.isArray(value.elements)) return value;
+
+                const candidateKeys = [
+                    'project', 'data', 'payload', 'result', 'value',
+                    'content', 'json', 'diagram', 'flow', 'state', 'body'
+                ];
+
+                for (const key of candidateKeys) {
+                    if (!(key in value)) continue;
+                    const found = this.resolveProjectPayload(value[key], depth + 1, seen);
+                    if (found) return found;
+                }
+
+                return null;
+            }
+
+            applyLoadedProject(raw, options = {}) {
+                const source = String(options.source || 'fuente');
+                const isDeck = Boolean(options.isDeck);
+                const requireElements = options.requireElements !== false;
+
+                const project = this.resolveProjectPayload(raw);
+                if (!project) {
+                    throw new Error(`Formato de proyecto inválido (${source})`);
+                }
+
+                this.normalizeProjectInPlace(project);
+
+                const hasElements = Array.isArray(project.elements) && project.elements.length > 0;
+                if (isDeck && requireElements && !hasElements) {
+                    throw new Error(`Proyecto vacío (${source})`);
+                }
+
+                this.elements = project.elements || [];
+                this.camera = project.camera || { x: 0, y: 0, zoom: 1 };
+                this.selectedElements = [];
+                this.saveHistory();
+                this.updateZoomIndicator();
+                this.maybeAutoFitViewerCamera();
+                this.refreshDeckUI();
+                return project;
+            }
             
             loadFromURLParameter() {
                 const urlParams = new URLSearchParams(window.location.search);
                 const mode = String(urlParams.get('mode') || '').trim().toLowerCase();
                 const isDeck = mode === 'deck';
+
+                const deckFallback = (reason) => {
+                    if (!isDeck) return;
+                    console.log(`ℹ️ Fallback (deck): ${reason}`);
+                    try {
+                        const url = new URL(window.location.href);
+                        url.searchParams.delete('id');
+                        history.replaceState(null, '', url.toString());
+                    } catch {
+                        // Ignorar
+                    }
+                    this.loadWelcomeDeckProject();
+                };
 
                 // 0) Modo escucha (canal vivo): ?listen=SESSION
                 const listenSession = urlParams.get('listen') || urlParams.get('session');
@@ -8220,19 +8305,21 @@
                             data = JSON.parse(decodeURIComponent(jsonData));
                         } catch (error2) {
                             console.error('❌ Error al parsear JSON desde URL:', error2);
+                            deckFallback('error al parsear parámetro data');
                             return;
                         }
                     }
                     
-                    this.normalizeProjectInPlace(data);
-                    this.elements = data.elements || [];
-                    this.camera = data.camera || { x: 0, y: 0, zoom: 1 };
-                    this.selectedElements = [];
-                    this.saveHistory();
-                    this.updateZoomIndicator();
-                    this.maybeAutoFitViewerCamera();
-                    this.refreshDeckUI();
-                    console.log('✅ Proyecto cargado desde parámetro data');
+                    try {
+                        this.applyLoadedProject(data, {
+                            source: 'parámetro data',
+                            isDeck
+                        });
+                        console.log('✅ Proyecto cargado desde parámetro data');
+                    } catch (error) {
+                        console.error('❌ Error al cargar proyecto desde parámetro data:', error);
+                        deckFallback('proyecto inválido/vacío en parámetro data');
+                    }
                     return;
                 }
 
@@ -8247,29 +8334,15 @@
                             return response.json();
                         })
                         .then(data => {
-                            this.normalizeProjectInPlace(data);
-                            this.elements = data.elements || [];
-                            this.camera = data.camera || { x: 0, y: 0, zoom: 1 };
-                            this.selectedElements = [];
-                            this.saveHistory();
-                            this.updateZoomIndicator();
-                            this.maybeAutoFitViewerCamera();
-                            this.refreshDeckUI();
+                            this.applyLoadedProject(data, {
+                                source: 'id',
+                                isDeck
+                            });
                             console.log('✅ Proyecto cargado desde ID');
                         })
                         .catch(error => {
                             console.error('❌ Error al cargar proyecto desde ID:', error);
-                            if (isDeck) {
-                                console.log('ℹ️ Fallback (deck): cargando lámina de bienvenida.');
-                                try {
-                                    const url = new URL(window.location.href);
-                                    url.searchParams.delete('id');
-                                    history.replaceState(null, '', url.toString());
-                                } catch {
-                                    // Ignorar
-                                }
-                                this.loadWelcomeDeckProject();
-                            }
+                            deckFallback('id no encontrado o proyecto inválido/vacío');
                         });
                     return;
                 }
@@ -8285,18 +8358,15 @@
                             return response.json();
                         })
                         .then(data => {
-                            this.normalizeProjectInPlace(data);
-                            this.elements = data.elements || [];
-                            this.camera = data.camera || { x: 0, y: 0, zoom: 1 };
-                            this.selectedElements = [];
-                            this.saveHistory();
-                            this.updateZoomIndicator();
-                            this.maybeAutoFitViewerCamera();
-                            this.refreshDeckUI();
+                            this.applyLoadedProject(data, {
+                                source: 'url',
+                                isDeck
+                            });
                             console.log('✅ Proyecto cargado desde URL');
                         })
                         .catch(error => {
                             console.error('❌ Error al cargar proyecto desde URL:', error);
+                            deckFallback('error al cargar proyecto desde URL');
                         });
                     return;
                 }
@@ -8332,14 +8402,11 @@
                     })
                     .then(data => {
                         if (!data) return;
-                        this.normalizeProjectInPlace(data);
-                        this.elements = data.elements || [];
-                        this.camera = data.camera || { x: 0, y: 0, zoom: 1 };
-                        this.selectedElements = [];
-                        this.saveHistory();
-                        this.updateZoomIndicator();
-                        this.maybeAutoFitViewerCamera();
-                        this.refreshDeckUI();
+                        this.applyLoadedProject(data, {
+                            source: 'project.json',
+                            isDeck,
+                            requireElements: false
+                        });
                         console.log('✅ Proyecto cargado desde project.json');
                     })
                     .catch(error => {
