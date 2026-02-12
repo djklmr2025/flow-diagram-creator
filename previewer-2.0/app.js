@@ -12,8 +12,10 @@
     inputJson: document.getElementById('input-json'),
     inputBg: document.getElementById('input-bg'),
     inputUploadJson: document.getElementById('input-upload-json'),
+    inputMedia: document.getElementById('input-media'),
 
     btnOpenJson: document.getElementById('btn-open-json'),
+    btnOpenMedia: document.getElementById('btn-open-media'),
     btnClear: document.getElementById('btn-clear'),
     btnOpenBg: document.getElementById('btn-open-bg'),
 
@@ -36,7 +38,22 @@
     uploadKind: document.getElementById('upload-kind'),
     uploadFolder: document.getElementById('upload-folder'),
     uploadKey: document.getElementById('upload-key'),
-    btnUploadJson: document.getElementById('btn-upload-json')
+    btnUploadJson: document.getElementById('btn-upload-json'),
+
+    btnMediaToggle: document.getElementById('btn-media-toggle'),
+    btnMediaHide: document.getElementById('btn-media-hide'),
+    btnMediaRefresh: document.getElementById('btn-media-refresh'),
+    btnMediaClearList: document.getElementById('btn-media-clear-list'),
+    mediaSearch: document.getElementById('media-search'),
+    mediaList: document.getElementById('media-list'),
+
+    mediaOverlay: document.getElementById('media-overlay'),
+    mediaTitle: document.getElementById('media-title'),
+    btnMediaClose: document.getElementById('btn-media-close'),
+    mediaImage: document.getElementById('media-image'),
+    mediaVideo: document.getElementById('media-video'),
+    mediaModelViewer: document.getElementById('media-model-viewer'),
+    media3dCanvas: document.getElementById('media-3d-canvas')
   };
 
   const state = {
@@ -57,7 +74,17 @@
     libraryItems: [],
     previewCache: new Map(),
     previewLoading: new Set(),
-    listRenderTimer: null
+    listRenderTimer: null,
+
+    mediaVisible: false,
+    mediaItems: [],
+    mediaUrls: [],
+    activeMediaId: '',
+    mediaRenderTimer: null,
+
+    modelViewerReadyPromise: null,
+    threeModules: null,
+    threeRuntime: null
   };
 
   function setStatus(msg) {
@@ -89,6 +116,18 @@
     return parts[parts.length - 1] || id;
   }
 
+  function extName(name) {
+    const n = String(name || '').toLowerCase();
+    const i = n.lastIndexOf('.');
+    return i >= 0 ? n.slice(i + 1) : '';
+  }
+
+  function baseName(name) {
+    const n = String(name || '');
+    const i = n.lastIndexOf('.');
+    return i >= 0 ? n.slice(0, i) : n;
+  }
+
   function svgEl(tag, attrs = {}) {
     const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
     Object.entries(attrs).forEach(([k, v]) => {
@@ -103,6 +142,11 @@
     if (state.libraryVisible && state.libraryItems.length === 0) {
       void loadLibraryCatalog();
     }
+  }
+
+  function setMediaVisible(on) {
+    state.mediaVisible = Boolean(on);
+    els.workspace.classList.toggle('media-open', state.mediaVisible);
   }
 
   function updateWorldTransform() {
@@ -528,6 +572,13 @@
     }, 90);
   }
 
+  function scheduleMediaRender() {
+    if (state.mediaRenderTimer) clearTimeout(state.mediaRenderTimer);
+    state.mediaRenderTimer = setTimeout(() => {
+      renderMediaList();
+    }, 60);
+  }
+
   async function ensureItemPreview(item) {
     if (!item || !item.id) return;
     if (state.previewCache.has(item.id)) return;
@@ -679,6 +730,7 @@
       if (!res.ok) throw new Error(`No se pudo cargar id=${item.id}`);
       const raw = await res.text();
       await parseAndApplyProject(raw, `${item.kind}:${item.id}`);
+      closeMediaOverlay();
     } catch (error) {
       setStatus(`Error cargando item: ${error.message}`);
     }
@@ -744,6 +796,448 @@
     }
   }
 
+  function mediaKindFromFile(file) {
+    const type = String(file.type || '').toLowerCase();
+    const ext = extName(file.name);
+
+    if (ext === 'gltf' || ext === 'glb') return 'model-gltf';
+    if (ext === 'obj') return 'model-obj';
+    if (ext === 'mtl') return 'model-mtl';
+
+    if (type.startsWith('video/') || ext === 'mp4' || ext === 'webm') return 'video';
+
+    if (
+      type.startsWith('image/') ||
+      ext === 'gif' || ext === 'webp' || ext === 'png' || ext === 'jpg' || ext === 'jpeg'
+    ) {
+      return 'image';
+    }
+
+    return 'other';
+  }
+
+  function mediaPlaceholder(kind, name) {
+    let label = 'FILE';
+    let color = '#93c5fd';
+    if (kind === 'video') {
+      label = 'VIDEO';
+      color = '#f59e0b';
+    } else if (kind === 'model-gltf' || kind === 'model-obj') {
+      label = '3D';
+      color = '#34d399';
+    } else if (kind === 'image') {
+      label = 'IMG';
+      color = '#38bdf8';
+    }
+
+    const title = String(name || '').slice(0, 12);
+    const svg = `<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#111f3b"/><stop offset="100%" stop-color="#0b1530"/></linearGradient></defs><rect width="160" height="120" fill="url(#g)"/><rect x="18" y="18" width="124" height="68" rx="10" fill="none" stroke="${color}" stroke-width="4"/><text x="80" y="57" text-anchor="middle" font-size="22" fill="${color}" font-family="Segoe UI" font-weight="700">${label}</text><text x="80" y="104" text-anchor="middle" font-size="11" fill="#dbeafe" font-family="Segoe UI">${escapeAttr(title)}</text></svg>`;
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+  }
+
+  function clearMediaUrls() {
+    state.mediaUrls.forEach((url) => {
+      try {
+        URL.revokeObjectURL(url);
+      } catch (_) {
+        // no-op
+      }
+    });
+    state.mediaUrls = [];
+  }
+
+  function resetMediaList() {
+    closeMediaOverlay();
+    clearMediaUrls();
+    state.mediaItems = [];
+    state.activeMediaId = '';
+    renderMediaList();
+  }
+
+  function filteredMediaItems() {
+    const search = String(els.mediaSearch.value || '').trim().toLowerCase();
+    if (!search) return state.mediaItems;
+
+    return state.mediaItems.filter((item) => {
+      return String(item.name || '').toLowerCase().includes(search);
+    });
+  }
+
+  function renderMediaList() {
+    const rows = filteredMediaItems();
+    els.mediaList.innerHTML = '';
+
+    if (!rows.length) {
+      const empty = document.createElement('div');
+      empty.className = 'library-empty';
+      empty.textContent = 'No hay media cargada. Usa "Abrir Media/3D".';
+      els.mediaList.appendChild(empty);
+      return;
+    }
+
+    rows.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'library-item';
+      row.dataset.id = item.id;
+
+      const img = document.createElement('img');
+      img.className = 'library-thumb';
+      img.alt = 'media';
+      img.src = item.thumb;
+
+      const meta = document.createElement('div');
+      meta.className = 'library-meta';
+      const title = document.createElement('div');
+      title.className = 'library-title';
+      title.textContent = item.name;
+      const sub = document.createElement('div');
+      sub.className = 'library-sub';
+      sub.textContent = `${item.kind} • ${formatBytes(item.size)}`;
+
+      const pills = document.createElement('div');
+      pills.className = 'library-pills';
+      const pillExt = document.createElement('span');
+      pillExt.className = 'pill';
+      pillExt.textContent = item.ext || '-';
+      pills.appendChild(pillExt);
+
+      meta.appendChild(title);
+      meta.appendChild(sub);
+      meta.appendChild(pills);
+
+      const action = document.createElement('button');
+      action.className = 'btn btn-small';
+      action.textContent = 'Ver';
+      action.addEventListener('click', () => {
+        void openMediaItem(item);
+      });
+
+      row.appendChild(img);
+      row.appendChild(meta);
+      row.appendChild(action);
+      els.mediaList.appendChild(row);
+    });
+  }
+
+  function hideAllMediaWidgets() {
+    els.mediaImage.hidden = true;
+    els.mediaVideo.hidden = true;
+    els.mediaModelViewer.hidden = true;
+    els.media3dCanvas.hidden = true;
+  }
+
+  function disposeThreeRuntime() {
+    const rt = state.threeRuntime;
+    if (!rt) return;
+
+    if (rt.rafId) cancelAnimationFrame(rt.rafId);
+    if (rt.controls && typeof rt.controls.dispose === 'function') rt.controls.dispose();
+
+    if (rt.scene) {
+      rt.scene.traverse((obj) => {
+        if (obj.geometry && typeof obj.geometry.dispose === 'function') obj.geometry.dispose();
+        if (obj.material) {
+          if (Array.isArray(obj.material)) {
+            obj.material.forEach((m) => m && typeof m.dispose === 'function' && m.dispose());
+          } else if (typeof obj.material.dispose === 'function') {
+            obj.material.dispose();
+          }
+        }
+      });
+    }
+
+    if (rt.renderer && typeof rt.renderer.dispose === 'function') rt.renderer.dispose();
+    state.threeRuntime = null;
+  }
+
+  function closeMediaOverlay() {
+    hideAllMediaWidgets();
+
+    try {
+      els.mediaVideo.pause();
+      els.mediaVideo.removeAttribute('src');
+      els.mediaVideo.load();
+    } catch (_) {
+      // no-op
+    }
+
+    try {
+      els.mediaModelViewer.removeAttribute('src');
+    } catch (_) {
+      // no-op
+    }
+
+    disposeThreeRuntime();
+    els.mediaOverlay.hidden = true;
+    state.activeMediaId = '';
+  }
+
+  function openMediaOverlay(title) {
+    els.mediaTitle.textContent = title || 'Media Viewer';
+    els.mediaOverlay.hidden = false;
+  }
+
+  async function ensureModelViewerLoaded() {
+    if (customElements.get('model-viewer')) return;
+    if (state.modelViewerReadyPromise) {
+      await state.modelViewerReadyPromise;
+      return;
+    }
+
+    state.modelViewerReadyPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.type = 'module';
+      script.src = 'https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js';
+      script.onload = () => {
+        customElements.whenDefined('model-viewer').then(resolve).catch(reject);
+      };
+      script.onerror = () => reject(new Error('No se pudo cargar model-viewer'));
+      document.head.appendChild(script);
+    });
+
+    await state.modelViewerReadyPromise;
+  }
+
+  async function ensureThreeModules() {
+    if (state.threeModules) return state.threeModules;
+
+    const THREE = await import('https://unpkg.com/three@0.164.1/build/three.module.js');
+    const { OrbitControls } = await import('https://unpkg.com/three@0.164.1/examples/jsm/controls/OrbitControls.js');
+    const { OBJLoader } = await import('https://unpkg.com/three@0.164.1/examples/jsm/loaders/OBJLoader.js');
+    const { MTLLoader } = await import('https://unpkg.com/three@0.164.1/examples/jsm/loaders/MTLLoader.js');
+
+    state.threeModules = {
+      THREE,
+      OrbitControls,
+      OBJLoader,
+      MTLLoader
+    };
+
+    return state.threeModules;
+  }
+
+  function fitCameraToObject(THREE, camera, controls, object) {
+    const box = new THREE.Box3().setFromObject(object);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const maxSize = Math.max(size.x, size.y, size.z, 1);
+    const fov = camera.fov * (Math.PI / 180);
+    const distance = (maxSize / Math.sin(fov / 2)) * 0.75;
+
+    camera.position.set(center.x + distance, center.y + distance * 0.6, center.z + distance);
+    camera.near = Math.max(0.01, distance / 1000);
+    camera.far = distance * 100;
+    camera.lookAt(center);
+    camera.updateProjectionMatrix();
+
+    controls.target.copy(center);
+    controls.update();
+  }
+
+  async function renderObjPreview(item) {
+    const mods = await ensureThreeModules();
+    const THREE = mods.THREE;
+
+    disposeThreeRuntime();
+
+    els.media3dCanvas.hidden = false;
+    const canvas = els.media3dCanvas;
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: true,
+      preserveDrawingBuffer: false
+    });
+
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(400, Math.floor(rect.width || 960));
+    const height = Math.max(280, Math.floor(rect.height || 540));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(width, height, false);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b1f3f);
+
+    const camera = new THREE.PerspectiveCamera(50, width / height, 0.01, 20000);
+    const controls = new mods.OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+
+    const amb = new THREE.AmbientLight(0xffffff, 0.85);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+    dir.position.set(2, 3, 4);
+    scene.add(amb, dir);
+
+    const manager = new THREE.LoadingManager();
+    const resourceMap = item.resourceMap || new Map();
+    manager.setURLModifier((url) => {
+      const clean = String(url || '').split('/').pop().toLowerCase();
+      return resourceMap.get(clean) || url;
+    });
+
+    const addLoadedObject = (obj) => {
+      scene.add(obj);
+      fitCameraToObject(THREE, camera, controls, obj);
+
+      const runtime = {
+        renderer,
+        scene,
+        camera,
+        controls,
+        rafId: 0
+      };
+
+      const tick = () => {
+        runtime.rafId = requestAnimationFrame(tick);
+        controls.update();
+        renderer.render(scene, camera);
+      };
+
+      tick();
+      state.threeRuntime = runtime;
+    };
+
+    await new Promise((resolve, reject) => {
+      const objLoader = new mods.OBJLoader(manager);
+
+      const onObj = (obj) => {
+        addLoadedObject(obj);
+        resolve();
+      };
+
+      const onErr = (err) => {
+        reject(err || new Error('No se pudo cargar OBJ'));
+      };
+
+      if (item.mtlUrl) {
+        const mtlLoader = new mods.MTLLoader(manager);
+        mtlLoader.load(
+          item.mtlUrl,
+          (materials) => {
+            materials.preload();
+            objLoader.setMaterials(materials);
+            objLoader.load(item.url, onObj, undefined, onErr);
+          },
+          undefined,
+          onErr
+        );
+      } else {
+        objLoader.load(item.url, onObj, undefined, onErr);
+      }
+    });
+  }
+
+  async function openMediaItem(item) {
+    if (!item) return;
+
+    closeMediaOverlay();
+    hideAllMediaWidgets();
+
+    openMediaOverlay(item.name);
+    state.activeMediaId = item.id;
+
+    if (item.kind === 'image') {
+      els.mediaImage.src = item.url;
+      els.mediaImage.hidden = false;
+      setStatus(`Media: ${item.name}`);
+      return;
+    }
+
+    if (item.kind === 'video') {
+      els.mediaVideo.src = item.url;
+      els.mediaVideo.hidden = false;
+      try {
+        await els.mediaVideo.play();
+      } catch (_) {
+        // no-op
+      }
+      setStatus(`Media: ${item.name}`);
+      return;
+    }
+
+    if (item.kind === 'model-gltf') {
+      await ensureModelViewerLoaded();
+      els.mediaModelViewer.src = item.url;
+      els.mediaModelViewer.hidden = false;
+      setStatus(`3D GLTF: ${item.name}`);
+      return;
+    }
+
+    if (item.kind === 'model-obj') {
+      await renderObjPreview(item);
+      setStatus(`3D OBJ: ${item.name}`);
+      return;
+    }
+
+    setStatus(`Formato no soportado aún: ${item.name}`);
+  }
+
+  function addMediaFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+
+    resetMediaList();
+
+    const byName = new Map();
+    files.forEach((file) => {
+      byName.set(String(file.name || '').toLowerCase(), file);
+    });
+
+    const urlByName = new Map();
+    files.forEach((file) => {
+      const url = URL.createObjectURL(file);
+      state.mediaUrls.push(url);
+      urlByName.set(String(file.name || '').toLowerCase(), url);
+    });
+
+    const mtlByBase = new Map();
+    files.forEach((file) => {
+      if (mediaKindFromFile(file) === 'model-mtl') {
+        mtlByBase.set(baseName(file.name).toLowerCase(), file);
+      }
+    });
+
+    files.forEach((file) => {
+      const kind = mediaKindFromFile(file);
+      if (kind === 'model-mtl' || kind === 'other') return;
+
+      const nameKey = String(file.name || '').toLowerCase();
+      const url = urlByName.get(nameKey);
+      const ext = extName(file.name);
+
+      const item = {
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${nameKey}`,
+        name: file.name,
+        kind,
+        ext,
+        size: Number(file.size || 0),
+        url,
+        thumb: kind === 'image' ? url : mediaPlaceholder(kind, file.name),
+        mtlUrl: '',
+        resourceMap: urlByName
+      };
+
+      if (kind === 'model-obj') {
+        const mtl = mtlByBase.get(baseName(file.name).toLowerCase());
+        if (mtl) {
+          const mtlKey = String(mtl.name || '').toLowerCase();
+          item.mtlUrl = urlByName.get(mtlKey) || '';
+        }
+      }
+
+      state.mediaItems.push(item);
+    });
+
+    renderMediaList();
+    setMediaVisible(true);
+    setStatus(`Media cargada: ${state.mediaItems.length} item(s).`);
+
+    if (state.mediaItems.length > 0) {
+      void openMediaItem(state.mediaItems[0]);
+    }
+  }
+
   async function loadFromQuery() {
     const params = new URLSearchParams(window.location.search);
 
@@ -777,12 +1271,30 @@
 
   function bindEvents() {
     els.btnOpenJson.addEventListener('click', () => els.inputJson.click());
+    els.btnOpenMedia.addEventListener('click', () => els.inputMedia.click());
     els.btnOpenBg.addEventListener('click', () => els.inputBg.click());
 
     els.btnLibraryToggle.addEventListener('click', () => setLibraryVisible(!state.libraryVisible));
     els.btnLibraryHide.addEventListener('click', () => setLibraryVisible(false));
     els.btnLibraryRefresh.addEventListener('click', () => {
       void loadLibraryCatalog();
+    });
+
+    els.btnMediaToggle.addEventListener('click', () => setMediaVisible(!state.mediaVisible));
+    els.btnMediaHide.addEventListener('click', () => setMediaVisible(false));
+    els.btnMediaRefresh.addEventListener('click', () => renderMediaList());
+    els.btnMediaClearList.addEventListener('click', () => {
+      resetMediaList();
+      setStatus('Lista media limpia.');
+    });
+
+    els.mediaSearch.addEventListener('input', () => {
+      scheduleMediaRender();
+    });
+
+    els.btnMediaClose.addEventListener('click', () => {
+      closeMediaOverlay();
+      setStatus('Overlay multimedia cerrado.');
     });
 
     els.librarySearch.addEventListener('input', () => renderLibraryList());
@@ -811,9 +1323,15 @@
       const text = await file.text();
       try {
         await parseAndApplyProject(text, `archivo:${file.name}`);
+        closeMediaOverlay();
       } catch (err) {
         setStatus(`Error: ${err.message}`);
       }
+      e.target.value = '';
+    });
+
+    els.inputMedia.addEventListener('change', (e) => {
+      addMediaFiles(e.target.files);
       e.target.value = '';
     });
 
@@ -823,6 +1341,7 @@
       const url = URL.createObjectURL(file);
       els.bgImage.src = url;
       els.bgImage.hidden = false;
+      state.mediaUrls.push(url);
       setStatus('Fondo cargado.');
       e.target.value = '';
     });
@@ -838,6 +1357,7 @@
       els.bgImage.hidden = true;
       els.bgImage.removeAttribute('src');
       clearScene();
+      closeMediaOverlay();
       updateWorldTransform();
       setStatus('Vista limpia.');
     });
@@ -886,6 +1406,7 @@
     els.stage.addEventListener('pointerdown', (e) => {
       if (state.fixed) return;
       if (e.button !== 0) return;
+      if (!els.mediaOverlay.hidden) return;
       state.isPanning = true;
       state.panStartX = e.clientX - state.panX;
       state.panStartY = e.clientY - state.panY;
@@ -909,16 +1430,23 @@
     });
 
     els.stage.addEventListener('wheel', (e) => {
+      if (!els.mediaOverlay.hidden) return;
       e.preventDefault();
       const dir = e.deltaY > 0 ? -0.1 : 0.1;
       state.zoom = clamp(state.zoom + dir, 0.1, 5);
       updateWorldTransform();
     }, { passive: false });
+
+    window.addEventListener('beforeunload', () => {
+      closeMediaOverlay();
+      clearMediaUrls();
+    });
   }
 
   async function boot() {
     bindEvents();
     updateWorldTransform();
+    renderMediaList();
     setStatus('Previewer 2.0 listo.');
 
     try {
