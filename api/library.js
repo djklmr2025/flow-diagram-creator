@@ -29,6 +29,16 @@ function sanitizePrefix(input) {
   return prefix;
 }
 
+function sanitizeScope(input) {
+  const scope = String(input || 'library').toLowerCase().trim();
+  if (scope === 'projects') return 'projects';
+  return 'library';
+}
+
+function stripRoot(pathname, root) {
+  return String(pathname || '').replace(new RegExp(`^${root}/`), '');
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     setCors(res);
@@ -45,13 +55,15 @@ export default async function handler(req, res) {
   const origin = getOrigin(req);
   const url = new URL(req.url, origin);
 
-  // Prefijo "humano" sin el "library/" interno.
+  // Prefijo "humano" sin el root interno.
   const prefixParam = sanitizePrefix(url.searchParams.get('prefix'));
+  const scope = sanitizeScope(url.searchParams.get('scope'));
   const modeParam = String(url.searchParams.get('mode') || 'folded').toLowerCase();
   const limitParam = Number(url.searchParams.get('limit') || '200');
   const cursor = url.searchParams.get('cursor') || undefined;
 
-  const prefix = prefixParam ? `library/${prefixParam.replace(/\/+$/, '')}/` : 'library/';
+  const root = scope === 'projects' ? 'projects' : 'library';
+  const prefix = prefixParam ? `${root}/${prefixParam.replace(/\/+$/, '')}/` : `${root}/`;
   const mode = modeParam === 'expanded' ? 'expanded' : 'folded';
   const limit = Number.isFinite(limitParam) ? Math.min(Math.max(1, limitParam), 1000) : 200;
 
@@ -65,12 +77,13 @@ export default async function handler(req, res) {
 
   sendJson(res, 200, {
     ok: true,
-    prefix: prefix.replace(/^library\//, ''),
+    scope,
+    prefix: stripRoot(prefix, root),
     mode,
     limit,
-    folders: (result.folders || []).map((f) => String(f).replace(/^library\//, '').replace(/\/+$/, '')),
+    folders: (result.folders || []).map((f) => stripRoot(String(f), root).replace(/\/+$/, '')),
     blobs: (result.blobs || []).map((b) => ({
-      pathname: b.pathname.replace(/^library\//, '').replace(/\.json$/i, ''),
+      pathname: stripRoot(b.pathname, root).replace(/\.json$/i, ''),
       url: b.url,
       size: b.size,
       uploadedAt: b.uploadedAt,
@@ -79,4 +92,3 @@ export default async function handler(req, res) {
     hasMore: Boolean(result.hasMore),
   });
 }
-
