@@ -1672,6 +1672,12 @@
 	        <div class="context-menu-item" id="ctx-crop">
 	            <span>✂️</span> Recortar...
 	        </div>
+            <div class="context-menu-item" id="ctx-auto-trim-image">
+                <span>🧭</span> Autoajustar PNG al contorno
+            </div>
+            <div class="context-menu-item" id="ctx-vectorize-image">
+                <span>⬟</span> Convertir PNG a vector
+            </div>
 	        <div class="context-menu-separator"></div>
 	        <div class="context-menu-item" id="ctx-rotate-left">
 	            <span>↺</span> Girar -15°
@@ -2335,6 +2341,22 @@
 	                        this.hideContextMenu();
 	                    });
 	                }
+
+                    const ctxAutoTrimImage = document.getElementById('ctx-auto-trim-image');
+                    if (ctxAutoTrimImage) {
+                        ctxAutoTrimImage.addEventListener('click', async () => {
+                            await this.autoTrimSelectedImageToAlpha();
+                            this.hideContextMenu();
+                        });
+                    }
+
+                    const ctxVectorizeImage = document.getElementById('ctx-vectorize-image');
+                    if (ctxVectorizeImage) {
+                        ctxVectorizeImage.addEventListener('click', async () => {
+                            await this.convertSelectedImageToVectorPolygon();
+                            this.hideContextMenu();
+                        });
+                    }
 
 	                const ctxRotateLeft = document.getElementById('ctx-rotate-left');
 	                if (ctxRotateLeft) {
@@ -3772,6 +3794,10 @@
                         this.selectedElements = [imageElement];
                         this.saveHistory();
                         this.updatePropertiesPanel();
+                        // Autoajuste inicial del PNG para que la caja se acerque al contorno real.
+                        setTimeout(() => {
+                            this.autoTrimSelectedImageToAlpha().catch(() => {});
+                        }, 0);
                         
                         // Ordenar elementos por zIndex
                         this.sortElementsByZIndex();
@@ -4012,8 +4038,27 @@
                 }));
 
                 if (this.hasImagesInElements(selectedClone)) {
-                    alert('No se puede guardar en "agrupados" si incluye imágenes/video. Usa vector puro.');
-                    return;
+                    const doConvert = confirm(
+                        'La selección incluye imágenes/video.\n\n' +
+                        '¿Quieres convertir automáticamente las imágenes PNG a polígonos vectoriales para guardar en "agrupados"?'
+                    );
+                    if (!doConvert) {
+                        alert('No se puede guardar en "agrupados" si incluye imágenes/video. Usa vector puro.');
+                        return;
+                    }
+
+                    const conversion = await this.convertImagesInElementsToVectorPolygons(selectedClone);
+                    if (conversion.converted > 0) {
+                        // seguir: selectedClone ya convertido parcialmente
+                    }
+                    if (this.hasImagesInElements(selectedClone)) {
+                        alert(
+                            'No se pudo convertir todo a vector puro.\n' +
+                            `Convertidos: ${conversion.converted} | Fallidos: ${conversion.failed}\n` +
+                            'Tip: usa "Autoajustar PNG" y luego "Convertir PNG a vector" sobre cada imagen.'
+                        );
+                        return;
+                    }
                 }
 
                 const defaultName =
@@ -4064,8 +4109,13 @@
                 // Mostrar/ocultar items según el tipo seleccionado.
                 const sel = (this.selectedElements && this.selectedElements.length === 1) ? this.selectedElements[0] : null;
                 const canCrop = sel && (sel.type === 'image' || sel.type === 'video');
+                const canImageOps = sel && sel.type === 'image';
                 const cropItem = document.getElementById('ctx-crop');
                 if (cropItem) cropItem.style.display = canCrop ? 'block' : 'none';
+                const trimItem = document.getElementById('ctx-auto-trim-image');
+                if (trimItem) trimItem.style.display = canImageOps ? 'block' : 'none';
+                const vectorizeItem = document.getElementById('ctx-vectorize-image');
+                if (vectorizeItem) vectorizeItem.style.display = canImageOps ? 'block' : 'none';
                 const saveGroupedItem = document.getElementById('ctx-save-grouped');
                 if (saveGroupedItem) saveGroupedItem.style.display = (this.selectedElements && this.selectedElements.length > 0) ? 'block' : 'none';
 
@@ -4161,6 +4211,297 @@
 	                this.saveHistory();
 	                this.updatePropertiesPanel();
 	            }
+
+            async getRenderableImageForElement(elem) {
+                if (!elem || typeof elem !== 'object' || elem.type !== 'image') return null;
+
+                const isHtmlImage = (v) =>
+                    v && typeof HTMLImageElement !== 'undefined' && v instanceof HTMLImageElement;
+
+                let img = elem.imageData;
+                if (img && !isHtmlImage(img)) {
+                    img = null;
+                    try { delete elem.imageData; } catch {}
+                }
+
+                if (!img && this.loadedImages[elem.id] && isHtmlImage(this.loadedImages[elem.id])) {
+                    img = this.loadedImages[elem.id];
+                }
+
+                if (img && img.complete) {
+                    elem.imageData = img;
+                    this.loadedImages[elem.id] = img;
+                    return img;
+                }
+
+                if (!elem.imageSrc || typeof elem.imageSrc !== 'string') return null;
+
+                img = await new Promise((resolve) => {
+                    try {
+                        const i = new Image();
+                        i.onload = () => resolve(i);
+                        i.onerror = () => resolve(null);
+                        i.src = elem.imageSrc;
+                    } catch {
+                        resolve(null);
+                    }
+                });
+
+                if (img) {
+                    elem.imageData = img;
+                    this.loadedImages[elem.id] = img;
+                }
+                return img;
+            }
+
+            getImageRenderMetrics(elem, img) {
+                const sw = Math.max(1, Number(img && (img.naturalWidth || img.width)) || 1);
+                const sh = Math.max(1, Number(img && (img.naturalHeight || img.height)) || 1);
+                const crop = (elem && elem.crop && typeof elem.crop === 'object' && !Array.isArray(elem.crop)) ? elem.crop : null;
+                let sx = 0;
+                let sy = 0;
+                let sww = sw;
+                let shh = sh;
+
+                if (crop && Number.isFinite(crop.x) && Number.isFinite(crop.y) &&
+                    Number.isFinite(crop.w) && Number.isFinite(crop.h) &&
+                    crop.w > 0 && crop.h > 0) {
+                    sx = Math.max(0, Math.min(sw, crop.x * sw));
+                    sy = Math.max(0, Math.min(sh, crop.y * sh));
+                    sww = Math.max(1, Math.min(sw - sx, crop.w * sw));
+                    shh = Math.max(1, Math.min(sh - sy, crop.h * sh));
+                }
+
+                return { sw, sh, sx, sy, sww, shh };
+            }
+
+            buildAlphaContourFromImageElement(elem, options) {
+                if (!elem || typeof elem !== 'object' || elem.type !== 'image') return null;
+                const opts = options && typeof options === 'object' ? options : {};
+                const alphaThreshold = Number.isFinite(opts.alphaThreshold) ? Number(opts.alphaThreshold) : 20;
+                const maxTraceSize = Number.isFinite(opts.maxTraceSize) ? Number(opts.maxTraceSize) : 420;
+                const rowStep = Math.max(1, Number.isFinite(opts.rowStep) ? Number(opts.rowStep) : 2);
+                const maxPoints = Math.max(20, Number.isFinite(opts.maxPoints) ? Number(opts.maxPoints) : 220);
+
+                const img = this.loadedImages[elem.id] || elem.imageData;
+                if (!img) return null;
+
+                const m = this.getImageRenderMetrics(elem, img);
+                const scale = Math.min(1, maxTraceSize / Math.max(m.sww, m.shh));
+                const tw = Math.max(1, Math.round(m.sww * scale));
+                const th = Math.max(1, Math.round(m.shh * scale));
+
+                const cv = document.createElement('canvas');
+                cv.width = tw;
+                cv.height = th;
+                const cx = cv.getContext('2d', { willReadFrequently: true });
+                if (!cx) return null;
+                cx.clearRect(0, 0, tw, th);
+                cx.drawImage(img, m.sx, m.sy, m.sww, m.shh, 0, 0, tw, th);
+
+                let data;
+                try {
+                    data = cx.getImageData(0, 0, tw, th).data;
+                } catch {
+                    return null;
+                }
+
+                const alphaAt = (x, y) => data[((y * tw + x) * 4) + 3];
+
+                let minX = tw, minY = th, maxX = -1, maxY = -1;
+                const leftPts = [];
+                const rightPts = [];
+
+                for (let y = 0; y < th; y += rowStep) {
+                    let left = -1;
+                    let right = -1;
+                    for (let x = 0; x < tw; x++) {
+                        if (alphaAt(x, y) > alphaThreshold) {
+                            left = x;
+                            break;
+                        }
+                    }
+                    if (left < 0) continue;
+                    for (let x = tw - 1; x >= 0; x--) {
+                        if (alphaAt(x, y) > alphaThreshold) {
+                            right = x;
+                            break;
+                        }
+                    }
+                    if (right < left) right = left;
+
+                    minX = Math.min(minX, left);
+                    maxX = Math.max(maxX, right);
+                    minY = Math.min(minY, y);
+                    maxY = Math.max(maxY, y);
+
+                    leftPts.push({ x: left, y });
+                    rightPts.push({ x: right, y });
+                }
+
+                if (maxX < minX || maxY < minY || leftPts.length < 2) return null;
+
+                let contour = leftPts.concat(rightPts.slice().reverse());
+                if (contour.length > maxPoints) {
+                    const skip = Math.ceil(contour.length / maxPoints);
+                    contour = contour.filter((_, i) => i % skip === 0);
+                }
+
+                if (contour.length < 3) return null;
+
+                const relMinX = minX / tw;
+                const relMinY = minY / th;
+                const relMaxX = (maxX + 1) / tw;
+                const relMaxY = (maxY + 1) / th;
+
+                const worldPts = contour.map((p) => ({
+                    x: elem.x + (p.x / tw) * elem.width,
+                    y: elem.y + (p.y / th) * elem.height
+                }));
+
+                return {
+                    worldPoints: worldPts,
+                    relBounds: {
+                        x: relMinX,
+                        y: relMinY,
+                        w: Math.max(0, relMaxX - relMinX),
+                        h: Math.max(0, relMaxY - relMinY)
+                    },
+                    metrics: m
+                };
+            }
+
+            async autoTrimSelectedImageToAlpha() {
+                if (this.readOnly) return;
+                if (!this.selectedElements || this.selectedElements.length !== 1) return;
+                const elem = this.selectedElements[0];
+                if (!elem || elem.type !== 'image') return;
+                if (elem.locked) return;
+
+                const img = await this.getRenderableImageForElement(elem);
+                if (!img) {
+                    alert('No se pudo cargar la imagen para autoajuste.');
+                    return;
+                }
+
+                const traced = this.buildAlphaContourFromImageElement(elem, { maxTraceSize: 420, rowStep: 2 });
+                if (!traced || !traced.relBounds || traced.relBounds.w <= 0 || traced.relBounds.h <= 0) {
+                    alert('No se detectó contorno alfa útil para autoajuste.');
+                    return;
+                }
+
+                const m = traced.metrics;
+                const rb = traced.relBounds;
+
+                const newSx = m.sx + rb.x * m.sww;
+                const newSy = m.sy + rb.y * m.shh;
+                const newSww = Math.max(1, rb.w * m.sww);
+                const newShh = Math.max(1, rb.h * m.shh);
+
+                const oldX = Number(elem.x) || 0;
+                const oldY = Number(elem.y) || 0;
+                const oldW = Number(elem.width) || 1;
+                const oldH = Number(elem.height) || 1;
+                const newX = oldX + rb.x * oldW;
+                const newY = oldY + rb.y * oldH;
+                const newW = Math.max(1, rb.w * oldW);
+                const newH = Math.max(1, rb.h * oldH);
+
+                elem.x = newX;
+                elem.y = newY;
+                elem.width = newW;
+                elem.height = newH;
+                elem.crop = {
+                    x: Math.max(0, Math.min(1, newSx / m.sw)),
+                    y: Math.max(0, Math.min(1, newSy / m.sh)),
+                    w: Math.max(0.0001, Math.min(1, newSww / m.sw)),
+                    h: Math.max(0.0001, Math.min(1, newShh / m.sh))
+                };
+
+                this.normalizeBoxElementInPlace(elem);
+                this.saveHistory();
+                this.updatePropertiesPanel();
+            }
+
+            async convertSelectedImageToVectorPolygon() {
+                if (this.readOnly) return;
+                if (!this.selectedElements || this.selectedElements.length !== 1) return;
+                const elem = this.selectedElements[0];
+                if (!elem || elem.type !== 'image') return;
+                if (elem.locked) return;
+
+                const img = await this.getRenderableImageForElement(elem);
+                if (!img) {
+                    alert('No se pudo cargar la imagen para vectorizar.');
+                    return;
+                }
+
+                const traced = this.buildAlphaContourFromImageElement(elem, { maxTraceSize: 460, rowStep: 2, maxPoints: 260 });
+                if (!traced || !Array.isArray(traced.worldPoints) || traced.worldPoints.length < 3) {
+                    alert('No se pudo extraer contorno vectorial del PNG.');
+                    return;
+                }
+
+                const idx = this.elements.indexOf(elem);
+                if (idx < 0) return;
+
+                const poly = this.buildVectorPolygonFromImageElement(elem, traced);
+
+                this.elements[idx] = poly;
+                this.selectedElements = [poly];
+                this.saveHistory();
+                this.updatePropertiesPanel();
+                alert('PNG convertido a polígono vectorial. Ahora sí se puede guardar en Agrupados.');
+            }
+
+            buildVectorPolygonFromImageElement(elem, traced) {
+                return {
+                    id: elem.id,
+                    type: 'polygon',
+                    points: traced.worldPoints,
+                    lineWidth: 2,
+                    fillColor: 'transparent',
+                    strokeColor: this.isTransparentColor(elem.strokeColor) ? '#e94560' : elem.strokeColor,
+                    locked: false,
+                    active: elem.active !== false,
+                    connectionStatus: elem.connectionStatus || 'none',
+                    name: (String(elem.name || '').replace(/\.[a-z0-9]+$/i, '') || 'vectorizado') + '-vector',
+                    closed: true
+                };
+            }
+
+            async convertImagesInElementsToVectorPolygons(elements) {
+                const stats = { converted: 0, failed: 0 };
+                const walk = async (arr) => {
+                    if (!Array.isArray(arr)) return;
+                    for (let i = 0; i < arr.length; i++) {
+                        const elem = arr[i];
+                        if (!elem || typeof elem !== 'object') continue;
+                        if (elem.type === 'group' && Array.isArray(elem.elements)) {
+                            await walk(elem.elements);
+                            continue;
+                        }
+                        if (elem.type !== 'image') continue;
+
+                        const img = await this.getRenderableImageForElement(elem);
+                        if (!img) {
+                            stats.failed += 1;
+                            continue;
+                        }
+                        const traced = this.buildAlphaContourFromImageElement(elem, { maxTraceSize: 460, rowStep: 2, maxPoints: 260 });
+                        if (!traced || !Array.isArray(traced.worldPoints) || traced.worldPoints.length < 3) {
+                            stats.failed += 1;
+                            continue;
+                        }
+
+                        arr[i] = this.buildVectorPolygonFromImageElement(elem, traced);
+                        stats.converted += 1;
+                    }
+                };
+
+                await walk(elements);
+                return stats;
+            }
 
 	            // ==================== ROTAR / VOLTEAR (ESPEJO) ====================
 
@@ -4970,6 +5311,10 @@
                 const elem = this.selectedElements[0];
                 if (!elem || typeof elem !== 'object') return;
                 if (elem.locked) return;
+                if (elem.type === 'image') {
+                    this.convertSelectedImageToVectorPolygon();
+                    return;
+                }
                 if (!(elem.type === 'rectangle' || elem.type === 'circle')) return;
 
                 const idx = this.elements.indexOf(elem);
@@ -9921,10 +10266,16 @@
                     document.getElementById('prop-active').value = elem.active ? 'true' : 'false';
 
 	                    const geoTools = document.getElementById('prop-geometry-tools');
+                        const geoBtn = document.getElementById('btn-convert-to-polygon');
 	                    if (geoTools) {
 	                        geoTools.style.display =
-	                            (elem.type === 'rectangle' || elem.type === 'circle') ? 'block' : 'none';
+	                            (elem.type === 'rectangle' || elem.type === 'circle' || elem.type === 'image') ? 'block' : 'none';
 	                    }
+                        if (geoBtn) {
+                            geoBtn.textContent = elem.type === 'image'
+                                ? 'Convertir PNG a Polígono'
+                                : 'Convertir a Polígono';
+                        }
 
 	                    // Punto de Información (Lámina)
 	                    const cpGroup = document.getElementById('prop-control-point-group');
