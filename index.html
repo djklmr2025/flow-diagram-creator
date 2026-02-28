@@ -1515,6 +1515,9 @@
             <label class="property-checkbox">
                 <input type="checkbox" id="prop-is-route"> Usar como ruta de movimiento
             </label>
+            <label class="property-checkbox">
+                <input type="checkbox" id="prop-route-circular"> Ruta circular (loop)
+            </label>
         </div>
         <div class="property-group" id="prop-mover-tools" style="display:none;">
             <label class="property-checkbox">
@@ -1530,6 +1533,11 @@
                 <input type="range" id="prop-mover-speed" min="1" max="300" value="40">
                 <span id="prop-mover-speed-value">40</span>
             </div>
+            <label>Modo ruta:</label>
+            <select id="prop-route-mode">
+                <option value="loop">Loop (repite)</option>
+                <option value="stop">Stop al final</option>
+            </select>
         </div>
         <div class="property-group" id="prop-mover-size-tools" style="display:none;">
             <label>Ancho actor:</label>
@@ -2263,8 +2271,10 @@
 	                    'prop-active',
 	                    'prop-stroke-transparent',
                         'prop-is-route',
+                        'prop-route-circular',
                         'prop-route-id',
                         'prop-follow-route',
+                        'prop-route-mode',
 		                ];
 	                
 		                inputs.forEach(id => {
@@ -3971,8 +3981,10 @@
 	                }
 
                     if (elem.type === 'mover') {
-                        const state = this.resolveMoverState(elem, false);
-                        return { x: state.x, y: state.y };
+                        return {
+                            x: Number.isFinite(elem.x) ? elem.x : 0,
+                            y: Number.isFinite(elem.y) ? elem.y : 0
+                        };
                     }
 
 	                if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points) && elem.points.length) {
@@ -4667,6 +4679,7 @@
                             endY: y,
                             lineWidth: 5,
                             routeRole: true,
+                            routeCircular: false,
                             name: `Ruta ${Date.now()}`,
                             animColor: '#00d4ff',
                             flowDirection: 'right',
@@ -4687,6 +4700,7 @@
                             height: 28,
                             flowDirection: 'right',
                             speed: 40,
+                            routeMode: 'loop',
                             progress: 0,
                             routeId,
                             name: kind === 'metro' ? 'Metro' : (kind === 'male' ? 'Hombre' : 'Mujer'),
@@ -4834,10 +4848,18 @@
 	                            return elem;
 	                        }
                     } else if (elem.type === 'line') {
-                        // Detección simple de línea (con margen)
-                        const dist = this.distanceToLineSegment(x, y, elem.x, elem.y, elem.endX, elem.endY);
-                        if (dist < 10 / this.camera.zoom) {
-                            return elem;
+                        if (elem.routeCircular) {
+                            const cx = (elem.x + elem.endX) / 2;
+                            const cy = (elem.y + elem.endY) / 2;
+                            const radius = Math.max(2, Math.sqrt(Math.pow(elem.endX - elem.x, 2) + Math.pow(elem.endY - elem.y, 2)) / 2);
+                            const d = Math.sqrt(Math.pow(x - cx, 2) + Math.pow(y - cy, 2));
+                            if (Math.abs(d - radius) < (10 / this.camera.zoom)) return elem;
+                        } else {
+                            // Detección simple de línea (con margen)
+                            const dist = this.distanceToLineSegment(x, y, elem.x, elem.y, elem.endX, elem.endY);
+                            if (dist < 10 / this.camera.zoom) {
+                                return elem;
+                            }
                         }
                     } else if (elem.type === 'mover') {
                         const state = this.resolveMoverState(elem, false);
@@ -5097,6 +5119,18 @@
                 if (!elem || typeof elem !== 'object') return [];
                 if (elem.type === 'line') {
                     if (!Number.isFinite(elem.x) || !Number.isFinite(elem.y) || !Number.isFinite(elem.endX) || !Number.isFinite(elem.endY)) return [];
+                    if (elem.routeCircular) {
+                        const cx = (elem.x + elem.endX) / 2;
+                        const cy = (elem.y + elem.endY) / 2;
+                        const radius = Math.max(2, Math.sqrt(Math.pow(elem.endX - elem.x, 2) + Math.pow(elem.endY - elem.y, 2)) / 2);
+                        const segments = 72;
+                        const pts = [];
+                        for (let i = 0; i <= segments; i++) {
+                            const a = (Math.PI * 2 * i) / segments;
+                            pts.push({ x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a) });
+                        }
+                        return pts;
+                    }
                     return [{ x: elem.x, y: elem.y }, { x: elem.endX, y: elem.endY }];
                 }
                 if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points)) {
@@ -5204,8 +5238,10 @@
             resolveElementRouteState(elem, updateProgress) {
                 if (!elem || typeof elem !== 'object') return { x: 0, y: 0, angle: 0, routeFound: false };
 
-                const defaultCenter = this.getElementCenterPoint(elem);
                 const isMover = elem.type === 'mover';
+                const defaultCenter = isMover
+                    ? { x: Number.isFinite(elem.x) ? elem.x : 0, y: Number.isFinite(elem.y) ? elem.y : 0 }
+                    : this.getElementCenterPoint(elem);
                 const enabled = isMover ? true : Boolean(elem.followRoute);
                 const routeId = String(elem.routeId || '');
                 if (!enabled || !routeId) {
@@ -5228,7 +5264,18 @@
                     const speed = Number.isFinite(rawSpeed) ? Math.max(1, Math.min(300, rawSpeed)) : 40;
                     progress += dir * (speed / 12000);
                 }
-                progress = ((progress % 1) + 1) % 1;
+                const routeMode = String(elem.routeMode || 'loop');
+                if (routeMode === 'stop') {
+                    if (progress <= 0) {
+                        progress = 0;
+                        if (updateProgress) elem.active = false;
+                    } else if (progress >= 1) {
+                        progress = 1;
+                        if (updateProgress) elem.active = false;
+                    }
+                } else {
+                    progress = ((progress % 1) + 1) % 1;
+                }
                 elem[progressKey] = progress;
 
                 const p = this.getPointOnPolyline(points, progress);
@@ -5593,16 +5640,33 @@
 	                    this.drawConnectionIndicator(elem, centerX + radiusX, centerY);
 	                    this.restoreElementBoxTransform(didTransform);
 	                    
-	                } else if (elem.type === 'line') {
+                } else if (elem.type === 'line') {
                     // Dibujar línea
                     const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
                     const doStroke = !this.isTransparentColor(strokeColor);
                     const isRoute = this.isRouteElement(elem);
+                    const isCircularRoute = Boolean(isRoute && elem.routeCircular);
                     this.ctx.strokeStyle = strokeColor;
                     this.ctx.lineWidth = this.getElementLineWidth(elem) / this.camera.zoom;
                     
                     if (doStroke) {
-                        if (isRoute) {
+                        if (isCircularRoute) {
+                            const cx = (elem.x + elem.endX) / 2;
+                            const cy = (elem.y + elem.endY) / 2;
+                            const radius = Math.max(2, Math.sqrt(Math.pow(elem.endX - elem.x, 2) + Math.pow(elem.endY - elem.y, 2)) / 2);
+                            this.ctx.save();
+                            this.ctx.lineCap = 'round';
+                            this.ctx.lineJoin = 'round';
+                            this.ctx.beginPath();
+                            this.ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                            this.ctx.stroke();
+                            this.ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+                            this.ctx.lineWidth = Math.max(1 / this.camera.zoom, this.ctx.lineWidth * 0.35);
+                            this.ctx.beginPath();
+                            this.ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                            this.ctx.stroke();
+                            this.ctx.restore();
+                        } else if (isRoute) {
                             // Dibujo "vía": trazo base + línea central.
                             this.ctx.save();
                             this.ctx.lineCap = 'round';
@@ -5633,7 +5697,13 @@
                     }
                     
                     // Indicador de conexión
-                    this.drawConnectionIndicator(elem, elem.endX, elem.endY);
+                    if (isCircularRoute) {
+                        const cx = (elem.x + elem.endX) / 2;
+                        const cy = (elem.y + elem.endY) / 2;
+                        this.drawConnectionIndicator(elem, cx, cy);
+                    } else {
+                        this.drawConnectionIndicator(elem, elem.endX, elem.endY);
+                    }
                     
 	                } else if (elem.type === 'path' || elem.type === 'polygon') {
 	                    // Dibujar trazado libre o polígono cerrado
@@ -5732,6 +5802,22 @@
                 } else {
                     elem.animOffset = (elem.animOffset - step) % (dashLength + gapLength);
                     if (elem.animOffset < 0) elem.animOffset += (dashLength + gapLength);
+                }
+
+                if (elem.routeCircular) {
+                    const points = this.getRoutePoints(elem);
+                    if (points.length < 2) return;
+                    let length = this.getPolylineLength(points);
+                    if (length <= 0) return;
+                    this.ctx.fillStyle = elem.animColor || '#4caf50';
+                    for (let i = elem.animOffset; i < length; i += dashLength + gapLength) {
+                        const p = this.getPointOnPolyline(points, i / length);
+                        if (!p) continue;
+                        this.ctx.beginPath();
+                        this.ctx.arc(p.x, p.y, particleSize / this.camera.zoom, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    }
+                    return;
                 }
                 
                 const dx = elem.endX - elem.x;
@@ -5894,10 +5980,19 @@
                     this.ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
                     this.ctx.stroke();
                 } else if (elem.type === 'line') {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(elem.x, elem.y);
-                    this.ctx.lineTo(elem.endX, elem.endY);
-                    this.ctx.stroke();
+                    if (elem.routeCircular) {
+                        const cx = (elem.x + elem.endX) / 2;
+                        const cy = (elem.y + elem.endY) / 2;
+                        const radius = Math.max(2, Math.sqrt(Math.pow(elem.endX - elem.x, 2) + Math.pow(elem.endY - elem.y, 2)) / 2);
+                        this.ctx.beginPath();
+                        this.ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                        this.ctx.stroke();
+                    } else {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(elem.x, elem.y);
+                        this.ctx.lineTo(elem.endX, elem.endY);
+                        this.ctx.stroke();
+                    }
                 } else if (elem.type === 'mover') {
                     const state = this.resolveMoverState(elem, false);
                     const w = Math.max(16, Math.abs(Number(elem.width) || 44)) + (10 / this.camera.zoom);
@@ -6995,6 +7090,8 @@
                         if (!Number.isFinite(elem.animOffset)) elem.animOffset = 0;
                         if (!Array.isArray(elem.controlPoints)) elem.controlPoints = [];
                         if (typeof elem.routeRole !== 'boolean') elem.routeRole = false;
+                        if (typeof elem.routeCircular !== 'boolean') elem.routeCircular = false;
+                        if (typeof elem.routeMode !== 'string') elem.routeMode = 'loop';
                     } else if (elem.type === 'rectangle' || elem.type === 'circle') {
                         if (!Number.isFinite(elem.x)) elem.x = 0;
                         if (!Number.isFinite(elem.y)) elem.y = 0;
@@ -7093,6 +7190,7 @@
                                     if (!Number.isFinite(elem.progress)) elem.progress = 0;
                                     if (typeof elem.flowDirection !== 'string') elem.flowDirection = 'right';
                                     if (!Number.isFinite(elem.speed)) elem.speed = 40;
+                                    if (typeof elem.routeMode !== 'string') elem.routeMode = 'loop';
                                     if (typeof elem.fillColor !== 'string') {
                                         elem.fillColor = elem.moverKind === 'female' ? '#f472b6' : (elem.moverKind === 'male' ? '#3b82f6' : '#93c5fd');
                                     }
@@ -7709,6 +7807,12 @@
                 }
 
                 if (elem.type === 'line') {
+                    if (elem.routeCircular) {
+                        const cx = (elem.x + elem.endX) / 2;
+                        const cy = (elem.y + elem.endY) / 2;
+                        const radius = Math.max(2, Math.sqrt(Math.pow(elem.endX - elem.x, 2) + Math.pow(elem.endY - elem.y, 2)) / 2);
+                        return { minX: cx - radius, minY: cy - radius, maxX: cx + radius, maxY: cy + radius };
+                    }
                     const minX = Math.min(elem.x, elem.endX);
                     const minY = Math.min(elem.y, elem.endY);
                     const maxX = Math.max(elem.x, elem.endX);
@@ -8407,6 +8511,12 @@
 
                 if (elem.type === 'line') {
                     if (!Number.isFinite(elem.x) || !Number.isFinite(elem.y) || !Number.isFinite(elem.endX) || !Number.isFinite(elem.endY)) return null;
+                    if (elem.routeCircular) {
+                        const cx = (elem.x + elem.endX) / 2;
+                        const cy = (elem.y + elem.endY) / 2;
+                        const radius = Math.max(2, Math.sqrt(Math.pow(elem.endX - elem.x, 2) + Math.pow(elem.endY - elem.y, 2)) / 2);
+                        return { minX: cx - radius, minY: cy - radius, maxX: cx + radius, maxY: cy + radius };
+                    }
                     return {
                         minX: Math.min(elem.x, elem.endX),
                         minY: Math.min(elem.y, elem.endY),
@@ -9144,13 +9254,19 @@
 
                     const routeTools = document.getElementById('prop-route-tools');
                     const routeToggle = document.getElementById('prop-is-route');
+                    const routeCircularToggle = document.getElementById('prop-route-circular');
                     const isRouteCandidate = elem.type === 'line' || elem.type === 'path' || elem.type === 'polygon';
                     if (routeTools) routeTools.style.display = isRouteCandidate ? 'block' : 'none';
                     if (routeToggle) routeToggle.checked = this.isRouteElement(elem);
+                    if (routeCircularToggle) {
+                        routeCircularToggle.checked = Boolean(elem.routeCircular);
+                        routeCircularToggle.disabled = !(elem.type === 'line' && this.isRouteElement(elem));
+                    }
 
                     const moverTools = document.getElementById('prop-mover-tools');
                     const followRouteInput = document.getElementById('prop-follow-route');
                     const routeIdInput = document.getElementById('prop-route-id');
+                    const routeModeInput = document.getElementById('prop-route-mode');
                     const moverSpeed = document.getElementById('prop-mover-speed');
                     const moverSpeedValue = document.getElementById('prop-mover-speed-value');
                     const moverSizeTools = document.getElementById('prop-mover-size-tools');
@@ -9167,6 +9283,7 @@
                     }
                     if (isMover || isFollowerCandidate) {
                         if (routeIdInput) routeIdInput.value = String(elem.routeId || '');
+                        if (routeModeInput) routeModeInput.value = String(elem.routeMode || 'loop');
                         if (moverSpeed) {
                             const speedRaw = isMover ? Number(elem.speed) : Number(elem.routeSpeed);
                             const speed = Math.max(1, Math.min(300, speedRaw || 40));
@@ -9275,9 +9392,11 @@
 	                const lw = document.getElementById('prop-line-width');
 	                const lwValue = lw ? Number.parseInt(String(lw.value || ''), 10) : NaN;
 	                const lineWidth = Number.isFinite(lwValue) ? Math.max(1, Math.min(20, lwValue)) : null;
-	                const routeFlag = Boolean(document.getElementById('prop-is-route') && document.getElementById('prop-is-route').checked);
+                    const routeFlag = Boolean(document.getElementById('prop-is-route') && document.getElementById('prop-is-route').checked);
+                    const routeCircularFlag = Boolean(document.getElementById('prop-route-circular') && document.getElementById('prop-route-circular').checked);
                     const followRouteFlag = Boolean(document.getElementById('prop-follow-route') && document.getElementById('prop-follow-route').checked);
                     const routeId = String((document.getElementById('prop-route-id') && document.getElementById('prop-route-id').value) || '').trim();
+                    const routeMode = String((document.getElementById('prop-route-mode') && document.getElementById('prop-route-mode').value) || 'loop');
                     const moverSpeedEl = document.getElementById('prop-mover-speed');
                     const moverSpeedRaw = moverSpeedEl ? Number.parseFloat(String(moverSpeedEl.value || '')) : NaN;
                     const moverSpeed = Number.isFinite(moverSpeedRaw) ? Math.max(1, Math.min(300, moverSpeedRaw)) : 40;
@@ -9323,11 +9442,13 @@
 	                    }
                         if (elem.type === 'line' || elem.type === 'path' || elem.type === 'polygon') {
                             elem.routeRole = routeFlag;
+                            if (elem.type === 'line') elem.routeCircular = routeCircularFlag;
                         }
                         if (elem.type === 'mover') {
                             elem.routeId = routeId;
                             elem.speed = moverSpeed;
                             elem.flowDirection = document.getElementById('prop-flow-direction').value;
+                            elem.routeMode = routeMode;
                             elem.width = moverWidth;
                             elem.height = moverHeight;
                         } else if (elem.type !== 'line') {
@@ -9335,6 +9456,7 @@
                             elem.routeId = routeId;
                             elem.routeSpeed = moverSpeed;
                             elem.routeDirection = document.getElementById('prop-flow-direction').value;
+                            elem.routeMode = routeMode;
                         }
 
 	                    // Punto de Información (Lámina)
