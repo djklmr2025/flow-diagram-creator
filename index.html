@@ -2043,6 +2043,7 @@
                 this.listenSession = null;
                 this.listenTimer = null;
                 this.listenLastDate = null;
+                this._renderErrorNotifiedAt = 0;
                 
                 // Módulos (permite expandir funcionalidad)
                 this.modules = {};
@@ -5527,10 +5528,20 @@
                 }
 
                 // Animar elementos "montados" a rutas (except movers dedicados).
-                this.updateRouteFollowersInPlace();
+                try {
+                    this.updateRouteFollowersInPlace();
+                } catch (err) {
+                    this.reportRenderError(err, 'updateRouteFollowersInPlace');
+                }
                 
                 // Dibujar elementos
-                this.elements.forEach(elem => this.drawElement(elem));
+                this.elements.forEach(elem => {
+                    try {
+                        this.drawElement(elem);
+                    } catch (err) {
+                        this.reportRenderError(err, `drawElement:${String(elem && elem.type || 'unknown')}`);
+                    }
+                });
                 
                 // Dibujar path temporal
                 if (this.drawingPath) {
@@ -5590,7 +5601,11 @@
                 // Dibujar elemento temporal
                 if (this.tempElement) {
                     this.ctx.globalAlpha = 0.5;
-                    this.drawElement(this.tempElement);
+                    try {
+                        this.drawElement(this.tempElement);
+                    } catch (err) {
+                        this.reportRenderError(err, 'drawElement:temp');
+                    }
                     this.ctx.globalAlpha = 1;
                 }
                 
@@ -5674,6 +5689,18 @@
                     this.ctx.lineTo(endX, y);
                     this.ctx.stroke();
                 }
+            }
+
+            reportRenderError(error, context) {
+                try {
+                    console.error('Render error:', context, error);
+                } catch {}
+                const now = Date.now();
+                if (now - this._renderErrorNotifiedAt < 1500) return;
+                this._renderErrorNotifiedAt = now;
+                try {
+                    this.updateStatusBar(`⚠️ Render parcial (${context}).`);
+                } catch {}
             }
 
             isRouteElement(elem) {
