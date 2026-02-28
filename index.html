@@ -1692,6 +1692,15 @@
 	        <div class="context-menu-item" id="ctx-duplicate">
 	            <span>📋</span> Duplicar
 	        </div>
+        <div class="context-menu-item" id="ctx-scale-up">
+            <span>🔍</span> Agrandar +10%
+        </div>
+        <div class="context-menu-item" id="ctx-scale-down">
+            <span>🔎</span> Achicar -10%
+        </div>
+        <div class="context-menu-item" id="ctx-flatten-selection">
+            <span>🧩</span> Combinar a objeto final
+        </div>
         <div class="context-menu-item" id="ctx-save-grouped">
             <span>📦</span> Guardar agrupado en biblioteca
         </div>
@@ -2314,6 +2323,30 @@
                     this.duplicateSelected();
                     this.hideContextMenu();
                 });
+
+                const ctxScaleUp = document.getElementById('ctx-scale-up');
+                if (ctxScaleUp) {
+                    ctxScaleUp.addEventListener('click', () => {
+                        this.scaleSelectedElements(1.1);
+                        this.hideContextMenu();
+                    });
+                }
+
+                const ctxScaleDown = document.getElementById('ctx-scale-down');
+                if (ctxScaleDown) {
+                    ctxScaleDown.addEventListener('click', () => {
+                        this.scaleSelectedElements(0.9);
+                        this.hideContextMenu();
+                    });
+                }
+
+                const ctxFlatten = document.getElementById('ctx-flatten-selection');
+                if (ctxFlatten) {
+                    ctxFlatten.addEventListener('click', async () => {
+                        await this.flattenSelectionToSingleObject();
+                        this.hideContextMenu();
+                    });
+                }
 
                 const ctxSaveGrouped = document.getElementById('ctx-save-grouped');
                 if (ctxSaveGrouped) {
@@ -4118,6 +4151,13 @@
                 if (trimItem) trimItem.style.display = canImageOps ? 'block' : 'none';
                 const vectorizeItem = document.getElementById('ctx-vectorize-image');
                 if (vectorizeItem) vectorizeItem.style.display = canImageOps ? 'block' : 'none';
+                const canTransform = Boolean(this.selectedElements && this.selectedElements.length > 0 && !this.readOnly);
+                const scaleUpItem = document.getElementById('ctx-scale-up');
+                if (scaleUpItem) scaleUpItem.style.display = canTransform ? 'block' : 'none';
+                const scaleDownItem = document.getElementById('ctx-scale-down');
+                if (scaleDownItem) scaleDownItem.style.display = canTransform ? 'block' : 'none';
+                const flattenItem = document.getElementById('ctx-flatten-selection');
+                if (flattenItem) flattenItem.style.display = canTransform ? 'block' : 'none';
                 const saveGroupedItem = document.getElementById('ctx-save-grouped');
                 if (saveGroupedItem) saveGroupedItem.style.display = (this.selectedElements && this.selectedElements.length > 0) ? 'block' : 'none';
 
@@ -4696,6 +4736,213 @@
 	                this.updateStatusBar();
 	                this.refreshLayersPanel();
 	            }
+
+            scaleElementAroundPoint(elem, factor, center) {
+                if (!elem || typeof elem !== 'object') return;
+                if (!Number.isFinite(factor) || factor <= 0) return;
+                const cx = Number(center && center.x);
+                const cy = Number(center && center.y);
+                if (!Number.isFinite(cx) || !Number.isFinite(cy)) return;
+
+                const scalePoint = (x, y) => ({
+                    x: cx + ((Number(x) - cx) * factor),
+                    y: cy + ((Number(y) - cy) * factor)
+                });
+
+                if (elem.type === 'group' && Array.isArray(elem.elements)) {
+                    elem.elements.forEach((child) => this.scaleElementAroundPoint(child, factor, center));
+                    if (Number.isFinite(elem.x) && Number.isFinite(elem.y) && Number.isFinite(elem.width) && Number.isFinite(elem.height)) {
+                        const p1 = scalePoint(elem.x, elem.y);
+                        const p2 = scalePoint(elem.x + elem.width, elem.y + elem.height);
+                        elem.x = Math.min(p1.x, p2.x);
+                        elem.y = Math.min(p1.y, p2.y);
+                        elem.width = Math.abs(p2.x - p1.x);
+                        elem.height = Math.abs(p2.y - p1.y);
+                    } else {
+                        this.ensureGroupBounds(elem);
+                    }
+                    return;
+                }
+
+                if (elem.type === 'line') {
+                    const s = scalePoint(elem.x, elem.y);
+                    const e = scalePoint(elem.endX, elem.endY);
+                    elem.x = s.x;
+                    elem.y = s.y;
+                    elem.endX = e.x;
+                    elem.endY = e.y;
+                    return;
+                }
+
+                if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points)) {
+                    elem.points.forEach((p) => {
+                        if (!p || typeof p !== 'object') return;
+                        const sp = scalePoint(p.x, p.y);
+                        p.x = sp.x;
+                        p.y = sp.y;
+                    });
+                    return;
+                }
+
+                if (Number.isFinite(elem.x) && Number.isFinite(elem.y) && Number.isFinite(elem.width) && Number.isFinite(elem.height)) {
+                    const p1 = scalePoint(elem.x, elem.y);
+                    const p2 = scalePoint(elem.x + elem.width, elem.y + elem.height);
+                    elem.x = Math.min(p1.x, p2.x);
+                    elem.y = Math.min(p1.y, p2.y);
+                    elem.width = Math.abs(p2.x - p1.x);
+                    elem.height = Math.abs(p2.y - p1.y);
+                    this.normalizeBoxElementInPlace(elem);
+                    return;
+                }
+
+                if (Number.isFinite(elem.x) && Number.isFinite(elem.y)) {
+                    const p = scalePoint(elem.x, elem.y);
+                    elem.x = p.x;
+                    elem.y = p.y;
+                }
+            }
+
+            scaleSelectedElements(factor) {
+                if (this.readOnly) return;
+                if (!Array.isArray(this.selectedElements) || this.selectedElements.length === 0) return;
+                const f = Number(factor);
+                if (!Number.isFinite(f) || f <= 0) return;
+
+                const bounds = this.getElementsBounds(this.selectedElements);
+                if (!bounds) return;
+                const center = {
+                    x: (bounds.minX + bounds.maxX) / 2,
+                    y: (bounds.minY + bounds.maxY) / 2
+                };
+
+                this.selectedElements.forEach((elem) => {
+                    if (!elem || typeof elem !== 'object' || elem.locked) return;
+                    this.scaleElementAroundPoint(elem, f, center);
+                });
+
+                this.saveHistory();
+                this.updatePropertiesPanel();
+                this.updateStatusBar();
+                this.refreshLayersPanel();
+            }
+
+            removeElementRecursiveFromList(list, target) {
+                if (!Array.isArray(list) || !target) return false;
+                for (let i = list.length - 1; i >= 0; i--) {
+                    const elem = list[i];
+                    if (elem === target) {
+                        list.splice(i, 1);
+                        return true;
+                    }
+                    if (elem && elem.type === 'group' && Array.isArray(elem.elements)) {
+                        if (this.removeElementRecursiveFromList(elem.elements, target)) return true;
+                    }
+                }
+                return false;
+            }
+
+            removeSelectedElementsFromCanvas() {
+                if (!Array.isArray(this.selectedElements) || this.selectedElements.length === 0) return;
+                this.selectedElements.forEach((elem) => {
+                    this.removeElementRecursiveFromList(this.elements, elem);
+                });
+            }
+
+            async flattenSelectionToSingleObject() {
+                if (this.readOnly) return;
+                if (!Array.isArray(this.selectedElements) || this.selectedElements.length === 0) return;
+
+                const bounds = this.getElementsBounds(this.selectedElements);
+                if (!bounds) return;
+
+                const pad = 4;
+                const rawWidth = Math.max(1, Math.ceil((bounds.maxX - bounds.minX) + (pad * 2)));
+                const rawHeight = Math.max(1, Math.ceil((bounds.maxY - bounds.minY) + (pad * 2)));
+                const maxTex = 4096;
+                const scale = Math.min(1, maxTex / Math.max(rawWidth, rawHeight));
+                const outWidth = Math.max(1, Math.round(rawWidth * scale));
+                const outHeight = Math.max(1, Math.round(rawHeight * scale));
+
+                const off = document.createElement('canvas');
+                off.width = outWidth;
+                off.height = outHeight;
+                const octx = off.getContext('2d');
+                if (!octx) return;
+
+                const prevCtx = this.ctx;
+                const prevCamera = this.camera;
+                const prevSelected = this.selectedElements;
+                const prevReadOnly = this.readOnly;
+                const prevViewerShowLabels = this.viewerShowLabels;
+                const prevDepthFx = this.depthFx;
+
+                try {
+                    octx.clearRect(0, 0, outWidth, outHeight);
+                    octx.save();
+                    octx.scale(scale, scale);
+                    octx.translate((-bounds.minX) + pad, (-bounds.minY) + pad);
+
+                    this.ctx = octx;
+                    this.camera = { x: 0, y: 0, zoom: 1, targetZoom: 1 };
+                    this.selectedElements = [];
+                    this.readOnly = true;
+                    this.viewerShowLabels = false;
+                    this.depthFx = false;
+
+                    prevSelected.forEach((elem) => this.drawElement(elem));
+                    octx.restore();
+
+                    const imageSrc = off.toDataURL('image/png');
+                    const merged = {
+                        id: Date.now() + Math.random(),
+                        type: 'image',
+                        name: `merged-${Date.now()}`,
+                        x: bounds.minX - pad,
+                        y: bounds.minY - pad,
+                        width: rawWidth,
+                        height: rawHeight,
+                        originalWidth: rawWidth,
+                        originalHeight: rawHeight,
+                        imageSrc,
+                        fillColor: 'transparent',
+                        strokeColor: 'transparent',
+                        lineWidth: 1,
+                        locked: false,
+                        active: true,
+                        connectionStatus: 'none',
+                        followRoute: false,
+                        routeId: '',
+                        routeSpeed: 40,
+                        routeDirection: 'right',
+                        routeProgress: 0,
+                        routeMode: 'loop',
+                        autoConnectRoute: false
+                    };
+
+                    this.removeSelectedElementsFromCanvas();
+                    this.elements.push(merged);
+                    this.selectedElements = [merged];
+                    this.loadedImages[merged.id] = new Image();
+                    this.loadedImages[merged.id].src = imageSrc;
+
+                    this.saveHistory();
+                    this.updatePropertiesPanel();
+                    this.updateStatusBar();
+                    this.refreshLayersPanel();
+                } catch (err) {
+                    console.error('flattenSelectionToSingleObject error:', err);
+                    alert('No se pudo combinar la selección en un solo objeto. Si hay imágenes externas, usa imágenes locales/base64.');
+                } finally {
+                    this.ctx = prevCtx;
+                    this.camera = prevCamera;
+                    if (!Array.isArray(this.selectedElements) || this.selectedElements.length === 0) {
+                        this.selectedElements = prevSelected;
+                    }
+                    this.readOnly = prevReadOnly;
+                    this.viewerShowLabels = prevViewerShowLabels;
+                    this.depthFx = prevDepthFx;
+                }
+            }
 	            
 	            // ==================== REDIMENSIONAMIENTO ====================
             
