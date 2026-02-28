@@ -2020,6 +2020,8 @@
                 this._touchMouseDown = false;
                 this._nudgeHistoryTimer = null; // Debounce para movimientos por teclado
                 this.selectionBox = null; // { start:{x,y}, end:{x,y}, additive:boolean, base:[] }
+                this.routeDraft = null; // Dibujo de ruta por nodos (tool=route)
+                this.lastPointerWorld = null; // Última posición world del cursor
                 // Herramienta "Formas" (plantillas vectoriales)
                 this.shapeType = safeLocalStorageGet('flow-diagram-shape-type', 'triangle') || 'triangle';
                 // Panel Objetos (Capas)
@@ -2973,6 +2975,9 @@
 	                    return;
 	                }
 
+                    if (this.tool === 'route' && tool !== 'route' && this.routeDraft) {
+                        this.cancelRouteDraft();
+                    }
 	                this.tool = tool;
 	                
                 const btnMap = {
@@ -3222,6 +3227,62 @@
 
 	                return { x: rx + cx, y: ry + cy };
 	            }
+
+            startRouteDraftAt(x, y) {
+                this.routeDraft = {
+                    id: Date.now() + Math.random(),
+                    type: 'path',
+                    name: `Ruta ${Date.now()}`,
+                    points: [{ x, y }],
+                    strokeColor: '#00d4ff',
+                    fillColor: 'transparent',
+                    lineWidth: 5,
+                    routeRole: true,
+                    locked: false,
+                    active: true,
+                    connectionStatus: 'none',
+                    closed: false
+                };
+                const hint = document.getElementById('close-path-hint');
+                if (hint) hint.classList.add('show');
+            }
+
+            addRouteDraftPoint(x, y) {
+                if (!this.routeDraft || !Array.isArray(this.routeDraft.points)) return;
+                const pts = this.routeDraft.points;
+                const last = pts[pts.length - 1];
+                if (!last) {
+                    pts.push({ x, y });
+                    return;
+                }
+                const dx = Number(x) - Number(last.x);
+                const dy = Number(y) - Number(last.y);
+                const dist = Math.sqrt((dx * dx) + (dy * dy));
+                if (dist < 1) return; // evita nodos duplicados casi iguales
+                pts.push({ x, y });
+            }
+
+            finalizeRouteDraft() {
+                if (!this.routeDraft) return;
+                const draft = this.routeDraft;
+                this.routeDraft = null;
+                const hint = document.getElementById('close-path-hint');
+                if (hint) hint.classList.remove('show');
+
+                if (!Array.isArray(draft.points) || draft.points.length < 2) return;
+                this.elements.push(draft);
+                this.selectedElements = [draft];
+                this.saveHistory();
+                this.updatePropertiesPanel();
+                this.updateStatusBar();
+            }
+
+            cancelRouteDraft() {
+                this.routeDraft = null;
+                const hint = document.getElementById('close-path-hint');
+                if (hint) hint.classList.remove('show');
+                this.updateStatusBar();
+            }
 	            
 	            // ==================== EVENTOS DEL MOUSE ====================
             
@@ -3233,6 +3294,7 @@
                 const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
                 const worldPos = this.screenToWorld(mouseX, mouseY);
+                this.lastPointerWorld = { x: worldPos.x, y: worldPos.y };
 
                 // Modo visor: solo pan/zoom (sin selección, sin edición, sin menú contextual)
                 if (this.readOnly) {
@@ -3253,6 +3315,13 @@
                         document.getElementById('canvas-container').classList.add('grabbing');
                         this.canvas.style.cursor = 'grabbing';
                     }
+                    return;
+                }
+
+                // Preview de ruta por nodos (tool=route)
+                if (this.tool === 'route' && this.routeDraft && Array.isArray(this.routeDraft.points)) {
+                    this.routeDraft.preview = { x: worldPos.x, y: worldPos.y };
+                    this.canvas.style.cursor = 'crosshair';
                     return;
                 }
                 
@@ -3303,6 +3372,19 @@
 	                    }
 	                    return;
 	                }
+
+                    // Herramienta Ruta (nodos continuos): clic agrega nodo, doble clic finaliza.
+                    if (this.tool === 'route' && e.button === 0) {
+                        if (!this.routeDraft) {
+                            this.startRouteDraftAt(worldPos.x, worldPos.y);
+                        } else {
+                            this.addRouteDraftPoint(worldPos.x, worldPos.y);
+                            if (e.detail >= 2) {
+                                this.finalizeRouteDraft();
+                            }
+                        }
+                        return;
+                    }
 	                
 	                if (this.tool === 'select') {
 	                    // Verificar si estamos sobre un handle de redimensionamiento
@@ -3466,7 +3548,7 @@
                             worldPos.x,
                             worldPos.y
                         );
-                    } else if (this.tool === 'line' || this.tool === 'route') {
+                    } else if (this.tool === 'line') {
                         this.tempElement.endX = worldPos.x;
                         this.tempElement.endY = worldPos.y;
                     }
@@ -3640,6 +3722,13 @@
 
                 // Detectar espacio para pan
                 if (e.code === 'Space' && !this.spacePressed) {
+                    // En herramienta Ruta con draft activo: Space agrega nodo (no activa pan).
+                    if (this.tool === 'route' && this.routeDraft && this.lastPointerWorld) {
+                        e.preventDefault();
+                        this.addRouteDraftPoint(this.lastPointerWorld.x, this.lastPointerWorld.y);
+                        this.updateStatusBar();
+                        return;
+                    }
                     this.spacePressed = true;
                     document.getElementById('canvas-container').classList.add('pan-mode');
                     e.preventDefault();
@@ -3706,6 +3795,20 @@
                     }
                 } else {
                     switch(e.key) {
+                        case 'Enter':
+                            if (this.tool === 'route' && this.routeDraft) {
+                                e.preventDefault();
+                                this.finalizeRouteDraft();
+                                return;
+                            }
+                            break;
+                        case 'Escape':
+                            if (this.tool === 'route' && this.routeDraft) {
+                                e.preventDefault();
+                                this.cancelRouteDraft();
+                                return;
+                            }
+                            break;
                         case 'Delete':
                         case 'Backspace':
                             e.preventDefault();
@@ -5844,6 +5947,34 @@
                         this.ctx.fill();
                     }
                 }
+
+                // Dibujo en vivo de ruta por nodos (tool=route)
+                if (this.routeDraft && Array.isArray(this.routeDraft.points) && this.routeDraft.points.length > 0) {
+                    const pts = this.routeDraft.points;
+                    this.ctx.save();
+                    this.ctx.strokeStyle = this.routeDraft.strokeColor || '#00d4ff';
+                    this.ctx.lineWidth = (Number(this.routeDraft.lineWidth) || 5) / this.camera.zoom;
+                    this.ctx.lineCap = 'round';
+                    this.ctx.lineJoin = 'round';
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(pts[0].x, pts[0].y);
+                    for (let i = 1; i < pts.length; i++) {
+                        this.ctx.lineTo(pts[i].x, pts[i].y);
+                    }
+                    if (this.routeDraft.preview) {
+                        this.ctx.lineTo(this.routeDraft.preview.x, this.routeDraft.preview.y);
+                    }
+                    this.ctx.stroke();
+
+                    // nodos visibles
+                    this.ctx.fillStyle = '#00d4ff';
+                    for (let i = 0; i < pts.length; i++) {
+                        this.ctx.beginPath();
+                        this.ctx.arc(pts[i].x, pts[i].y, 3.5 / this.camera.zoom, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    }
+                    this.ctx.restore();
+                }
                 
                 // Dibujar elemento temporal
                 if (this.tempElement) {
@@ -6317,28 +6448,85 @@
                 let progress = Number.isFinite(rawProgress) ? rawProgress : 0;
 
                 const dirRaw = isMover ? elem.flowDirection : (elem.routeDirection || elem.flowDirection);
-                const dir = String(dirRaw || 'right') === 'left' ? -1 : 1;
+                let dir = String(dirRaw || 'right') === 'left' ? -1 : 1;
+                const autoConnect = Boolean(elem.autoConnectRoute);
+                const routeMode = String(elem.routeMode || 'loop');
+
                 if (updateProgress && elem.active !== false) {
                     const rawSpeed = Number(isMover ? elem.speed : (elem.routeSpeed || elem.speed));
                     const speed = Number.isFinite(rawSpeed) ? Math.max(1, Math.min(300, rawSpeed)) : 40;
-                    progress += dir * (speed / 12000);
-                }
-                const autoConnect = Boolean(elem.autoConnectRoute);
-                if (autoConnect && (progress > 1 || progress < 0)) {
-                    const next = this.findConnectedRoute(route, dir > 0);
-                    if (next && next.route) {
-                        route = next.route;
-                        points = this.getRoutePoints(route);
-                        elem.routeId = String(route.id);
-                        progress = next.progress;
-                        if (isMover) {
-                            elem.flowDirection = next.direction;
-                        } else {
-                            elem.routeDirection = next.direction;
+                    // Velocidad uniforme por distancia recorrida real (px/frame).
+                    let remainingDist = dir * (speed / 24);
+                    let guard = 0;
+                    while (Math.abs(remainingDist) > 1e-6 && guard < 16) {
+                        guard += 1;
+                        const routeLen = Math.max(1e-6, this.getPolylineLength(points));
+                        const along = progress * routeLen;
+                        const nextAlong = along + remainingDist;
+
+                        if (nextAlong >= 0 && nextAlong <= routeLen) {
+                            progress = nextAlong / routeLen;
+                            remainingDist = 0;
+                            break;
                         }
+
+                        if (nextAlong > routeLen) {
+                            const overflow = nextAlong - routeLen;
+                            if (autoConnect) {
+                                const next = this.findConnectedRoute(route, true);
+                                if (next && next.route) {
+                                    route = next.route;
+                                    points = this.getRoutePoints(route);
+                                    elem.routeId = String(route.id);
+                                    dir = String(next.direction || 'right') === 'left' ? -1 : 1;
+                                    if (isMover) elem.flowDirection = dir < 0 ? 'left' : 'right';
+                                    else elem.routeDirection = dir < 0 ? 'left' : 'right';
+                                    progress = Math.max(0, Math.min(1, Number(next.progress) || 0));
+                                    remainingDist = Math.abs(overflow) * (dir < 0 ? -1 : 1);
+                                    continue;
+                                }
+                            }
+
+                            if (routeMode === 'stop') {
+                                progress = 1;
+                                elem.active = false;
+                            } else {
+                                progress = (nextAlong % routeLen) / routeLen;
+                            }
+                            remainingDist = 0;
+                            break;
+                        }
+
+                        // nextAlong < 0
+                        const overflow = -nextAlong;
+                        if (autoConnect) {
+                            const next = this.findConnectedRoute(route, false);
+                            if (next && next.route) {
+                                route = next.route;
+                                points = this.getRoutePoints(route);
+                                elem.routeId = String(route.id);
+                                dir = String(next.direction || 'right') === 'left' ? -1 : 1;
+                                if (isMover) elem.flowDirection = dir < 0 ? 'left' : 'right';
+                                else elem.routeDirection = dir < 0 ? 'left' : 'right';
+                                progress = Math.max(0, Math.min(1, Number(next.progress) || 0));
+                                remainingDist = Math.abs(overflow) * (dir < 0 ? -1 : 1);
+                                continue;
+                            }
+                        }
+
+                        if (routeMode === 'stop') {
+                            progress = 0;
+                            elem.active = false;
+                        } else {
+                            const routeLen = Math.max(1e-6, this.getPolylineLength(points));
+                            const wrapped = ((nextAlong % routeLen) + routeLen) % routeLen;
+                            progress = wrapped / routeLen;
+                        }
+                        remainingDist = 0;
+                        break;
                     }
                 }
-                const routeMode = String(elem.routeMode || 'loop');
+
                 if (routeMode === 'stop') {
                     if (progress <= 0) {
                         progress = 0;
