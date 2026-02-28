@@ -1517,6 +1517,9 @@
             </label>
         </div>
         <div class="property-group" id="prop-mover-tools" style="display:none;">
+            <label class="property-checkbox">
+                <input type="checkbox" id="prop-follow-route"> Seguir ruta
+            </label>
             <label>ID de Ruta:</label>
             <input type="text" id="prop-route-id" placeholder="ID de línea/path/polígono">
             <button class="btn small" id="btn-bind-nearest-route" title="Asigna la ruta más cercana al mover">
@@ -1526,6 +1529,18 @@
             <div class="property-range-row">
                 <input type="range" id="prop-mover-speed" min="1" max="300" value="40">
                 <span id="prop-mover-speed-value">40</span>
+            </div>
+        </div>
+        <div class="property-group" id="prop-mover-size-tools" style="display:none;">
+            <label>Ancho actor:</label>
+            <div class="property-range-row">
+                <input type="range" id="prop-mover-width" min="12" max="320" value="44">
+                <span id="prop-mover-width-value">44</span>
+            </div>
+            <label>Alto actor:</label>
+            <div class="property-range-row">
+                <input type="range" id="prop-mover-height" min="12" max="320" value="28">
+                <span id="prop-mover-height-value">28</span>
             </div>
         </div>
         <div class="property-group" id="prop-geometry-tools" style="display:none;">
@@ -2249,6 +2264,7 @@
 	                    'prop-stroke-transparent',
                         'prop-is-route',
                         'prop-route-id',
+                        'prop-follow-route',
 		                ];
 	                
 		                inputs.forEach(id => {
@@ -2335,6 +2351,27 @@
                         };
                         moverSpeed.addEventListener('input', onMoverSpeed);
                         moverSpeed.addEventListener('change', onMoverSpeed);
+                    }
+
+                    const moverWidth = document.getElementById('prop-mover-width');
+                    const moverWidthVal = document.getElementById('prop-mover-width-value');
+                    const moverHeight = document.getElementById('prop-mover-height');
+                    const moverHeightVal = document.getElementById('prop-mover-height-value');
+                    if (moverWidth) {
+                        const onMoverWidth = () => {
+                            if (moverWidthVal) moverWidthVal.textContent = String(moverWidth.value || '0');
+                            this.updateSelectedProperties();
+                        };
+                        moverWidth.addEventListener('input', onMoverWidth);
+                        moverWidth.addEventListener('change', onMoverWidth);
+                    }
+                    if (moverHeight) {
+                        const onMoverHeight = () => {
+                            if (moverHeightVal) moverHeightVal.textContent = String(moverHeight.value || '0');
+                            this.updateSelectedProperties();
+                        };
+                        moverHeight.addEventListener('input', onMoverHeight);
+                        moverHeight.addEventListener('change', onMoverHeight);
                     }
 
 	                const cpEnabled = document.getElementById('prop-cp-enabled');
@@ -4109,7 +4146,23 @@
                 const handles = [];
                 const handleSize = 8 / this.camera.zoom;
                 
-                if (elem.type === 'rectangle' || elem.type === 'circle' || elem.type === 'image' || elem.type === 'video' || elem.type === 'mover') {
+                if (elem.type === 'mover') {
+                    const state = this.resolveMoverState(elem, false);
+                    const w = Math.max(12, Math.abs(Number(elem.width) || 44));
+                    const h = Math.max(12, Math.abs(Number(elem.height) || 28));
+                    const x = state.x - (w / 2);
+                    const y = state.y - (h / 2);
+                    handles.push(
+                        { x, y, position: 'nw' },
+                        { x: x + (w / 2), y, position: 'n' },
+                        { x: x + w, y, position: 'ne' },
+                        { x: x + w, y: y + (h / 2), position: 'e' },
+                        { x: x + w, y: y + h, position: 'se' },
+                        { x: x + (w / 2), y: y + h, position: 's' },
+                        { x, y: y + h, position: 'sw' },
+                        { x, y: y + (h / 2), position: 'w' }
+                    );
+                } else if (elem.type === 'rectangle' || elem.type === 'circle' || elem.type === 'image' || elem.type === 'video') {
                     // 8 handles: esquinas y puntos medios
                     handles.push(
                         { x: elem.x, y: elem.y, position: 'nw' },
@@ -4275,7 +4328,51 @@
                     }
                 }
 
-                if (elem.type === 'rectangle' || elem.type === 'circle') {
+                if (elem.type === 'mover') {
+                    const state = this.resolveMoverState(elem, false);
+                    const baseW = Math.max(12, Math.abs(Number(elem.width) || 44));
+                    const baseH = Math.max(12, Math.abs(Number(elem.height) || 28));
+                    const left = state.x - (baseW / 2);
+                    const top = state.y - (baseH / 2);
+                    const originalRight = left + baseW;
+                    const originalBottom = top + baseH;
+                    let w = baseW;
+                    let h = baseH;
+
+                    switch(handle) {
+                        case 'nw':
+                            w = originalRight - worldPos.x;
+                            h = originalBottom - worldPos.y;
+                            break;
+                        case 'n':
+                            h = originalBottom - worldPos.y;
+                            break;
+                        case 'ne':
+                            w = worldPos.x - left;
+                            h = originalBottom - worldPos.y;
+                            break;
+                        case 'e':
+                            w = worldPos.x - left;
+                            break;
+                        case 'se':
+                            w = worldPos.x - left;
+                            h = worldPos.y - top;
+                            break;
+                        case 's':
+                            h = worldPos.y - top;
+                            break;
+                        case 'sw':
+                            w = originalRight - worldPos.x;
+                            h = worldPos.y - top;
+                            break;
+                        case 'w':
+                            w = originalRight - worldPos.x;
+                            break;
+                    }
+
+                    elem.width = Math.max(12, Math.abs(w));
+                    elem.height = Math.max(12, Math.abs(h));
+                } else if (elem.type === 'rectangle' || elem.type === 'circle') {
                     const originalRight = elem.x + elem.width;
                     const originalBottom = elem.y + elem.height;
                     
@@ -4836,6 +4933,9 @@
                 if (this.showGrid) {
                     this.drawGrid();
                 }
+
+                // Animar elementos "montados" a rutas (except movers dedicados).
+                this.updateRouteFollowersInPlace();
                 
                 // Dibujar elementos
                 this.elements.forEach(elem => this.drawElement(elem));
@@ -5079,12 +5179,18 @@
                 if (!Array.isArray(this.selectedElements) || this.selectedElements.length === 0) return;
                 let changed = 0;
                 this.selectedElements.forEach((elem) => {
-                    if (!elem || elem.type !== 'mover' || elem.locked) return;
-                    const state = this.resolveMoverState(elem, false);
+                    if (!elem || typeof elem !== 'object' || elem.locked) return;
+                    const canFollow = elem.type === 'mover' || Boolean(elem.followRoute);
+                    if (!canFollow) return;
+                    const state = this.resolveElementRouteState(elem, false);
                     const nearest = this.findNearestRouteForPoint(state.x, state.y);
                     if (!nearest) return;
                     elem.routeId = String(nearest.id);
-                    elem.progress = Math.max(0, Math.min(1, Number(elem.progress) || 0));
+                    if (elem.type === 'mover') {
+                        elem.progress = Math.max(0, Math.min(1, Number(elem.progress) || 0));
+                    } else {
+                        elem.routeProgress = Math.max(0, Math.min(1, Number(elem.routeProgress) || 0));
+                    }
                     changed++;
                 });
                 if (changed > 0) {
@@ -5095,37 +5201,61 @@
                 }
             }
 
-            resolveMoverState(elem, updateProgress) {
-                const fallbackX = Number.isFinite(elem.x) ? elem.x : 0;
-                const fallbackY = Number.isFinite(elem.y) ? elem.y : 0;
-                let angle = 0;
-                let routeFound = false;
+            resolveElementRouteState(elem, updateProgress) {
+                if (!elem || typeof elem !== 'object') return { x: 0, y: 0, angle: 0, routeFound: false };
 
-                const route = this.getRouteElementById(elem.routeId);
-                if (route) {
-                    const points = this.getRoutePoints(route);
-                    if (points.length > 1) {
-                        routeFound = true;
-                        const raw = Number(elem.progress);
-                        let progress = Number.isFinite(raw) ? raw : 0;
-                        const dir = String(elem.flowDirection || 'right') === 'left' ? -1 : 1;
-                        if (updateProgress && elem.active !== false) {
-                            const rawSpeed = Number(elem.speed);
-                            const speed = Number.isFinite(rawSpeed) ? Math.max(1, Math.min(300, rawSpeed)) : 40;
-                            progress += dir * (speed / 12000);
-                        }
-                        progress = ((progress % 1) + 1) % 1;
-                        elem.progress = progress;
-
-                        const p = this.getPointOnPolyline(points, progress);
-                        if (p) {
-                            angle = p.angle;
-                            return { x: p.x, y: p.y, angle, routeFound };
-                        }
-                    }
+                const defaultCenter = this.getElementCenterPoint(elem);
+                const isMover = elem.type === 'mover';
+                const enabled = isMover ? true : Boolean(elem.followRoute);
+                const routeId = String(elem.routeId || '');
+                if (!enabled || !routeId) {
+                    return { x: defaultCenter.x, y: defaultCenter.y, angle: 0, routeFound: false };
                 }
 
-                return { x: fallbackX, y: fallbackY, angle, routeFound };
+                const route = this.getRouteElementById(routeId);
+                if (!route) return { x: defaultCenter.x, y: defaultCenter.y, angle: 0, routeFound: false };
+                const points = this.getRoutePoints(route);
+                if (points.length <= 1) return { x: defaultCenter.x, y: defaultCenter.y, angle: 0, routeFound: false };
+
+                const progressKey = isMover ? 'progress' : 'routeProgress';
+                const rawProgress = Number(elem[progressKey]);
+                let progress = Number.isFinite(rawProgress) ? rawProgress : 0;
+
+                const dirRaw = isMover ? elem.flowDirection : (elem.routeDirection || elem.flowDirection);
+                const dir = String(dirRaw || 'right') === 'left' ? -1 : 1;
+                if (updateProgress && elem.active !== false) {
+                    const rawSpeed = Number(isMover ? elem.speed : (elem.routeSpeed || elem.speed));
+                    const speed = Number.isFinite(rawSpeed) ? Math.max(1, Math.min(300, rawSpeed)) : 40;
+                    progress += dir * (speed / 12000);
+                }
+                progress = ((progress % 1) + 1) % 1;
+                elem[progressKey] = progress;
+
+                const p = this.getPointOnPolyline(points, progress);
+                if (!p) return { x: defaultCenter.x, y: defaultCenter.y, angle: 0, routeFound: false };
+                return { x: p.x, y: p.y, angle: p.angle, routeFound: true };
+            }
+
+            resolveMoverState(elem, updateProgress) {
+                return this.resolveElementRouteState(elem, updateProgress);
+            }
+
+            updateRouteFollowersInPlace() {
+                this.walkElements(this.elements, (elem) => {
+                    if (!elem || typeof elem !== 'object') return true;
+                    if (elem.type === 'mover') return true; // mover se dibuja por estado dinámico
+
+                    if (!elem.followRoute || !elem.routeId) return true;
+                    const state = this.resolveElementRouteState(elem, true);
+                    if (!state.routeFound) return true;
+                    const center = this.getElementCenterPoint(elem);
+                    const dx = state.x - center.x;
+                    const dy = state.y - center.y;
+                    if (Number.isFinite(dx) && Number.isFinite(dy) && (Math.abs(dx) > 0.0001 || Math.abs(dy) > 0.0001)) {
+                        this.offsetElement(elem, dx, dy);
+                    }
+                    return true;
+                });
             }
 
             drawMover(elem) {
@@ -6985,6 +7115,11 @@
 	                    if (typeof elem.locked !== 'boolean') elem.locked = false;
 	                    if (typeof elem.active !== 'boolean') elem.active = true;
 	                    if (typeof elem.connectionStatus !== 'string') elem.connectionStatus = 'none';
+                    if (typeof elem.followRoute !== 'boolean') elem.followRoute = false;
+                    if (typeof elem.routeId !== 'string') elem.routeId = '';
+                    if (!Number.isFinite(elem.routeSpeed)) elem.routeSpeed = 40;
+                    if (typeof elem.routeDirection !== 'string') elem.routeDirection = 'right';
+                    if (!Number.isFinite(elem.routeProgress)) elem.routeProgress = 0;
 
                     this.normalizeBoxElementInPlace(elem);
                 };
@@ -9003,6 +9138,8 @@
                         document.getElementById('prop-flow-direction').value = elem.flowDirection || 'right';
                     } else if (elem.type === 'mover') {
                         document.getElementById('prop-flow-direction').value = elem.flowDirection || 'right';
+                    } else if (elem.followRoute) {
+                        document.getElementById('prop-flow-direction').value = elem.routeDirection || elem.flowDirection || 'right';
                     }
 
                     const routeTools = document.getElementById('prop-route-tools');
@@ -9012,20 +9149,41 @@
                     if (routeToggle) routeToggle.checked = this.isRouteElement(elem);
 
                     const moverTools = document.getElementById('prop-mover-tools');
+                    const followRouteInput = document.getElementById('prop-follow-route');
                     const routeIdInput = document.getElementById('prop-route-id');
                     const moverSpeed = document.getElementById('prop-mover-speed');
                     const moverSpeedValue = document.getElementById('prop-mover-speed-value');
+                    const moverSizeTools = document.getElementById('prop-mover-size-tools');
+                    const moverWidth = document.getElementById('prop-mover-width');
+                    const moverWidthValue = document.getElementById('prop-mover-width-value');
+                    const moverHeight = document.getElementById('prop-mover-height');
+                    const moverHeightValue = document.getElementById('prop-mover-height-value');
                     const isMover = elem.type === 'mover';
-                    if (moverTools) moverTools.style.display = isMover ? 'block' : 'none';
-                    if (isMover) {
+                    const isFollowerCandidate = elem.type !== 'line';
+                    if (moverTools) moverTools.style.display = (isMover || isFollowerCandidate) ? 'block' : 'none';
+                    if (followRouteInput) {
+                        followRouteInput.checked = isMover ? true : Boolean(elem.followRoute);
+                        followRouteInput.disabled = isMover;
+                    }
+                    if (isMover || isFollowerCandidate) {
                         if (routeIdInput) routeIdInput.value = String(elem.routeId || '');
                         if (moverSpeed) {
-                            const speed = Math.max(1, Math.min(300, Number(elem.speed) || 40));
+                            const speedRaw = isMover ? Number(elem.speed) : Number(elem.routeSpeed);
+                            const speed = Math.max(1, Math.min(300, speedRaw || 40));
                             moverSpeed.value = String(Math.round(speed));
                             if (moverSpeedValue) moverSpeedValue.textContent = String(Math.round(speed));
                         }
                     } else if (routeIdInput) {
                         routeIdInput.value = '';
+                    }
+                    if (moverSizeTools) moverSizeTools.style.display = isMover ? 'block' : 'none';
+                    if (isMover) {
+                        const w = Math.max(12, Math.min(320, Math.round(Math.abs(Number(elem.width) || 44))));
+                        const h = Math.max(12, Math.min(320, Math.round(Math.abs(Number(elem.height) || 28))));
+                        if (moverWidth) moverWidth.value = String(w);
+                        if (moverWidthValue) moverWidthValue.textContent = String(w);
+                        if (moverHeight) moverHeight.value = String(h);
+                        if (moverHeightValue) moverHeightValue.textContent = String(h);
                     }
                     
                     document.getElementById('prop-connection-status').value = elem.connectionStatus || 'none';
@@ -9117,11 +9275,18 @@
 	                const lw = document.getElementById('prop-line-width');
 	                const lwValue = lw ? Number.parseInt(String(lw.value || ''), 10) : NaN;
 	                const lineWidth = Number.isFinite(lwValue) ? Math.max(1, Math.min(20, lwValue)) : null;
-                    const routeFlag = Boolean(document.getElementById('prop-is-route') && document.getElementById('prop-is-route').checked);
+	                const routeFlag = Boolean(document.getElementById('prop-is-route') && document.getElementById('prop-is-route').checked);
+                    const followRouteFlag = Boolean(document.getElementById('prop-follow-route') && document.getElementById('prop-follow-route').checked);
                     const routeId = String((document.getElementById('prop-route-id') && document.getElementById('prop-route-id').value) || '').trim();
                     const moverSpeedEl = document.getElementById('prop-mover-speed');
                     const moverSpeedRaw = moverSpeedEl ? Number.parseFloat(String(moverSpeedEl.value || '')) : NaN;
                     const moverSpeed = Number.isFinite(moverSpeedRaw) ? Math.max(1, Math.min(300, moverSpeedRaw)) : 40;
+                    const moverWidthEl = document.getElementById('prop-mover-width');
+                    const moverWidthRaw = moverWidthEl ? Number.parseFloat(String(moverWidthEl.value || '')) : NaN;
+                    const moverWidth = Number.isFinite(moverWidthRaw) ? Math.max(12, Math.min(320, moverWidthRaw)) : 44;
+                    const moverHeightEl = document.getElementById('prop-mover-height');
+                    const moverHeightRaw = moverHeightEl ? Number.parseFloat(String(moverHeightEl.value || '')) : NaN;
+                    const moverHeight = Number.isFinite(moverHeightRaw) ? Math.max(12, Math.min(320, moverHeightRaw)) : 28;
 
 	                this.selectedElements.forEach((elem) => {
 		                    if (!elem || typeof elem !== 'object') return;
@@ -9163,6 +9328,13 @@
                             elem.routeId = routeId;
                             elem.speed = moverSpeed;
                             elem.flowDirection = document.getElementById('prop-flow-direction').value;
+                            elem.width = moverWidth;
+                            elem.height = moverHeight;
+                        } else if (elem.type !== 'line') {
+                            elem.followRoute = followRouteFlag;
+                            elem.routeId = routeId;
+                            elem.routeSpeed = moverSpeed;
+                            elem.routeDirection = document.getElementById('prop-flow-direction').value;
                         }
 
 	                    // Punto de Información (Lámina)
