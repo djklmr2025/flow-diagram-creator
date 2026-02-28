@@ -1631,6 +1631,9 @@
 	        <div class="context-menu-item" id="ctx-duplicate">
 	            <span>📋</span> Duplicar
 	        </div>
+        <div class="context-menu-item" id="ctx-save-grouped">
+            <span>📦</span> Guardar agrupado en biblioteca
+        </div>
 	        <div class="context-menu-item" id="ctx-delete">
             <span>🗑️</span> Eliminar
         </div>
@@ -2236,6 +2239,14 @@
                     this.duplicateSelected();
                     this.hideContextMenu();
                 });
+
+                const ctxSaveGrouped = document.getElementById('ctx-save-grouped');
+                if (ctxSaveGrouped) {
+                    ctxSaveGrouped.addEventListener('click', async () => {
+                        await this.saveSelectionAsGroupedLibrary();
+                        this.hideContextMenu();
+                    });
+                }
                 
                 document.getElementById('ctx-delete').addEventListener('click', () => {
                     this.deleteElements();
@@ -3907,6 +3918,63 @@
                 this.selectedElements = duplicates;
                 this.saveHistory();
                 this.updatePropertiesPanel();
+            }
+
+            async saveSelectionAsGroupedLibrary() {
+                if (this.readOnly) return;
+                if (!Array.isArray(this.selectedElements) || this.selectedElements.length === 0) {
+                    alert('Selecciona uno o más elementos para guardar.');
+                    return;
+                }
+
+                const selectedClone = JSON.parse(JSON.stringify(this.selectedElements, (key, value) => {
+                    if (key === 'imageData' || key === 'videoData') return undefined;
+                    return value;
+                }));
+
+                if (this.hasImagesInElements(selectedClone)) {
+                    alert('No se puede guardar en "agrupados" si incluye imágenes/video. Usa vector puro.');
+                    return;
+                }
+
+                const defaultName =
+                    this.selectedElements.length === 1
+                        ? (String(this.selectedElements[0].name || '').trim() || 'agrupado')
+                        : `agrupado-${Date.now()}`;
+                const nameInput = prompt('Nombre del agrupado:', defaultName);
+                if (nameInput === null) return;
+                const name = String(nameInput || '').trim() || defaultName;
+
+                const payload = {
+                    name,
+                    elements: selectedClone,
+                    camera: { x: 0, y: 0, zoom: 1 },
+                    folder: 'grouped',
+                    tags: ['grouped', 'quick-save']
+                };
+
+                let response;
+                let data;
+                try {
+                    response = await fetch('/api/publish-grouped', {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    data = await response.json();
+                } catch (error) {
+                    alert(`Error de red al guardar agrupado: ${error}`);
+                    return;
+                }
+
+                if (!response.ok || !data || !data.ok) {
+                    const msg = (data && data.error) ? data.error : `HTTP ${response.status}`;
+                    alert(`No se pudo guardar agrupado: ${msg}`);
+                    return;
+                }
+
+                this.updateStatusBar();
+                alert(`Guardado en biblioteca/agrupados:\nID: ${data.id}`);
             }
             
             showContextMenu(x, y) {

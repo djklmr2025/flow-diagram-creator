@@ -211,6 +211,7 @@ Importante:
 Endpoints:
 * `POST /api/publish` publica un sticker vectorial (JSON sin imágenes) y devuelve links.
 * `POST /api/publish-project` publica un proyecto (JSON con imágenes) y devuelve links.
+* `POST /api/publish-grouped` publica una selección rápida en `library/grouped` (acción del menú contextual).
 * `GET /api/project?id=...` devuelve el JSON publicado (busca en `library/` o `projects/`).
 * `GET /api/library?prefix=...&mode=folded|expanded&limit=...` lista la biblioteca por carpetas.
 * `POST /api/inject?session=...` (canal vivo): inyecta un proyecto a una sesión para actualizar un canvas abierto en tiempo real.
@@ -220,6 +221,7 @@ Endpoints:
 Notas:
 * CORS está habilitado (`*`) para facilitar consumo desde plataformas de IA.
 * `POST /api/publish` **rechaza imágenes** (`type: "image"` / `imageSrc`) para mantener stickers vectoriales/animados.
+* Acción rápida de editor: clic derecho en selección → **Guardar agrupado en biblioteca**.
 * `POST /api/publish-project` permite imágenes y, si vienen embebidas como `data:` (base64), las sube como assets y reemplaza `imageSrc` por URLs públicas.
 * Límites anti-abuso (aprox): máximo 2000 elementos (contando grupos de forma recursiva). `publish` guarda ~200KB y `publish-project` guarda ~300KB (sin base64). `publish-project` limita request a ~6MB y sube hasta 40 imágenes (máx 8MB total).
 * Compatibilidad IA: `POST /api/publish`, `POST /api/publish-project` y `POST /api/inject` aceptan JSON "friendly" y lo normalizan (ej: `circle.radius`, `line.x1/y1/x2/y2`, `color`, `isAnim`).
