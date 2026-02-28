@@ -588,10 +588,10 @@
             height: 100%;
             border: 0;
             pointer-events: none;
-            transform: scale(0.36);
+            transform: scale(0.5);
             transform-origin: top left;
-            width: 278%;
-            height: 278%;
+            width: 200%;
+            height: 200%;
         }
 
         .library-row:last-child {
@@ -1373,6 +1373,9 @@
         <button class="btn" id="btn-publish" title="Publicar sticker vectorial (Link IA)">
             <span>🔗</span> Publicar Vector
         </button>
+        <button class="btn" id="btn-publish-sticker" title="Publicar stiker en carpeta stickers">
+            <span>✨</span> Publicar Stiker
+        </button>
         <button class="btn" id="btn-publish-project" title="Publicar proyecto (incluye imágenes/fondo)">
             <span>🖼️</span> Publicar Proyecto
         </button>
@@ -2023,7 +2026,7 @@
                 // Publicación desde archivo
                 this.publishFileProject = null;
                 this.publishFileName = '';
-                this.publishIntent = 'vector'; // 'vector' | 'project'
+                this.publishIntent = 'vector'; // 'vector' | 'sticker' | 'project'
 
                 // Navegación de biblioteca
                 this.libraryPrefix = '';
@@ -2201,6 +2204,7 @@
                 document.getElementById('btn-load').addEventListener('click', () => this.loadProject());
                 document.getElementById('btn-export').addEventListener('click', () => this.exportProject());
                 document.getElementById('btn-publish').addEventListener('click', () => this.showPublishModal('vector'));
+                document.getElementById('btn-publish-sticker').addEventListener('click', () => this.showPublishModal('sticker'));
                 document.getElementById('btn-publish-project').addEventListener('click', () => this.showPublishModal('project'));
                 document.getElementById('btn-library').addEventListener('click', () => this.showLibraryModal());
                 document.getElementById('btn-grouped-library').addEventListener('click', () => this.showLibraryModal('grouped'));
@@ -6805,13 +6809,15 @@
 
             showPublishModal(intent) {
                 const parsed = String(intent || '').toLowerCase();
-                this.publishIntent = parsed === 'project' ? 'project' : 'vector';
+                this.publishIntent = parsed === 'project' ? 'project' : (parsed === 'sticker' ? 'sticker' : 'vector');
 
                 const modal = document.getElementById('publish-modal');
                 const result = document.getElementById('publish-result');
+                const btnConfirmVector = document.getElementById('btn-confirm-publish');
+                const btnConfirmProject = document.getElementById('btn-confirm-publish-project');
                 modal.classList.add('show');
                 document.getElementById('publish-name').value = '';
-                document.getElementById('publish-folder').value = '';
+                document.getElementById('publish-folder').value = this.publishIntent === 'sticker' ? 'stickers' : '';
                 const keyInput = document.getElementById('publish-key');
                 if (keyInput) keyInput.value = safeLocalStorageGet('flow-diagram-publish-key', '') || '';
                 const modeHint = document.getElementById('publish-mode-hint');
@@ -6819,7 +6825,16 @@
                     modeHint.innerHTML =
                         this.publishIntent === 'project'
                             ? '<strong>Seleccionado: Proyecto</strong> (permite imágenes/fondo; sube assets). <strong>Vector:</strong> sin imágenes (sticker/biblioteca).'
-                            : '<strong>Seleccionado: Vector</strong> (sin imágenes; sticker/biblioteca). <strong>Proyecto:</strong> permite imágenes/fondo (sube assets).';
+                            : (this.publishIntent === 'sticker'
+                                ? '<strong>Seleccionado: Stiker</strong> (sin imágenes; carpeta por defecto: <code>stickers</code>). <strong>Proyecto:</strong> permite imágenes/fondo.'
+                                : '<strong>Seleccionado: Vector</strong> (sin imágenes; sticker/biblioteca). <strong>Proyecto:</strong> permite imágenes/fondo (sube assets).');
+                }
+                if (btnConfirmVector) {
+                    btnConfirmVector.textContent = this.publishIntent === 'sticker' ? 'Publicar Stiker' : 'Publicar Vector';
+                    btnConfirmVector.style.display = 'inline-flex';
+                }
+                if (btnConfirmProject) {
+                    btnConfirmProject.style.display = this.publishIntent === 'project' ? 'inline-flex' : 'none';
                 }
 
                 document.getElementById('publish-name').focus();
@@ -7290,6 +7305,7 @@
                 blobs.sort((a, b) => String(a.pathname).localeCompare(String(b.pathname)));
                 let previewFrameCount = 0;
                 const previewFrameLimit = this.libraryMode === 'stkers' ? 28 : 18;
+                const thumbMode = this.libraryMode === 'grouped' ? 'preview' : 'sticker';
 
                 const addRow = ({ name, type, path, id, actions }) => {
                     const row = document.createElement('div');
@@ -7309,9 +7325,9 @@
                         if (previewFrameCount < previewFrameLimit) {
                             try {
                                 const frame = document.createElement('iframe');
-                                frame.setAttribute('loading', 'lazy');
+                                frame.setAttribute('loading', previewFrameCount < 8 ? 'eager' : 'lazy');
                                 frame.setAttribute('title', `preview-${id}`);
-                                frame.src = `${window.location.origin}/?mode=sticker&id=${encodeURIComponent(id)}`;
+                                frame.src = `${window.location.origin}/?mode=${thumbMode}&id=${encodeURIComponent(id)}`;
                                 thumb.appendChild(frame);
                                 previewFrameCount += 1;
                             } catch {
