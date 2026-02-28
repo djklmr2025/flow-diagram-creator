@@ -1237,6 +1237,18 @@
         <button class="btn" id="btn-line" title="Línea Animada (L)">
             <span>→</span> Línea
         </button>
+        <button class="btn" id="btn-route" title="Ruta / Vía (U)">
+            <span>🛤️</span> Ruta
+        </button>
+        <button class="btn" id="btn-metro" title="Mover Metro (N)">
+            <span>🚇</span> Metro
+        </button>
+        <button class="btn" id="btn-person-male" title="Mover Hombre (H)">
+            <span>🚹</span> Hombre
+        </button>
+        <button class="btn" id="btn-person-female" title="Mover Mujer (J)">
+            <span>🚺</span> Mujer
+        </button>
         <button class="btn" id="btn-pencil" title="Dibujo Libre (P)">
             <span>✏️</span> Lápiz
         </button>
@@ -1498,6 +1510,23 @@
                 <option value="true">Sí - Animando</option>
                 <option value="false">No - Pausado</option>
             </select>
+        </div>
+        <div class="property-group" id="prop-route-tools" style="display:none;">
+            <label class="property-checkbox">
+                <input type="checkbox" id="prop-is-route"> Usar como ruta de movimiento
+            </label>
+        </div>
+        <div class="property-group" id="prop-mover-tools" style="display:none;">
+            <label>ID de Ruta:</label>
+            <input type="text" id="prop-route-id" placeholder="ID de línea/path/polígono">
+            <button class="btn small" id="btn-bind-nearest-route" title="Asigna la ruta más cercana al mover">
+                Vincular ruta cercana
+            </button>
+            <label>Velocidad:</label>
+            <div class="property-range-row">
+                <input type="range" id="prop-mover-speed" min="1" max="300" value="40">
+                <span id="prop-mover-speed-value">40</span>
+            </div>
         </div>
         <div class="property-group" id="prop-geometry-tools" style="display:none;">
             <label>Geometría:</label>
@@ -2011,12 +2040,12 @@
             }
             
 	            setupToolbar() {
-	                // Herramientas de dibujo
-	                document.getElementById('btn-select').addEventListener('click', () => this.setTool('select'));
-	                document.getElementById('btn-rectangle').addEventListener('click', () => this.setTool('rectangle'));
-	                document.getElementById('btn-circle').addEventListener('click', () => this.setTool('circle'));
-	                document.getElementById('btn-poi').addEventListener('click', () => this.setTool('poi'));
-	                document.getElementById('btn-shape').addEventListener('click', () => this.setTool('shape'));
+                // Herramientas de dibujo
+                document.getElementById('btn-select').addEventListener('click', () => this.setTool('select'));
+                document.getElementById('btn-rectangle').addEventListener('click', () => this.setTool('rectangle'));
+                document.getElementById('btn-circle').addEventListener('click', () => this.setTool('circle'));
+                document.getElementById('btn-poi').addEventListener('click', () => this.setTool('poi'));
+                document.getElementById('btn-shape').addEventListener('click', () => this.setTool('shape'));
 	                const shapeTypeSelect = document.getElementById('shape-type');
 	                if (shapeTypeSelect) {
 	                    shapeTypeSelect.value = this.shapeType || 'triangle';
@@ -2026,6 +2055,10 @@
                     });
                 }
                 document.getElementById('btn-line').addEventListener('click', () => this.setTool('line'));
+                document.getElementById('btn-route').addEventListener('click', () => this.setTool('route'));
+                document.getElementById('btn-metro').addEventListener('click', () => this.setTool('mover-metro'));
+                document.getElementById('btn-person-male').addEventListener('click', () => this.setTool('mover-male'));
+                document.getElementById('btn-person-female').addEventListener('click', () => this.setTool('mover-female'));
                 document.getElementById('btn-pencil').addEventListener('click', () => this.setTool('pencil'));
                 document.getElementById('btn-image').addEventListener('click', () => this.insertImage());
                 document.getElementById('btn-video').addEventListener('click', () => this.insertVideo());
@@ -2210,10 +2243,12 @@
 		                    'prop-fill-color',
 		                    'prop-stroke-color',
 		                    'prop-anim-color',
-		                    'prop-flow-direction',
-		                    'prop-connection-status',
-		                    'prop-active',
-		                    'prop-stroke-transparent',
+	                    'prop-flow-direction',
+	                    'prop-connection-status',
+	                    'prop-active',
+	                    'prop-stroke-transparent',
+                        'prop-is-route',
+                        'prop-route-id',
 		                ];
 	                
 		                inputs.forEach(id => {
@@ -2285,6 +2320,22 @@
 	                if (btnConvert) {
 	                    btnConvert.addEventListener('click', () => this.convertSelectedToPolygon());
 	                }
+
+                    const bindNearestRouteBtn = document.getElementById('btn-bind-nearest-route');
+                    if (bindNearestRouteBtn) {
+                        bindNearestRouteBtn.addEventListener('click', () => this.bindSelectedMoversToNearestRoute());
+                    }
+
+                    const moverSpeed = document.getElementById('prop-mover-speed');
+                    const moverSpeedVal = document.getElementById('prop-mover-speed-value');
+                    if (moverSpeed) {
+                        const onMoverSpeed = () => {
+                            if (moverSpeedVal) moverSpeedVal.textContent = String(moverSpeed.value || '0');
+                            this.updateSelectedProperties();
+                        };
+                        moverSpeed.addEventListener('input', onMoverSpeed);
+                        moverSpeed.addEventListener('change', onMoverSpeed);
+                    }
 
 	                const cpEnabled = document.getElementById('prop-cp-enabled');
 	                const cpDetails = document.getElementById('prop-cp-details');
@@ -2369,6 +2420,7 @@
                     rectangle: '▭',
                     circle: '●',
                     line: '→',
+                    mover: '🚶',
                     polygon: '⬠',
                     path: '✎',
                     image: '🖼️',
@@ -2384,6 +2436,7 @@
                     rectangle: 'Rectángulo',
                     circle: 'Círculo',
                     line: 'Línea',
+                    mover: 'Actor',
                     polygon: 'Polígono',
                     path: 'Trazado',
                     image: 'Imagen',
@@ -2401,6 +2454,12 @@
                 if (elem.type === 'group') {
                     const n = Array.isArray(elem.elements) ? elem.elements.length : 0;
                     return `Grupo (${n})`;
+                }
+                if (elem.type === 'mover') {
+                    const k = String(elem.moverKind || 'metro');
+                    if (k === 'male') return 'Actor Hombre';
+                    if (k === 'female') return 'Actor Mujer';
+                    return 'Actor Metro';
                 }
 
                 const label = this.getLayerTypeLabel(elem);
@@ -2683,6 +2742,10 @@
                     'shape': 'btn-shape',
                     'bucket': 'btn-bucket',
                     'line': 'btn-line',
+                    'route': 'btn-route',
+                    'mover-metro': 'btn-metro',
+                    'mover-male': 'btn-person-male',
+                    'mover-female': 'btn-person-female',
                     'pencil': 'btn-pencil'
                 };
 
@@ -3160,7 +3223,7 @@
                             worldPos.x,
                             worldPos.y
                         );
-                    } else if (this.tool === 'line') {
+                    } else if (this.tool === 'line' || this.tool === 'route') {
                         this.tempElement.endX = worldPos.x;
                         this.tempElement.endY = worldPos.y;
                     }
@@ -3423,6 +3486,18 @@
 	                        case 'l':
 	                            this.setTool('line');
 	                            break;
+                        case 'u':
+                            this.setTool('route');
+                            break;
+                        case 'n':
+                            this.setTool('mover-metro');
+                            break;
+                        case 'h':
+                            this.setTool('mover-male');
+                            break;
+                        case 'j':
+                            this.setTool('mover-female');
+                            break;
                         case 'p':
                             this.setTool('pencil');
                             break;
@@ -3858,6 +3933,11 @@
 	                    return { x: 0, y: 0 };
 	                }
 
+                    if (elem.type === 'mover') {
+                        const state = this.resolveMoverState(elem, false);
+                        return { x: state.x, y: state.y };
+                    }
+
 	                if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points) && elem.points.length) {
 	                    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 	                    elem.points.forEach((p) => {
@@ -4029,7 +4109,7 @@
                 const handles = [];
                 const handleSize = 8 / this.camera.zoom;
                 
-                if (elem.type === 'rectangle' || elem.type === 'circle' || elem.type === 'image' || elem.type === 'video') {
+                if (elem.type === 'rectangle' || elem.type === 'circle' || elem.type === 'image' || elem.type === 'video' || elem.type === 'mover') {
                     // 8 handles: esquinas y puntos medios
                     handles.push(
                         { x: elem.x, y: elem.y, position: 'nw' },
@@ -4482,6 +4562,40 @@
 	                        animOffset: 0,
 	                        controlPoints: [] // Para curvas editables
 	                    };
+                    } else if (this.tool === 'route') {
+                        return {
+                            ...baseElement,
+                            type: 'line',
+                            endX: x,
+                            endY: y,
+                            lineWidth: 5,
+                            routeRole: true,
+                            name: `Ruta ${Date.now()}`,
+                            animColor: '#00d4ff',
+                            flowDirection: 'right',
+                            animOffset: 0,
+                            controlPoints: []
+                        };
+                    } else if (this.tool === 'mover-metro' || this.tool === 'mover-male' || this.tool === 'mover-female') {
+                        const kind = this.tool === 'mover-metro'
+                            ? 'metro'
+                            : (this.tool === 'mover-male' ? 'male' : 'female');
+                        const nearest = this.findNearestRouteForPoint(x, y);
+                        const routeId = nearest ? String(nearest.id) : '';
+                        return {
+                            ...baseElement,
+                            type: 'mover',
+                            moverKind: kind,
+                            width: 44,
+                            height: 28,
+                            flowDirection: 'right',
+                            speed: 40,
+                            progress: 0,
+                            routeId,
+                            name: kind === 'metro' ? 'Metro' : (kind === 'male' ? 'Hombre' : 'Mujer'),
+                            fillColor: kind === 'female' ? '#f472b6' : (kind === 'male' ? '#3b82f6' : '#93c5fd'),
+                            strokeColor: '#0b1027'
+                        };
 	                }
 	            }
 
@@ -4626,6 +4740,13 @@
                         // Detección simple de línea (con margen)
                         const dist = this.distanceToLineSegment(x, y, elem.x, elem.y, elem.endX, elem.endY);
                         if (dist < 10 / this.camera.zoom) {
+                            return elem;
+                        }
+                    } else if (elem.type === 'mover') {
+                        const state = this.resolveMoverState(elem, false);
+                        const hw = (Math.abs(Number(elem.width) || 44) / 2) + (6 / this.camera.zoom);
+                        const hh = (Math.abs(Number(elem.height) || 28) / 2) + (6 / this.camera.zoom);
+                        if (x >= state.x - hw && x <= state.x + hw && y >= state.y - hh && y <= state.y + hh) {
                             return elem;
                         }
                     } else if ((elem.type === 'path' || elem.type === 'polygon') && elem.points) {
@@ -4862,7 +4983,207 @@
                     this.ctx.stroke();
                 }
             }
-            
+
+            isRouteElement(elem) {
+                if (!elem || typeof elem !== 'object') return false;
+                const t = String(elem.type || '');
+                if (!(t === 'line' || t === 'path' || t === 'polygon')) return false;
+                if (elem.routeRole === true) return true;
+                const n = String(elem.name || '').toLowerCase();
+                return n.includes('ruta') || n.includes('via');
+            }
+
+            getRoutePoints(elem) {
+                if (!elem || typeof elem !== 'object') return [];
+                if (elem.type === 'line') {
+                    if (!Number.isFinite(elem.x) || !Number.isFinite(elem.y) || !Number.isFinite(elem.endX) || !Number.isFinite(elem.endY)) return [];
+                    return [{ x: elem.x, y: elem.y }, { x: elem.endX, y: elem.endY }];
+                }
+                if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points)) {
+                    const pts = elem.points.filter((p) => p && Number.isFinite(p.x) && Number.isFinite(p.y));
+                    if (!pts.length) return [];
+                    if (elem.type === 'polygon' && elem.closed) {
+                        pts.push({ x: pts[0].x, y: pts[0].y });
+                    }
+                    return pts;
+                }
+                return [];
+            }
+
+            getPolylineLength(points) {
+                if (!Array.isArray(points) || points.length < 2) return 0;
+                let total = 0;
+                for (let i = 1; i < points.length; i++) {
+                    const dx = points[i].x - points[i - 1].x;
+                    const dy = points[i].y - points[i - 1].y;
+                    total += Math.sqrt(dx * dx + dy * dy);
+                }
+                return total;
+            }
+
+            getPointOnPolyline(points, t) {
+                if (!Array.isArray(points) || points.length === 0) return null;
+                if (points.length === 1) return { x: points[0].x, y: points[0].y, angle: 0 };
+                const clamped = Math.max(0, Math.min(1, Number(t) || 0));
+                const total = this.getPolylineLength(points);
+                if (total <= 0) return { x: points[0].x, y: points[0].y, angle: 0 };
+                const target = clamped * total;
+                let acc = 0;
+                for (let i = 1; i < points.length; i++) {
+                    const p0 = points[i - 1];
+                    const p1 = points[i];
+                    const dx = p1.x - p0.x;
+                    const dy = p1.y - p0.y;
+                    const seg = Math.sqrt(dx * dx + dy * dy);
+                    if (seg <= 0) continue;
+                    if (acc + seg >= target || i === points.length - 1) {
+                        const local = Math.max(0, Math.min(1, (target - acc) / seg));
+                        return {
+                            x: p0.x + dx * local,
+                            y: p0.y + dy * local,
+                            angle: Math.atan2(dy, dx)
+                        };
+                    }
+                    acc += seg;
+                }
+                const last = points[points.length - 1];
+                const prev = points[points.length - 2];
+                return { x: last.x, y: last.y, angle: Math.atan2(last.y - prev.y, last.x - prev.x) };
+            }
+
+            getRouteElementById(routeIdRaw) {
+                const routeId = String(routeIdRaw || '');
+                if (!routeId) return null;
+                return this.elements.find((elem) => this.isRouteElement(elem) && String(elem.id) === routeId) || null;
+            }
+
+            findNearestRouteForPoint(x, y) {
+                let best = null;
+                let bestDist = Infinity;
+                (this.elements || []).forEach((elem) => {
+                    if (!this.isRouteElement(elem)) return;
+                    const pts = this.getRoutePoints(elem);
+                    if (pts.length < 2) return;
+                    for (let i = 1; i < pts.length; i++) {
+                        const d = this.distanceToLineSegment(x, y, pts[i - 1].x, pts[i - 1].y, pts[i].x, pts[i].y);
+                        if (d < bestDist) {
+                            bestDist = d;
+                            best = elem;
+                        }
+                    }
+                });
+                return best;
+            }
+
+            bindSelectedMoversToNearestRoute() {
+                if (!Array.isArray(this.selectedElements) || this.selectedElements.length === 0) return;
+                let changed = 0;
+                this.selectedElements.forEach((elem) => {
+                    if (!elem || elem.type !== 'mover' || elem.locked) return;
+                    const state = this.resolveMoverState(elem, false);
+                    const nearest = this.findNearestRouteForPoint(state.x, state.y);
+                    if (!nearest) return;
+                    elem.routeId = String(nearest.id);
+                    elem.progress = Math.max(0, Math.min(1, Number(elem.progress) || 0));
+                    changed++;
+                });
+                if (changed > 0) {
+                    this.saveHistory();
+                    this.updatePropertiesPanel();
+                    this.updateStatusBar();
+                    this.refreshLayersPanel();
+                }
+            }
+
+            resolveMoverState(elem, updateProgress) {
+                const fallbackX = Number.isFinite(elem.x) ? elem.x : 0;
+                const fallbackY = Number.isFinite(elem.y) ? elem.y : 0;
+                let angle = 0;
+                let routeFound = false;
+
+                const route = this.getRouteElementById(elem.routeId);
+                if (route) {
+                    const points = this.getRoutePoints(route);
+                    if (points.length > 1) {
+                        routeFound = true;
+                        const raw = Number(elem.progress);
+                        let progress = Number.isFinite(raw) ? raw : 0;
+                        const dir = String(elem.flowDirection || 'right') === 'left' ? -1 : 1;
+                        if (updateProgress && elem.active !== false) {
+                            const rawSpeed = Number(elem.speed);
+                            const speed = Number.isFinite(rawSpeed) ? Math.max(1, Math.min(300, rawSpeed)) : 40;
+                            progress += dir * (speed / 12000);
+                        }
+                        progress = ((progress % 1) + 1) % 1;
+                        elem.progress = progress;
+
+                        const p = this.getPointOnPolyline(points, progress);
+                        if (p) {
+                            angle = p.angle;
+                            return { x: p.x, y: p.y, angle, routeFound };
+                        }
+                    }
+                }
+
+                return { x: fallbackX, y: fallbackY, angle, routeFound };
+            }
+
+            drawMover(elem) {
+                const state = this.resolveMoverState(elem, true);
+                const w = Math.max(16, Math.abs(Number(elem.width) || 44));
+                const h = Math.max(16, Math.abs(Number(elem.height) || 28));
+                const kind = String(elem.moverKind || 'metro');
+                const baseColor =
+                    kind === 'female' ? '#f472b6' :
+                    (kind === 'male' ? '#3b82f6' : '#93c5fd');
+
+                this.ctx.save();
+                this.ctx.translate(state.x, state.y);
+                this.ctx.rotate(state.angle);
+                this.ctx.lineWidth = 2 / this.camera.zoom;
+                this.ctx.strokeStyle = '#0b1027';
+                this.ctx.fillStyle = baseColor;
+
+                if (kind === 'metro') {
+                    this.ctx.beginPath();
+                    this.ctx.roundRect(-w / 2, -h / 2, w, h, Math.max(4, h * 0.2));
+                    this.ctx.fill();
+                    this.ctx.stroke();
+
+                    this.ctx.fillStyle = '#0b1027';
+                    this.ctx.fillRect(-w * 0.28, -h * 0.18, w * 0.18, h * 0.3);
+                    this.ctx.fillRect(-w * 0.02, -h * 0.18, w * 0.18, h * 0.3);
+                    this.ctx.fillRect(w * 0.24, h * 0.18, w * 0.16, h * 0.12);
+                } else {
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, -h * 0.28, h * 0.18, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.stroke();
+
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, -h * 0.08);
+                    this.ctx.lineTo(0, h * 0.22);
+                    this.ctx.moveTo(0, h * 0.02);
+                    this.ctx.lineTo(-w * 0.2, h * 0.08);
+                    this.ctx.moveTo(0, h * 0.02);
+                    this.ctx.lineTo(w * 0.2, h * 0.08);
+                    this.ctx.moveTo(0, h * 0.22);
+                    this.ctx.lineTo(-w * 0.18, h * 0.45);
+                    this.ctx.moveTo(0, h * 0.22);
+                    this.ctx.lineTo(w * 0.18, h * 0.45);
+                    this.ctx.stroke();
+                }
+
+                if (!state.routeFound) {
+                    this.ctx.fillStyle = '#f59e0b';
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, -h * 0.58, h * 0.12, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                this.ctx.restore();
+            }
+
 	            drawElement(elem) {
 	                if (elem.type === 'group' && Array.isArray(elem.elements)) {
 	                    // Dibujar elementos dentro del grupo
@@ -5146,14 +5467,34 @@
                     // Dibujar línea
                     const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
                     const doStroke = !this.isTransparentColor(strokeColor);
+                    const isRoute = this.isRouteElement(elem);
                     this.ctx.strokeStyle = strokeColor;
                     this.ctx.lineWidth = this.getElementLineWidth(elem) / this.camera.zoom;
                     
                     if (doStroke) {
-                        this.ctx.beginPath();
-                        this.ctx.moveTo(elem.x, elem.y);
-                        this.ctx.lineTo(elem.endX, elem.endY);
-                        this.ctx.stroke();
+                        if (isRoute) {
+                            // Dibujo "vía": trazo base + línea central.
+                            this.ctx.save();
+                            this.ctx.lineCap = 'round';
+                            this.ctx.lineJoin = 'round';
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(elem.x, elem.y);
+                            this.ctx.lineTo(elem.endX, elem.endY);
+                            this.ctx.stroke();
+
+                            this.ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+                            this.ctx.lineWidth = Math.max(1 / this.camera.zoom, this.ctx.lineWidth * 0.35);
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(elem.x, elem.y);
+                            this.ctx.lineTo(elem.endX, elem.endY);
+                            this.ctx.stroke();
+                            this.ctx.restore();
+                        } else {
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(elem.x, elem.y);
+                            this.ctx.lineTo(elem.endX, elem.endY);
+                            this.ctx.stroke();
+                        }
                     }
                     
                     // Animación de flujo
@@ -5206,6 +5547,8 @@
 	                        
 	                        if (doStroke) this.ctx.stroke();
 	                    }
+	                } else if (elem.type === 'mover') {
+                        this.drawMover(elem);
 	                }
 
                 // Etiquetas sin sombra (solo el "volumen" del elemento).
@@ -5225,8 +5568,9 @@
                 if (elem.name && elem.type !== 'image' && elem.type !== 'video') {
                     this.ctx.fillStyle = '#ffffff';
                     this.ctx.font = `${12 / this.camera.zoom}px Arial`;
-                    const textX = elem.x || (elem.points ? elem.points[0].x : 0);
-                    const textY = elem.y || (elem.points ? elem.points[0].y : 0);
+                    const moverState = elem.type === 'mover' ? this.resolveMoverState(elem, false) : null;
+                    const textX = moverState ? moverState.x : (elem.x || (elem.points ? elem.points[0].x : 0));
+                    const textY = moverState ? moverState.y : (elem.y || (elem.points ? elem.points[0].y : 0));
                     this.ctx.fillText(elem.name, textX, textY - 10 / this.camera.zoom);
                 }
                 
@@ -5234,8 +5578,9 @@
                 if (elem.locked) {
                     this.ctx.fillStyle = '#ff9800';
                     this.ctx.font = `${14 / this.camera.zoom}px Arial`;
-                    const lockX = elem.x || (elem.points ? elem.points[0].x : 0);
-                    const lockY = elem.y || (elem.points ? elem.points[0].y : 0);
+                    const moverState = elem.type === 'mover' ? this.resolveMoverState(elem, false) : null;
+                    const lockX = moverState ? moverState.x : (elem.x || (elem.points ? elem.points[0].x : 0));
+                    const lockY = moverState ? moverState.y : (elem.y || (elem.points ? elem.points[0].y : 0));
                     this.ctx.fillText('🔒', lockX, lockY);
                 }
 
@@ -5423,6 +5768,11 @@
                     this.ctx.moveTo(elem.x, elem.y);
                     this.ctx.lineTo(elem.endX, elem.endY);
                     this.ctx.stroke();
+                } else if (elem.type === 'mover') {
+                    const state = this.resolveMoverState(elem, false);
+                    const w = Math.max(16, Math.abs(Number(elem.width) || 44)) + (10 / this.camera.zoom);
+                    const h = Math.max(16, Math.abs(Number(elem.height) || 28)) + (10 / this.camera.zoom);
+                    this.ctx.strokeRect(state.x - (w / 2), state.y - (h / 2), w, h);
                 } else if ((elem.type === 'path' || elem.type === 'polygon') && elem.points && elem.points.length > 1) {
                     this.ctx.beginPath();
                     this.ctx.moveTo(elem.points[0].x, elem.points[0].y);
@@ -6514,6 +6864,7 @@
                         if (typeof elem.flowDirection !== 'string') elem.flowDirection = 'right';
                         if (!Number.isFinite(elem.animOffset)) elem.animOffset = 0;
                         if (!Array.isArray(elem.controlPoints)) elem.controlPoints = [];
+                        if (typeof elem.routeRole !== 'boolean') elem.routeRole = false;
                     } else if (elem.type === 'rectangle' || elem.type === 'circle') {
                         if (!Number.isFinite(elem.x)) elem.x = 0;
                         if (!Number.isFinite(elem.y)) elem.y = 0;
@@ -6601,6 +6952,21 @@
 			                        if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#e94560';
 			                        if (typeof elem.fillColor !== 'string') elem.fillColor = '#0f3460';
 			                        if (!Number.isFinite(elem.lineWidth)) elem.lineWidth = 3;
+                                    if (typeof elem.routeRole !== 'boolean') elem.routeRole = false;
+                                } else if (elem.type === 'mover') {
+                                    if (!Number.isFinite(elem.x)) elem.x = 0;
+                                    if (!Number.isFinite(elem.y)) elem.y = 0;
+                                    if (!Number.isFinite(elem.width)) elem.width = 44;
+                                    if (!Number.isFinite(elem.height)) elem.height = 28;
+                                    if (typeof elem.routeId !== 'string') elem.routeId = '';
+                                    if (typeof elem.moverKind !== 'string') elem.moverKind = 'metro';
+                                    if (!Number.isFinite(elem.progress)) elem.progress = 0;
+                                    if (typeof elem.flowDirection !== 'string') elem.flowDirection = 'right';
+                                    if (!Number.isFinite(elem.speed)) elem.speed = 40;
+                                    if (typeof elem.fillColor !== 'string') {
+                                        elem.fillColor = elem.moverKind === 'female' ? '#f472b6' : (elem.moverKind === 'male' ? '#3b82f6' : '#93c5fd');
+                                    }
+                                    if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#0b1027';
 			                    }
 
 	                    // Normalizar degradado de relleno (si existe).
@@ -7213,6 +7579,18 @@
                     const maxX = Math.max(elem.x, elem.endX);
                     const maxY = Math.max(elem.y, elem.endY);
                     return { minX, minY, maxX, maxY };
+                }
+
+                if (elem.type === 'mover') {
+                    const state = this.resolveMoverState(elem, false);
+                    const w = Math.max(16, Math.abs(Number(elem.width) || 44));
+                    const h = Math.max(16, Math.abs(Number(elem.height) || 28));
+                    return {
+                        minX: state.x - (w / 2),
+                        minY: state.y - (h / 2),
+                        maxX: state.x + (w / 2),
+                        maxY: state.y + (h / 2)
+                    };
                 }
 
                 if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points) && elem.points.length) {
@@ -7899,6 +8277,18 @@
                         minY: Math.min(elem.y, elem.endY),
                         maxX: Math.max(elem.x, elem.endX),
                         maxY: Math.max(elem.y, elem.endY)
+                    };
+                }
+
+                if (elem.type === 'mover') {
+                    const state = this.resolveMoverState(elem, false);
+                    const w = Math.max(16, Math.abs(Number(elem.width) || 44));
+                    const h = Math.max(16, Math.abs(Number(elem.height) || 28));
+                    return {
+                        minX: state.x - (w / 2),
+                        minY: state.y - (h / 2),
+                        maxX: state.x + (w / 2),
+                        maxY: state.y + (h / 2)
                     };
                 }
 
@@ -8611,6 +9001,31 @@
                     if (elem.type === 'line') {
                         document.getElementById('prop-anim-color').value = elem.animColor || '#4caf50';
                         document.getElementById('prop-flow-direction').value = elem.flowDirection || 'right';
+                    } else if (elem.type === 'mover') {
+                        document.getElementById('prop-flow-direction').value = elem.flowDirection || 'right';
+                    }
+
+                    const routeTools = document.getElementById('prop-route-tools');
+                    const routeToggle = document.getElementById('prop-is-route');
+                    const isRouteCandidate = elem.type === 'line' || elem.type === 'path' || elem.type === 'polygon';
+                    if (routeTools) routeTools.style.display = isRouteCandidate ? 'block' : 'none';
+                    if (routeToggle) routeToggle.checked = this.isRouteElement(elem);
+
+                    const moverTools = document.getElementById('prop-mover-tools');
+                    const routeIdInput = document.getElementById('prop-route-id');
+                    const moverSpeed = document.getElementById('prop-mover-speed');
+                    const moverSpeedValue = document.getElementById('prop-mover-speed-value');
+                    const isMover = elem.type === 'mover';
+                    if (moverTools) moverTools.style.display = isMover ? 'block' : 'none';
+                    if (isMover) {
+                        if (routeIdInput) routeIdInput.value = String(elem.routeId || '');
+                        if (moverSpeed) {
+                            const speed = Math.max(1, Math.min(300, Number(elem.speed) || 40));
+                            moverSpeed.value = String(Math.round(speed));
+                            if (moverSpeedValue) moverSpeedValue.textContent = String(Math.round(speed));
+                        }
+                    } else if (routeIdInput) {
+                        routeIdInput.value = '';
                     }
                     
                     document.getElementById('prop-connection-status').value = elem.connectionStatus || 'none';
@@ -8702,6 +9117,11 @@
 	                const lw = document.getElementById('prop-line-width');
 	                const lwValue = lw ? Number.parseInt(String(lw.value || ''), 10) : NaN;
 	                const lineWidth = Number.isFinite(lwValue) ? Math.max(1, Math.min(20, lwValue)) : null;
+                    const routeFlag = Boolean(document.getElementById('prop-is-route') && document.getElementById('prop-is-route').checked);
+                    const routeId = String((document.getElementById('prop-route-id') && document.getElementById('prop-route-id').value) || '').trim();
+                    const moverSpeedEl = document.getElementById('prop-mover-speed');
+                    const moverSpeedRaw = moverSpeedEl ? Number.parseFloat(String(moverSpeedEl.value || '')) : NaN;
+                    const moverSpeed = Number.isFinite(moverSpeedRaw) ? Math.max(1, Math.min(300, moverSpeedRaw)) : 40;
 
 	                this.selectedElements.forEach((elem) => {
 		                    if (!elem || typeof elem !== 'object') return;
@@ -8736,6 +9156,14 @@
 	                        elem.animColor = document.getElementById('prop-anim-color').value;
 	                        elem.flowDirection = document.getElementById('prop-flow-direction').value;
 	                    }
+                        if (elem.type === 'line' || elem.type === 'path' || elem.type === 'polygon') {
+                            elem.routeRole = routeFlag;
+                        }
+                        if (elem.type === 'mover') {
+                            elem.routeId = routeId;
+                            elem.speed = moverSpeed;
+                            elem.flowDirection = document.getElementById('prop-flow-direction').value;
+                        }
 
 	                    // Punto de Información (Lámina)
 	                    if (cpEnabledEl) {

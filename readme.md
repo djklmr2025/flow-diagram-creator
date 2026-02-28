@@ -29,6 +29,14 @@ Hay un documento de “estado real + pendientes + ruta de evolución” en `IMPL
 * **Gestión de Capas:** Sistema jerárquico para organizar qué elementos van al frente o al fondo.
 * **Interactividad:** Funciones de zoom infinito y redimensionamiento manteniendo proporciones.
 * **Persistencia:** Capacidad para guardar y cargar proyectos en formato JSON.
+* **Rutas y Actores Animados (MVP):** Nueva herramienta **Ruta** (`U`) y actores **Metro** (`N`), **Hombre** (`H`) y **Mujer** (`J`) que se desplazan por líneas/trazos/polígonos marcados como ruta.
+* **Control de Movimiento:** Cada actor permite configurar `ID de Ruta`, `Velocidad`, `Dirección` y botón de **Vincular ruta cercana** desde Propiedades.
+
+### 🎮 Flujo rápido para animación de escenario
+1. Dibuja una ruta con el botón **Ruta** o activa `Usar como ruta de movimiento` en una línea/trazo existente.
+2. Inserta un actor (`Metro`, `Hombre` o `Mujer`).
+3. En Propiedades, asigna `ID de Ruta` (o usa **Vincular ruta cercana**).
+4. Ajusta `Velocidad` + `Dirección` y deja `Activo = Sí`.
 
 ---
 
