@@ -2023,6 +2023,7 @@
                 this.backgroundColor = '#1a1a2e'; // null => transparente
                 this.viewerMode = null; // null | 'sticker' | 'deck'
                 this.depthFx = false; // Sombra suave para dar "volumen" en modos visor
+                this.viewerShowLabels = true; // En visor: ocultar nombres por defecto (override: ?labels=1)
 
                 // Estado del "deck" (lámina informativa)
                 this.deckLayout = 'horizontal'; // 'horizontal' | 'vertical'
@@ -6166,7 +6167,7 @@
 	                    elem.elements.forEach(child => this.drawElement(child));
 
                     // Dibujar nombre si existe
-                    if (elem.name) {
+                    if (this.shouldRenderElementLabels() && elem.name) {
                         this.ctx.fillStyle = '#ffffff';
                         this.ctx.font = `${12 / this.camera.zoom}px Arial`;
                         const textX = elem.x || 0;
@@ -6598,7 +6599,7 @@
 	                }
 	                
 	                // Dibujar nombre si existe
-                if (elem.name && elem.type !== 'image' && elem.type !== 'video') {
+                if (this.shouldRenderElementLabels() && elem.name && elem.type !== 'image' && elem.type !== 'video') {
                     this.ctx.fillStyle = '#ffffff';
                     this.ctx.font = `${12 / this.camera.zoom}px Arial`;
                     const moverState = elem.type === 'mover' ? this.resolveMoverState(elem, false) : null;
@@ -9140,6 +9141,21 @@
                 return Boolean(defaultOn);
             }
 
+            getViewerLabelsEnabled(defaultOn) {
+                const urlParams = new URLSearchParams(window.location.search);
+                const raw = String(urlParams.get('labels') || '').trim().toLowerCase();
+
+                if (raw === '0' || raw === 'false' || raw === 'no' || raw === 'off') return false;
+                if (raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on') return true;
+
+                return Boolean(defaultOn);
+            }
+
+            shouldRenderElementLabels() {
+                if (!this.readOnly) return true;
+                return Boolean(this.viewerShowLabels);
+            }
+
 	            shouldAutoFitForViewer() {
 	                const urlParams = new URLSearchParams(window.location.search);
 	                const mode = String(urlParams.get('mode') || '').toLowerCase();
@@ -9234,6 +9250,7 @@
                 const defaultBg = requested === 'preview' ? 'studio' : 'transparent';
                 this.applyViewerBackground(defaultBg);
                 this.depthFx = this.getViewerFxEnabled(true);
+                this.viewerShowLabels = this.getViewerLabelsEnabled(false);
 
                 // Deshabilitar interacciones de edición (solo navegación)
                 this.viewerMode = 'sticker';
@@ -9268,6 +9285,7 @@
 
                 this.applyViewerBackground('studio');
                 this.depthFx = this.getViewerFxEnabled(true);
+                this.viewerShowLabels = this.getViewerLabelsEnabled(false);
 
                 this.viewerMode = 'deck';
                 this.readOnly = true;
