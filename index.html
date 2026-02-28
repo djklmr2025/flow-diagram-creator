@@ -9191,21 +9191,9 @@
 	                if (fitParam === '0' || fitParam === 'false' || fitParam === 'no') return false;
 	                if (fitParam === '1' || fitParam === 'true' || fitParam === 'yes') return true;
 
-	                // Default: solo auto-fit en modos visor si la cámara parece "default".
+	                // Default: auto-fit SIEMPRE en modos visor, salvo override explícito (?fit=0).
 	                if (!(mode === 'preview' || mode === 'sticker' || mode === 'deck')) return false;
-
-	                // En modo deck, el auto-fit por defecto evita "huecos" cuando la cámara quedó guardada en una posición rara.
-	                if (mode === 'deck') return true;
-
-	                const cam = this.camera || {};
-	                const x = Number(cam.x);
-	                const y = Number(cam.y);
-	                const z = Number(cam.zoom);
-	                const isDefault =
-	                    Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) &&
-                    Math.abs(x) < 1e-6 && Math.abs(y) < 1e-6 && Math.abs(z - 1) < 1e-6;
-
-                return isDefault;
+                    return true;
             }
 
             autoFitCameraToElements(paddingPx) {
