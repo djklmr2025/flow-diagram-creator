@@ -1249,6 +1249,12 @@
         <button class="btn" id="btn-person-female" title="Mover Mujer (J)">
             <span>🚺</span> Mujer
         </button>
+        <button class="btn" id="btn-portal-in" title="Portal Import (Q)">
+            <span>🌀</span> Import
+        </button>
+        <button class="btn" id="btn-portal-out" title="Portal Export (W)">
+            <span>🛸</span> Export
+        </button>
         <button class="btn" id="btn-pencil" title="Dibujo Libre (P)">
             <span>✏️</span> Lápiz
         </button>
@@ -1538,6 +1544,9 @@
                 <option value="loop">Loop (repite)</option>
                 <option value="stop">Stop al final</option>
             </select>
+            <label class="property-checkbox">
+                <input type="checkbox" id="prop-auto-connect-route"> Auto-conectar ruta
+            </label>
         </div>
         <div class="property-group" id="prop-mover-size-tools" style="display:none;">
             <label>Ancho actor:</label>
@@ -1550,6 +1559,15 @@
                 <input type="range" id="prop-mover-height" min="12" max="320" value="28">
                 <span id="prop-mover-height-value">28</span>
             </div>
+        </div>
+        <div class="property-group" id="prop-portal-tools" style="display:none;">
+            <label>Tipo Portal:</label>
+            <select id="prop-portal-kind">
+                <option value="import">Import</option>
+                <option value="export">Export</option>
+            </select>
+            <label>Canal (key):</label>
+            <input type="text" id="prop-portal-key" placeholder="A1">
         </div>
         <div class="property-group" id="prop-geometry-tools" style="display:none;">
             <label>Geometría:</label>
@@ -2082,6 +2100,8 @@
                 document.getElementById('btn-metro').addEventListener('click', () => this.setTool('mover-metro'));
                 document.getElementById('btn-person-male').addEventListener('click', () => this.setTool('mover-male'));
                 document.getElementById('btn-person-female').addEventListener('click', () => this.setTool('mover-female'));
+                document.getElementById('btn-portal-in').addEventListener('click', () => this.setTool('portal-in'));
+                document.getElementById('btn-portal-out').addEventListener('click', () => this.setTool('portal-out'));
                 document.getElementById('btn-pencil').addEventListener('click', () => this.setTool('pencil'));
                 document.getElementById('btn-image').addEventListener('click', () => this.insertImage());
                 document.getElementById('btn-video').addEventListener('click', () => this.insertVideo());
@@ -2275,6 +2295,9 @@
                         'prop-route-id',
                         'prop-follow-route',
                         'prop-route-mode',
+                        'prop-auto-connect-route',
+                        'prop-portal-kind',
+                        'prop-portal-key',
 		                ];
 	                
 		                inputs.forEach(id => {
@@ -2468,6 +2491,7 @@
                     circle: '●',
                     line: '→',
                     mover: '🚶',
+                    portal: '🌀',
                     polygon: '⬠',
                     path: '✎',
                     image: '🖼️',
@@ -2484,6 +2508,7 @@
                     circle: 'Círculo',
                     line: 'Línea',
                     mover: 'Actor',
+                    portal: 'Portal',
                     polygon: 'Polígono',
                     path: 'Trazado',
                     image: 'Imagen',
@@ -2507,6 +2532,11 @@
                     if (k === 'male') return 'Actor Hombre';
                     if (k === 'female') return 'Actor Mujer';
                     return 'Actor Metro';
+                }
+                if (elem.type === 'portal') {
+                    const k = String(elem.portalKind || 'import');
+                    const key = String(elem.portalKey || 'A1');
+                    return `${k === 'export' ? 'Portal Export' : 'Portal Import'} · ${key}`;
                 }
 
                 const label = this.getLayerTypeLabel(elem);
@@ -2793,6 +2823,8 @@
                     'mover-metro': 'btn-metro',
                     'mover-male': 'btn-person-male',
                     'mover-female': 'btn-person-female',
+                    'portal-in': 'btn-portal-in',
+                    'portal-out': 'btn-portal-out',
                     'pencil': 'btn-pencil'
                 };
 
@@ -3545,6 +3577,12 @@
                         case 'j':
                             this.setTool('mover-female');
                             break;
+                        case 'q':
+                            this.setTool('portal-in');
+                            break;
+                        case 'w':
+                            this.setTool('portal-out');
+                            break;
                         case 'p':
                             this.setTool('pencil');
                             break;
@@ -4174,7 +4212,7 @@
                         { x, y: y + h, position: 'sw' },
                         { x, y: y + (h / 2), position: 'w' }
                     );
-                } else if (elem.type === 'rectangle' || elem.type === 'circle' || elem.type === 'image' || elem.type === 'video') {
+                } else if (elem.type === 'rectangle' || elem.type === 'circle' || elem.type === 'image' || elem.type === 'video' || elem.type === 'portal') {
                     // 8 handles: esquinas y puntos medios
                     handles.push(
                         { x: elem.x, y: elem.y, position: 'nw' },
@@ -4384,7 +4422,7 @@
 
                     elem.width = Math.max(12, Math.abs(w));
                     elem.height = Math.max(12, Math.abs(h));
-                } else if (elem.type === 'rectangle' || elem.type === 'circle') {
+                } else if (elem.type === 'rectangle' || elem.type === 'circle' || elem.type === 'portal') {
                     const originalRight = elem.x + elem.width;
                     const originalBottom = elem.y + elem.height;
                     
@@ -4701,11 +4739,25 @@
                             flowDirection: 'right',
                             speed: 40,
                             routeMode: 'loop',
+                            autoConnectRoute: true,
                             progress: 0,
                             routeId,
                             name: kind === 'metro' ? 'Metro' : (kind === 'male' ? 'Hombre' : 'Mujer'),
                             fillColor: kind === 'female' ? '#f472b6' : (kind === 'male' ? '#3b82f6' : '#93c5fd'),
                             strokeColor: '#0b1027'
+                        };
+                    } else if (this.tool === 'portal-in' || this.tool === 'portal-out') {
+                        const portalKind = this.tool === 'portal-in' ? 'import' : 'export';
+                        return {
+                            ...baseElement,
+                            type: 'portal',
+                            width: 36,
+                            height: 36,
+                            portalKind,
+                            portalKey: 'A1',
+                            fillColor: portalKind === 'import' ? '#22d3ee' : '#a78bfa',
+                            strokeColor: '#0b1027',
+                            lineWidth: 3
                         };
 	                }
 	            }
@@ -4756,7 +4808,7 @@
 
                 let points = [];
 
-                if (elem.type === 'rectangle') {
+                if (elem.type === 'rectangle' || elem.type === 'portal') {
                     const x1 = Number(elem.x);
                     const y1 = Number(elem.y);
                     const x2 = Number(elem.x + elem.width);
@@ -4818,7 +4870,7 @@
                         }
                     }
 
-	                    if (elem.type === 'image' || elem.type === 'video' || elem.type === 'rectangle') {
+	                    if (elem.type === 'image' || elem.type === 'video' || elem.type === 'rectangle' || elem.type === 'portal') {
 	                        if (typeof elem.x === 'number' && typeof elem.y === 'number' &&
 	                            typeof elem.width === 'number' && typeof elem.height === 'number') {
 	                            const p = this.transformPointToElementBoxLocal(elem, x, y);
@@ -5209,6 +5261,151 @@
                 return best;
             }
 
+            getRouteEndpoints(routeElem) {
+                const pts = this.getRoutePoints(routeElem);
+                if (!pts || pts.length < 2) return null;
+                return { start: pts[0], end: pts[pts.length - 1] };
+            }
+
+            findConnectedRoute(currentRoute, useEndPoint) {
+                const from = this.getRouteEndpoints(currentRoute);
+                if (!from) return null;
+                const pivot = useEndPoint ? from.end : from.start;
+                const threshold = 28;
+                let best = null;
+                let bestDist = Infinity;
+                (this.elements || []).forEach((candidate) => {
+                    if (!this.isRouteElement(candidate)) return;
+                    if (!candidate || String(candidate.id) === String(currentRoute.id)) return;
+                    const ep = this.getRouteEndpoints(candidate);
+                    if (!ep) return;
+
+                    const dStart = Math.sqrt(Math.pow(ep.start.x - pivot.x, 2) + Math.pow(ep.start.y - pivot.y, 2));
+                    const dEnd = Math.sqrt(Math.pow(ep.end.x - pivot.x, 2) + Math.pow(ep.end.y - pivot.y, 2));
+                    const d = Math.min(dStart, dEnd);
+                    if (d > threshold || d >= bestDist) return;
+
+                    bestDist = d;
+                    if (dStart <= dEnd) {
+                        best = { route: candidate, progress: 0.0001, direction: 'right' };
+                    } else {
+                        best = { route: candidate, progress: 0.9999, direction: 'left' };
+                    }
+                });
+                return best;
+            }
+
+            projectPointToRouteProgress(routeElem, x, y) {
+                const pts = this.getRoutePoints(routeElem);
+                if (!pts || pts.length < 2) return 0;
+                let totalLen = 0;
+                const segLens = [];
+                for (let i = 1; i < pts.length; i++) {
+                    const dx = pts[i].x - pts[i - 1].x;
+                    const dy = pts[i].y - pts[i - 1].y;
+                    const len = Math.sqrt(dx * dx + dy * dy);
+                    segLens.push(len);
+                    totalLen += len;
+                }
+                if (totalLen <= 0) return 0;
+
+                let bestDist = Infinity;
+                let bestAlong = 0;
+                let acc = 0;
+                for (let i = 1; i < pts.length; i++) {
+                    const p0 = pts[i - 1];
+                    const p1 = pts[i];
+                    const vx = p1.x - p0.x;
+                    const vy = p1.y - p0.y;
+                    const lenSq = vx * vx + vy * vy;
+                    if (lenSq <= 0) {
+                        acc += segLens[i - 1];
+                        continue;
+                    }
+                    const t = Math.max(0, Math.min(1, (((x - p0.x) * vx) + ((y - p0.y) * vy)) / lenSq));
+                    const px = p0.x + vx * t;
+                    const py = p0.y + vy * t;
+                    const d = Math.sqrt(Math.pow(x - px, 2) + Math.pow(y - py, 2));
+                    if (d < bestDist) {
+                        bestDist = d;
+                        bestAlong = acc + (segLens[i - 1] * t);
+                    }
+                    acc += segLens[i - 1];
+                }
+                return Math.max(0, Math.min(1, bestAlong / totalLen));
+            }
+
+            getPortalCenter(portal) {
+                if (!portal || portal.type !== 'portal') return null;
+                const x = Number(portal.x);
+                const y = Number(portal.y);
+                const w = Number(portal.width);
+                const h = Number(portal.height);
+                if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(w) || !Number.isFinite(h)) return null;
+                return { x: x + (w / 2), y: y + (h / 2), r: Math.max(8, Math.min(Math.abs(w), Math.abs(h)) / 2) };
+            }
+
+            findPortalAtPoint(x, y, kind) {
+                const tKind = String(kind || '');
+                let found = null;
+                let bestDist = Infinity;
+                (this.elements || []).forEach((elem) => {
+                    if (!elem || elem.type !== 'portal') return;
+                    if (String(elem.portalKind || '') !== tKind) return;
+                    const c = this.getPortalCenter(elem);
+                    if (!c) return;
+                    const d = Math.sqrt(Math.pow(x - c.x, 2) + Math.pow(y - c.y, 2));
+                    if (d <= c.r + 8 && d < bestDist) {
+                        bestDist = d;
+                        found = elem;
+                    }
+                });
+                return found;
+            }
+
+            findMatchingExportPortal(importPortal) {
+                if (!importPortal || importPortal.type !== 'portal') return null;
+                const key = String(importPortal.portalKey || '').trim().toLowerCase();
+                if (!key) return null;
+                let out = null;
+                (this.elements || []).forEach((elem) => {
+                    if (!elem || elem.type !== 'portal') return;
+                    if (String(elem.portalKind || '') !== 'export') return;
+                    if (String(elem.portalKey || '').trim().toLowerCase() !== key) return;
+                    out = elem;
+                });
+                return out;
+            }
+
+            applyPortalTeleport(elem, state) {
+                if (!elem || !state || !state.routeFound) return state;
+                const cd = Number(elem._portalCooldownFrames);
+                if (Number.isFinite(cd) && cd > 0) {
+                    elem._portalCooldownFrames = cd - 1;
+                    return state;
+                }
+
+                const pIn = this.findPortalAtPoint(state.x, state.y, 'import');
+                if (!pIn) return state;
+                const pOut = this.findMatchingExportPortal(pIn);
+                if (!pOut) return state;
+                const cOut = this.getPortalCenter(pOut);
+                if (!cOut) return state;
+
+                const nearest = this.findNearestRouteForPoint(cOut.x, cOut.y);
+                if (nearest) {
+                    elem.routeId = String(nearest.id);
+                    const t = this.projectPointToRouteProgress(nearest, cOut.x, cOut.y);
+                    if (elem.type === 'mover') {
+                        elem.progress = t;
+                    } else {
+                        elem.routeProgress = t;
+                    }
+                }
+                elem._portalCooldownFrames = 24;
+                return { x: cOut.x, y: cOut.y, angle: state.angle || 0, routeFound: true };
+            }
+
             bindSelectedMoversToNearestRoute() {
                 if (!Array.isArray(this.selectedElements) || this.selectedElements.length === 0) return;
                 let changed = 0;
@@ -5248,9 +5445,9 @@
                     return { x: defaultCenter.x, y: defaultCenter.y, angle: 0, routeFound: false };
                 }
 
-                const route = this.getRouteElementById(routeId);
+                let route = this.getRouteElementById(routeId);
                 if (!route) return { x: defaultCenter.x, y: defaultCenter.y, angle: 0, routeFound: false };
-                const points = this.getRoutePoints(route);
+                let points = this.getRoutePoints(route);
                 if (points.length <= 1) return { x: defaultCenter.x, y: defaultCenter.y, angle: 0, routeFound: false };
 
                 const progressKey = isMover ? 'progress' : 'routeProgress';
@@ -5263,6 +5460,21 @@
                     const rawSpeed = Number(isMover ? elem.speed : (elem.routeSpeed || elem.speed));
                     const speed = Number.isFinite(rawSpeed) ? Math.max(1, Math.min(300, rawSpeed)) : 40;
                     progress += dir * (speed / 12000);
+                }
+                const autoConnect = Boolean(elem.autoConnectRoute);
+                if (autoConnect && (progress > 1 || progress < 0)) {
+                    const next = this.findConnectedRoute(route, dir > 0);
+                    if (next && next.route) {
+                        route = next.route;
+                        points = this.getRoutePoints(route);
+                        elem.routeId = String(route.id);
+                        progress = next.progress;
+                        if (isMover) {
+                            elem.flowDirection = next.direction;
+                        } else {
+                            elem.routeDirection = next.direction;
+                        }
+                    }
                 }
                 const routeMode = String(elem.routeMode || 'loop');
                 if (routeMode === 'stop') {
@@ -5280,7 +5492,7 @@
 
                 const p = this.getPointOnPolyline(points, progress);
                 if (!p) return { x: defaultCenter.x, y: defaultCenter.y, angle: 0, routeFound: false };
-                return { x: p.x, y: p.y, angle: p.angle, routeFound: true };
+                return this.applyPortalTeleport(elem, { x: p.x, y: p.y, angle: p.angle, routeFound: true });
             }
 
             resolveMoverState(elem, updateProgress) {
@@ -5569,7 +5781,39 @@
 	                        this.restoreElementBoxTransform(didTransform);
 	                    }
 
-		                } else if (elem.type === 'rectangle') {
+		                } else if (elem.type === 'portal') {
+                            const didTransform = this.applyElementBoxTransformToContext(elem);
+                            const cx = elem.x + (elem.width / 2);
+                            const cy = elem.y + (elem.height / 2);
+                            const r = Math.max(8, Math.min(Math.abs(elem.width), Math.abs(elem.height)) / 2);
+                            const kind = String(elem.portalKind || 'import');
+                            const ring = kind === 'import' ? '#22d3ee' : '#a78bfa';
+
+                            this.ctx.save();
+                            this.ctx.lineWidth = Math.max(2 / this.camera.zoom, this.getElementLineWidth(elem) / this.camera.zoom);
+                            this.ctx.strokeStyle = ring;
+                            this.ctx.fillStyle = 'rgba(11,16,39,0.45)';
+                            this.ctx.beginPath();
+                            this.ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                            this.ctx.fill();
+                            this.ctx.stroke();
+
+                            this.ctx.strokeStyle = '#ffffff';
+                            this.ctx.lineWidth = 2 / this.camera.zoom;
+                            this.ctx.beginPath();
+                            if (kind === 'import') {
+                                this.ctx.moveTo(cx + r * 0.45, cy - r * 0.45);
+                                this.ctx.lineTo(cx - r * 0.15, cy);
+                                this.ctx.lineTo(cx + r * 0.45, cy + r * 0.45);
+                            } else {
+                                this.ctx.moveTo(cx - r * 0.45, cy - r * 0.45);
+                                this.ctx.lineTo(cx + r * 0.15, cy);
+                                this.ctx.lineTo(cx - r * 0.45, cy + r * 0.45);
+                            }
+                            this.ctx.stroke();
+                            this.ctx.restore();
+                            this.restoreElementBoxTransform(didTransform);
+	                    } else if (elem.type === 'rectangle') {
 		                    const didTransform = this.applyElementBoxTransformToContext(elem);
 		                    const fillColor = this.normalizeCanvasColor(elem.fillColor);
 		                    const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
@@ -7195,6 +7439,15 @@
                                         elem.fillColor = elem.moverKind === 'female' ? '#f472b6' : (elem.moverKind === 'male' ? '#3b82f6' : '#93c5fd');
                                     }
                                     if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#0b1027';
+                                } else if (elem.type === 'portal') {
+                                    if (!Number.isFinite(elem.x)) elem.x = 0;
+                                    if (!Number.isFinite(elem.y)) elem.y = 0;
+                                    if (!Number.isFinite(elem.width)) elem.width = 36;
+                                    if (!Number.isFinite(elem.height)) elem.height = 36;
+                                    if (typeof elem.portalKind !== 'string') elem.portalKind = 'import';
+                                    if (typeof elem.portalKey !== 'string') elem.portalKey = 'A1';
+                                    if (typeof elem.fillColor !== 'string') elem.fillColor = (elem.portalKind === 'export') ? '#a78bfa' : '#22d3ee';
+                                    if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#0b1027';
 			                    }
 
 	                    // Normalizar degradado de relleno (si existe).
@@ -7218,6 +7471,8 @@
                     if (!Number.isFinite(elem.routeSpeed)) elem.routeSpeed = 40;
                     if (typeof elem.routeDirection !== 'string') elem.routeDirection = 'right';
                     if (!Number.isFinite(elem.routeProgress)) elem.routeProgress = 0;
+                    if (typeof elem.routeMode !== 'string') elem.routeMode = 'loop';
+                    if (typeof elem.autoConnectRoute !== 'boolean') elem.autoConnectRoute = false;
 
                     this.normalizeBoxElementInPlace(elem);
                 };
@@ -9267,6 +9522,7 @@
                     const followRouteInput = document.getElementById('prop-follow-route');
                     const routeIdInput = document.getElementById('prop-route-id');
                     const routeModeInput = document.getElementById('prop-route-mode');
+                    const autoConnectRouteInput = document.getElementById('prop-auto-connect-route');
                     const moverSpeed = document.getElementById('prop-mover-speed');
                     const moverSpeedValue = document.getElementById('prop-mover-speed-value');
                     const moverSizeTools = document.getElementById('prop-mover-size-tools');
@@ -9275,7 +9531,7 @@
                     const moverHeight = document.getElementById('prop-mover-height');
                     const moverHeightValue = document.getElementById('prop-mover-height-value');
                     const isMover = elem.type === 'mover';
-                    const isFollowerCandidate = elem.type !== 'line';
+                    const isFollowerCandidate = elem.type !== 'line' && elem.type !== 'portal';
                     if (moverTools) moverTools.style.display = (isMover || isFollowerCandidate) ? 'block' : 'none';
                     if (followRouteInput) {
                         followRouteInput.checked = isMover ? true : Boolean(elem.followRoute);
@@ -9284,6 +9540,7 @@
                     if (isMover || isFollowerCandidate) {
                         if (routeIdInput) routeIdInput.value = String(elem.routeId || '');
                         if (routeModeInput) routeModeInput.value = String(elem.routeMode || 'loop');
+                        if (autoConnectRouteInput) autoConnectRouteInput.checked = Boolean(elem.autoConnectRoute);
                         if (moverSpeed) {
                             const speedRaw = isMover ? Number(elem.speed) : Number(elem.routeSpeed);
                             const speed = Math.max(1, Math.min(300, speedRaw || 40));
@@ -9292,6 +9549,7 @@
                         }
                     } else if (routeIdInput) {
                         routeIdInput.value = '';
+                        if (autoConnectRouteInput) autoConnectRouteInput.checked = false;
                     }
                     if (moverSizeTools) moverSizeTools.style.display = isMover ? 'block' : 'none';
                     if (isMover) {
@@ -9301,6 +9559,16 @@
                         if (moverWidthValue) moverWidthValue.textContent = String(w);
                         if (moverHeight) moverHeight.value = String(h);
                         if (moverHeightValue) moverHeightValue.textContent = String(h);
+                    }
+
+                    const portalTools = document.getElementById('prop-portal-tools');
+                    const portalKindInput = document.getElementById('prop-portal-kind');
+                    const portalKeyInput = document.getElementById('prop-portal-key');
+                    const isPortal = elem.type === 'portal';
+                    if (portalTools) portalTools.style.display = isPortal ? 'block' : 'none';
+                    if (isPortal) {
+                        if (portalKindInput) portalKindInput.value = String(elem.portalKind || 'import');
+                        if (portalKeyInput) portalKeyInput.value = String(elem.portalKey || 'A1');
                     }
                     
                     document.getElementById('prop-connection-status').value = elem.connectionStatus || 'none';
@@ -9395,8 +9663,11 @@
                     const routeFlag = Boolean(document.getElementById('prop-is-route') && document.getElementById('prop-is-route').checked);
                     const routeCircularFlag = Boolean(document.getElementById('prop-route-circular') && document.getElementById('prop-route-circular').checked);
                     const followRouteFlag = Boolean(document.getElementById('prop-follow-route') && document.getElementById('prop-follow-route').checked);
+                    const autoConnectRouteFlag = Boolean(document.getElementById('prop-auto-connect-route') && document.getElementById('prop-auto-connect-route').checked);
                     const routeId = String((document.getElementById('prop-route-id') && document.getElementById('prop-route-id').value) || '').trim();
                     const routeMode = String((document.getElementById('prop-route-mode') && document.getElementById('prop-route-mode').value) || 'loop');
+                    const portalKind = String((document.getElementById('prop-portal-kind') && document.getElementById('prop-portal-kind').value) || 'import');
+                    const portalKey = String((document.getElementById('prop-portal-key') && document.getElementById('prop-portal-key').value) || 'A1').trim();
                     const moverSpeedEl = document.getElementById('prop-mover-speed');
                     const moverSpeedRaw = moverSpeedEl ? Number.parseFloat(String(moverSpeedEl.value || '')) : NaN;
                     const moverSpeed = Number.isFinite(moverSpeedRaw) ? Math.max(1, Math.min(300, moverSpeedRaw)) : 40;
@@ -9449,14 +9720,20 @@
                             elem.speed = moverSpeed;
                             elem.flowDirection = document.getElementById('prop-flow-direction').value;
                             elem.routeMode = routeMode;
+                            elem.autoConnectRoute = autoConnectRouteFlag;
                             elem.width = moverWidth;
                             elem.height = moverHeight;
-                        } else if (elem.type !== 'line') {
+                        } else if (elem.type !== 'line' && elem.type !== 'portal') {
                             elem.followRoute = followRouteFlag;
                             elem.routeId = routeId;
                             elem.routeSpeed = moverSpeed;
                             elem.routeDirection = document.getElementById('prop-flow-direction').value;
                             elem.routeMode = routeMode;
+                            elem.autoConnectRoute = autoConnectRouteFlag;
+                        }
+                        if (elem.type === 'portal') {
+                            elem.portalKind = (portalKind === 'export') ? 'export' : 'import';
+                            elem.portalKey = portalKey || 'A1';
                         }
 
 	                    // Punto de Información (Lámina)
