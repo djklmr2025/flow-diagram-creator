@@ -32,6 +32,7 @@ Hay un documento de “estado real + pendientes + ruta de evolución” en `IMPL
 * **Rutas y Actores Animados (MVP):** Nueva herramienta **Ruta** (`U`) y actores **Metro** (`N`), **Hombre** (`H`) y **Mujer** (`J`) que se desplazan por líneas/trazos/polígonos marcados como ruta.
 * **Control de Movimiento:** Cada actor permite configurar `ID de Ruta`, `Velocidad`, `Dirección`, tamaño (`Ancho/Alto`) y botón de **Vincular ruta cercana** desde Propiedades.
 * **Seguimiento de Ruta para cualquier figura:** Elementos normales (incluidos los cargados desde `.json`) pueden activar **Seguir ruta** y animarse por la vía seleccionada.
+* **Rutas Curvas:** En líneas marcadas como ruta se puede elegir `Línea`, `Círculo`, `Semicírculo` o `Cuarto de círculo` (con lado del arco izquierda/derecha).
 
 ### 🎮 Flujo rápido para animación de escenario
 1. Dibuja una ruta con el botón **Ruta** o activa `Usar como ruta de movimiento` en una línea/trazo existente.
