@@ -8,6 +8,28 @@ Un editor gráfico interactivo diseñado para crear diagramas de flujo, planos a
 El proyecto se encuentra actualmente desplegado y funcional en:  
 👉 **[https://flow-diagram-creator.vercel.app/](https://flow-diagram-creator.vercel.app/)**
 
+## ✅ Snapshot de Cierre (Online + Local)
+**Versión:** `v1.4.0-r1`  
+**Fecha de corte:** `2026-02-28`  
+**Estado:** funcional en línea + funcional en local (base congelada para continuar con módulo Guardián).
+
+### Revisión incluida en este corte
+* Biblioteca con modo **Agrupados** y modo **Stkers**.
+* Menú contextual: **Guardar agrupado en biblioteca**.
+* Rutas avanzadas: círculo, semicírculo, cuarto de círculo y arco libre por grados.
+* Movimiento mejorado: `stop`, `loop`, autoconexión de rutas y portales import/export.
+* UI compactada para ampliar espacio de canvas.
+* Nuevo botón de barra: **Publicar Stiker**.
+* Ajuste de mini-preview en biblioteca (carga más confiable para visualización rápida).
+
+### Commits locales de referencia (últimos ajustes)
+* `8e06107` Fix library thumbs visibility and add Publicar Stiker action
+* `3fbf367` Add stkers library mode and compact UI for larger canvas
+* `95f8ea3` Add free-degree arc routes and grouped library browser UI
+* `fbbc0eb` Add context-menu quick save for grouped library via server endpoint
+
+> Nota: este snapshot se deja como base estable para el siguiente paso: implementación del **Daemon Guardián** (`/api/arkaios`) en entorno local.
+
 ---
 
 ## 🛠️ Estado del Proyecto: **En Desarrollo (Fase A)**
