@@ -559,14 +559,52 @@
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         }
 
+        .library-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+            flex: 1;
+            margin-right: 10px;
+        }
+
+        .library-thumb {
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            background: rgba(255, 255, 255, 0.04);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            flex-shrink: 0;
+            color: #cfe8ff;
+            font-size: 18px;
+        }
+
+        .library-thumb iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            pointer-events: none;
+            transform: scale(0.45);
+            transform-origin: top left;
+            width: 220%;
+            height: 220%;
+        }
+
         .library-row:last-child {
             border-bottom: none;
         }
 
         .library-name {
             flex: 1;
-            margin-right: 10px;
             font-size: 13px;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .library-actions {
@@ -1341,6 +1379,9 @@
         <button class="btn" id="btn-library" title="Biblioteca de Stickers">
             <span>📚</span> Biblioteca
         </button>
+        <button class="btn" id="btn-grouped-library" title="Colección de Agrupados">
+            <span>📦</span> Agrupados
+        </button>
         <button class="btn" id="btn-layers" title="Objetos (O)">
             <span>≡</span> Objetos
         </button>
@@ -1527,12 +1568,20 @@
                 <option value="circle">Círculo</option>
                 <option value="semi">Semicírculo</option>
                 <option value="quarter">Cuarto de círculo</option>
+                <option value="custom">Arco libre (grados)</option>
             </select>
             <label>Lado del arco:</label>
             <select id="prop-route-arc-side">
                 <option value="left">Izquierda</option>
                 <option value="right">Derecha</option>
             </select>
+            <div id="prop-route-arc-deg-wrap" style="display:none; margin-top:8px;">
+                <label>Grados de arco:</label>
+                <div class="property-range-row">
+                    <input type="range" id="prop-route-arc-deg" min="5" max="355" value="120">
+                    <span id="prop-route-arc-deg-value">120°</span>
+                </div>
+            </div>
         </div>
         <div class="property-group" id="prop-mover-tools" style="display:none;">
             <label class="property-checkbox">
@@ -1693,6 +1742,10 @@
     <div id="library-modal" class="modal">
         <div class="modal-content">
             <h2>Biblioteca</h2>
+            <div class="modal-buttons" style="justify-content:flex-start;">
+                <button class="btn small" id="btn-library-mode-library">Biblioteca</button>
+                <button class="btn small" id="btn-library-mode-grouped">Agrupados</button>
+            </div>
             <input type="text" id="library-prefix" placeholder="Carpeta (ej: metro/linea-1) (vacío = raíz)">
             <div class="modal-buttons">
                 <button class="btn" id="btn-library-up">Arriba</button>
@@ -1970,6 +2023,7 @@
 
                 // Navegación de biblioteca
                 this.libraryPrefix = '';
+                this.libraryMode = 'library'; // 'library' | 'grouped'
 
                 // "Canal" vivo (IA -> Canvas): polling por sesión (?listen=...)
                 this.listenSession = null;
@@ -2145,6 +2199,7 @@
                 document.getElementById('btn-publish').addEventListener('click', () => this.showPublishModal('vector'));
                 document.getElementById('btn-publish-project').addEventListener('click', () => this.showPublishModal('project'));
                 document.getElementById('btn-library').addEventListener('click', () => this.showLibraryModal());
+                document.getElementById('btn-grouped-library').addEventListener('click', () => this.showLibraryModal('grouped'));
                 
                 // Modal de guardado
                 document.getElementById('btn-cancel-save').addEventListener('click', () => this.hideSaveModal());
@@ -2166,6 +2221,8 @@
                 document.getElementById('btn-library-refresh').addEventListener('click', () => this.refreshLibrary());
                 document.getElementById('btn-library-up').addEventListener('click', () => this.libraryNavigateUp());
                 document.getElementById('btn-library-upload').addEventListener('click', () => this.pickLibraryUploadFile());
+                document.getElementById('btn-library-mode-library').addEventListener('click', () => this.setLibraryMode('library'));
+                document.getElementById('btn-library-mode-grouped').addEventListener('click', () => this.setLibraryMode('grouped'));
                 document.getElementById('library-prefix').addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') this.refreshLibrary();
                 });
@@ -2313,6 +2370,7 @@
                         'prop-is-route',
                         'prop-route-curve',
                         'prop-route-arc-side',
+                        'prop-route-arc-deg',
                         'prop-route-id',
                         'prop-follow-route',
                         'prop-route-mode',
@@ -2426,6 +2484,17 @@
                         };
                         moverHeight.addEventListener('input', onMoverHeight);
                         moverHeight.addEventListener('change', onMoverHeight);
+                    }
+
+                    const routeArcDeg = document.getElementById('prop-route-arc-deg');
+                    const routeArcDegVal = document.getElementById('prop-route-arc-deg-value');
+                    if (routeArcDeg) {
+                        const onArcDeg = () => {
+                            if (routeArcDegVal) routeArcDegVal.textContent = `${String(routeArcDeg.value || '0')}°`;
+                            this.updateSelectedProperties();
+                        };
+                        routeArcDeg.addEventListener('input', onArcDeg);
+                        routeArcDeg.addEventListener('change', onArcDeg);
                     }
 
 	                const cpEnabled = document.getElementById('prop-cp-enabled');
@@ -3987,6 +4056,8 @@
                 const canCrop = sel && (sel.type === 'image' || sel.type === 'video');
                 const cropItem = document.getElementById('ctx-crop');
                 if (cropItem) cropItem.style.display = canCrop ? 'block' : 'none';
+                const saveGroupedItem = document.getElementById('ctx-save-grouped');
+                if (saveGroupedItem) saveGroupedItem.style.display = (this.selectedElements && this.selectedElements.length > 0) ? 'block' : 'none';
 
                 menu.classList.add('show');
             }
@@ -4805,6 +4876,7 @@
                             routeCircular: false,
                             routeCurve: 'line',
                             routeArcSide: 'left',
+                            routeArcDegrees: 120,
                             name: `Ruta ${Date.now()}`,
                             animColor: '#00d4ff',
                             flowDirection: 'right',
@@ -5261,8 +5333,14 @@
                 if (!elem || typeof elem !== 'object') return 'line';
                 if (elem.routeCircular === true) return 'circle';
                 const c = String(elem.routeCurve || 'line').toLowerCase();
-                if (c === 'circle' || c === 'semi' || c === 'quarter') return c;
+                if (c === 'circle' || c === 'semi' || c === 'quarter' || c === 'custom') return c;
                 return 'line';
+            }
+
+            getRouteArcDegrees(elem) {
+                const raw = Number(elem && elem.routeArcDegrees);
+                if (!Number.isFinite(raw)) return 120;
+                return Math.max(5, Math.min(355, raw));
             }
 
             buildArcPointsFromChord(x1, y1, x2, y2, fraction, side) {
@@ -5329,6 +5407,12 @@
                     if (curve === 'quarter') {
                         return this.buildArcPointsFromChord(
                             elem.x, elem.y, elem.endX, elem.endY, 0.25, elem.routeArcSide || 'left'
+                        );
+                    }
+                    if (curve === 'custom') {
+                        const deg = this.getRouteArcDegrees(elem);
+                        return this.buildArcPointsFromChord(
+                            elem.x, elem.y, elem.endX, elem.endY, deg / 360, elem.routeArcSide || 'left'
                         );
                     }
                     return [{ x: elem.x, y: elem.y }, { x: elem.endX, y: elem.endY }];
@@ -7083,12 +7167,35 @@
                 `;
             }
 
-            showLibraryModal() {
+            setLibraryMode(modeRaw) {
+                const mode = String(modeRaw || '').toLowerCase() === 'grouped' ? 'grouped' : 'library';
+                this.libraryMode = mode;
+
+                const bLib = document.getElementById('btn-library-mode-library');
+                const bGrp = document.getElementById('btn-library-mode-grouped');
+                if (bLib) bLib.classList.toggle('active', mode === 'library');
+                if (bGrp) bGrp.classList.toggle('active', mode === 'grouped');
+
+                const input = document.getElementById('library-prefix');
+                if (input) {
+                    if (mode === 'grouped' && (!String(input.value || '').trim() || String(input.value || '').trim() === 'grouped')) {
+                        input.value = 'grouped';
+                    } else if (mode === 'library' && String(input.value || '').trim() === 'grouped') {
+                        input.value = '';
+                    }
+                }
+            }
+
+            showLibraryModal(modeRaw) {
                 const modal = document.getElementById('library-modal');
                 modal.classList.add('show');
 
                 const input = document.getElementById('library-prefix');
-                input.value = this.libraryPrefix || '';
+                const mode = String(modeRaw || '').toLowerCase();
+                this.setLibraryMode(mode === 'grouped' ? 'grouped' : this.libraryMode);
+                input.value = this.libraryMode === 'grouped'
+                    ? (this.libraryPrefix || 'grouped')
+                    : (this.libraryPrefix === 'grouped' ? '' : (this.libraryPrefix || ''));
                 input.focus();
 
                 const uploadStatus = document.getElementById('library-upload-status');
@@ -7118,10 +7225,14 @@
 
             async refreshLibrary() {
                 const input = document.getElementById('library-prefix');
-                const prefix = (input.value || '')
+                let prefix = (input.value || '')
                     .trim()
                     .replace(/^\/+/, '')
                     .replace(/\/+$/, '');
+                if (this.libraryMode === 'grouped' && !prefix) {
+                    prefix = 'grouped';
+                    if (input) input.value = prefix;
+                }
 
                 this.libraryPrefix = prefix;
 
@@ -7133,7 +7244,7 @@
                 let response;
                 let data;
                 try {
-                    response = await fetch(`/api/library?prefix=${encodeURIComponent(prefix)}&mode=folded&limit=200`);
+                    response = await fetch(`/api/library?scope=library&prefix=${encodeURIComponent(prefix)}&mode=folded&limit=200`);
                     data = await response.json();
                 } catch (error) {
                     status.textContent = `❌ Error de red: ${error}`;
@@ -7150,7 +7261,8 @@
                 }
 
                 const currentPrefix = (data.prefix || '').replace(/\/+$/, '');
-                status.textContent = currentPrefix ? `Carpeta: /${currentPrefix}` : 'Carpeta: /';
+                const modeLabel = this.libraryMode === 'grouped' ? 'Agrupados' : 'Biblioteca';
+                status.textContent = `${modeLabel} · ${currentPrefix ? `Carpeta: /${currentPrefix}` : 'Carpeta: /'}`;
 
                 const folders = Array.isArray(data.folders) ? data.folders.slice() : [];
                 const blobs = Array.isArray(data.blobs) ? data.blobs.slice() : [];
@@ -7164,6 +7276,27 @@
                     row.dataset.type = type;
                     if (path) row.dataset.path = path;
                     if (id) row.dataset.id = id;
+
+                    const left = document.createElement('div');
+                    left.className = 'library-left';
+
+                    const thumb = document.createElement('div');
+                    thumb.className = 'library-thumb';
+                    if (type === 'folder') {
+                        thumb.textContent = '📁';
+                    } else if (type === 'sticker' && id) {
+                        try {
+                            const frame = document.createElement('iframe');
+                            frame.setAttribute('loading', 'lazy');
+                            frame.setAttribute('title', `preview-${id}`);
+                            frame.src = `${window.location.origin}/?mode=sticker&id=${encodeURIComponent(id)}`;
+                            thumb.appendChild(frame);
+                        } catch {
+                            thumb.textContent = '✨';
+                        }
+                    } else {
+                        thumb.textContent = '✨';
+                    }
 
                     const nameEl = document.createElement('div');
                     nameEl.className = 'library-name';
@@ -7180,7 +7313,9 @@
                         actionsEl.appendChild(btn);
                     });
 
-                    row.appendChild(nameEl);
+                    left.appendChild(thumb);
+                    left.appendChild(nameEl);
+                    row.appendChild(left);
                     row.appendChild(actionsEl);
                     listEl.appendChild(row);
                 };
@@ -7488,6 +7623,7 @@
                         if (typeof elem.routeCircular !== 'boolean') elem.routeCircular = false;
                         if (typeof elem.routeCurve !== 'string') elem.routeCurve = (elem.routeCircular ? 'circle' : 'line');
                         if (typeof elem.routeArcSide !== 'string') elem.routeArcSide = 'left';
+                        if (!Number.isFinite(elem.routeArcDegrees)) elem.routeArcDegrees = 120;
                         if (typeof elem.routeMode !== 'string') elem.routeMode = 'loop';
                     } else if (elem.type === 'rectangle' || elem.type === 'circle') {
                         if (!Number.isFinite(elem.x)) elem.x = 0;
@@ -9665,6 +9801,9 @@
                     const routeToggle = document.getElementById('prop-is-route');
                     const routeCurveInput = document.getElementById('prop-route-curve');
                     const routeArcSideInput = document.getElementById('prop-route-arc-side');
+                    const routeArcDegWrap = document.getElementById('prop-route-arc-deg-wrap');
+                    const routeArcDegInput = document.getElementById('prop-route-arc-deg');
+                    const routeArcDegValue = document.getElementById('prop-route-arc-deg-value');
                     const isRouteCandidate = elem.type === 'line' || elem.type === 'path' || elem.type === 'polygon';
                     if (routeTools) routeTools.style.display = isRouteCandidate ? 'block' : 'none';
                     if (routeToggle) routeToggle.checked = this.isRouteElement(elem);
@@ -9678,6 +9817,10 @@
                         const canSide = curve === 'semi' || curve === 'quarter';
                         routeArcSideInput.disabled = !(elem.type === 'line' && this.isRouteElement(elem) && canSide);
                     }
+                    const curve = (elem.type === 'line') ? this.getRouteCurve(elem) : 'line';
+                    if (routeArcDegWrap) routeArcDegWrap.style.display = (curve === 'custom') ? 'block' : 'none';
+                    if (routeArcDegInput) routeArcDegInput.value = String(Math.round(this.getRouteArcDegrees(elem)));
+                    if (routeArcDegValue) routeArcDegValue.textContent = `${String(routeArcDegInput ? routeArcDegInput.value : Math.round(this.getRouteArcDegrees(elem)))}°`;
 
                     const moverTools = document.getElementById('prop-mover-tools');
                     const followRouteInput = document.getElementById('prop-follow-route');
@@ -9824,6 +9967,8 @@
                     const routeFlag = Boolean(document.getElementById('prop-is-route') && document.getElementById('prop-is-route').checked);
                     const routeCurve = String((document.getElementById('prop-route-curve') && document.getElementById('prop-route-curve').value) || 'line');
                     const routeArcSide = String((document.getElementById('prop-route-arc-side') && document.getElementById('prop-route-arc-side').value) || 'left');
+                    const routeArcDegRaw = Number((document.getElementById('prop-route-arc-deg') && document.getElementById('prop-route-arc-deg').value) || 120);
+                    const routeArcDegrees = Number.isFinite(routeArcDegRaw) ? Math.max(5, Math.min(355, routeArcDegRaw)) : 120;
                     const followRouteFlag = Boolean(document.getElementById('prop-follow-route') && document.getElementById('prop-follow-route').checked);
                     const autoConnectRouteFlag = Boolean(document.getElementById('prop-auto-connect-route') && document.getElementById('prop-auto-connect-route').checked);
                     const routeId = String((document.getElementById('prop-route-id') && document.getElementById('prop-route-id').value) || '').trim();
@@ -9878,6 +10023,7 @@
                             if (elem.type === 'line') {
                                 elem.routeCurve = routeCurve;
                                 elem.routeArcSide = (routeArcSide === 'right') ? 'right' : 'left';
+                                elem.routeArcDegrees = routeArcDegrees;
                                 elem.routeCircular = routeCurve === 'circle';
                             }
                         }

@@ -33,6 +33,7 @@ Hay un documento de “estado real + pendientes + ruta de evolución” en `IMPL
 * **Control de Movimiento:** Cada actor permite configurar `ID de Ruta`, `Velocidad`, `Dirección`, tamaño (`Ancho/Alto`) y botón de **Vincular ruta cercana** desde Propiedades.
 * **Seguimiento de Ruta para cualquier figura:** Elementos normales (incluidos los cargados desde `.json`) pueden activar **Seguir ruta** y animarse por la vía seleccionada.
 * **Rutas Curvas:** En líneas marcadas como ruta se puede elegir `Línea`, `Círculo`, `Semicírculo` o `Cuarto de círculo` (con lado del arco izquierda/derecha).
+* **Arco Libre por Grados:** También puedes elegir `Arco libre (grados)` y ajustar el ángulo exacto (5° a 355°).
 
 ### 🎮 Flujo rápido para animación de escenario
 1. Dibuja una ruta con el botón **Ruta** o activa `Usar como ruta de movimiento` en una línea/trazo existente.
@@ -222,6 +223,7 @@ Notas:
 * CORS está habilitado (`*`) para facilitar consumo desde plataformas de IA.
 * `POST /api/publish` **rechaza imágenes** (`type: "image"` / `imageSrc`) para mantener stickers vectoriales/animados.
 * Acción rápida de editor: clic derecho en selección → **Guardar agrupado en biblioteca**.
+* Botón superior **Agrupados** abre directamente la carpeta `grouped` en la biblioteca.
 * `POST /api/publish-project` permite imágenes y, si vienen embebidas como `data:` (base64), las sube como assets y reemplaza `imageSrc` por URLs públicas.
 * Límites anti-abuso (aprox): máximo 2000 elementos (contando grupos de forma recursiva). `publish` guarda ~200KB y `publish-project` guarda ~300KB (sin base64). `publish-project` limita request a ~6MB y sube hasta 40 imágenes (máx 8MB total).
 * Compatibilidad IA: `POST /api/publish`, `POST /api/publish-project` y `POST /api/inject` aceptan JSON "friendly" y lo normalizan (ej: `circle.radius`, `line.x1/y1/x2/y2`, `color`, `isAnim`).
