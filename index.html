@@ -134,9 +134,9 @@
         #layers-panel {
             position: fixed;
             left: 0;
-            top: 60px;
+            top: 52px;
             bottom: 24px;
-            width: 280px;
+            width: 236px;
             background: rgba(22, 33, 62, 0.98);
             color: #eee;
             border-right: 2px solid #0f3460;
@@ -152,7 +152,7 @@
         }
 
         body.layers-open #canvas-container {
-            left: 280px;
+            left: 236px;
         }
 
         .layers-header {
@@ -281,9 +281,9 @@
             left: 0;
             right: 0;
             background: #16213e;
-            padding: 10px;
+            padding: 6px 8px;
             display: flex;
-            gap: 10px;
+            gap: 6px;
             flex-wrap: wrap;
             z-index: 1000;
             border-bottom: 2px solid #0f3460;
@@ -291,17 +291,17 @@
         }
 
         .btn {
-            padding: 8px 15px;
+            padding: 6px 10px;
             background: #0f3460;
             border: none;
             border-radius: 5px;
             color: #eee;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 12px;
             transition: all 0.3s;
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 4px;
         }
 
         .btn:hover {
@@ -319,15 +319,15 @@
         }
 
         #shape-type {
-            padding: 8px 12px;
+            padding: 6px 10px;
             background: #0f3460;
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 5px;
             color: #eee;
-            font-size: 14px;
+            font-size: 12px;
             cursor: pointer;
             display: none;
-            height: 36px;
+            height: 30px;
         }
 
         body.shape-tool-active #shape-type {
@@ -342,12 +342,12 @@
         .separator {
             width: 2px;
             background: #0f3460;
-            margin: 0 5px;
+            margin: 0 3px;
         }
 
         #canvas-container {
             position: fixed;
-            top: 60px;
+            top: 52px;
             left: 0;
             right: 0;
             bottom: 0;
@@ -369,13 +369,13 @@
 
         #properties-panel {
             position: fixed;
-            right: 20px;
-            top: 80px;
+            right: 10px;
+            top: 62px;
             background: #16213e;
-            padding: 15px;
-            border-radius: 10px;
-            min-width: 250px;
-            max-height: 80vh;
+            padding: 10px;
+            border-radius: 8px;
+            min-width: 210px;
+            max-height: 84vh;
             overflow-y: auto;
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             display: none;
@@ -569,9 +569,9 @@
         }
 
         .library-thumb {
-            width: 44px;
-            height: 44px;
-            border-radius: 8px;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
             border: 1px solid rgba(255, 255, 255, 0.16);
             background: rgba(255, 255, 255, 0.04);
             display: inline-flex;
@@ -580,7 +580,7 @@
             overflow: hidden;
             flex-shrink: 0;
             color: #cfe8ff;
-            font-size: 18px;
+            font-size: 14px;
         }
 
         .library-thumb iframe {
@@ -588,10 +588,10 @@
             height: 100%;
             border: 0;
             pointer-events: none;
-            transform: scale(0.45);
+            transform: scale(0.36);
             transform-origin: top left;
-            width: 220%;
-            height: 220%;
+            width: 278%;
+            height: 278%;
         }
 
         .library-row:last-child {
@@ -613,8 +613,8 @@
         }
 
         .btn.small {
-            padding: 6px 10px;
-            font-size: 12px;
+            padding: 4px 7px;
+            font-size: 11px;
         }
 
         /* ==================== DECK MODE (LÁMINA) ==================== */
@@ -1170,8 +1170,8 @@
             background: #16213e;
             border: 2px solid #e94560;
             border-radius: 8px;
-            padding: 8px 0;
-            min-width: 180px;
+            padding: 4px 0;
+            min-width: 156px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             z-index: 3000;
             display: none;
@@ -1182,13 +1182,13 @@
         }
 
         .context-menu-item {
-            padding: 10px 20px;
+            padding: 8px 14px;
             cursor: pointer;
             color: #eee;
-            font-size: 14px;
+            font-size: 12px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             transition: background 0.2s;
         }
 
@@ -1381,6 +1381,9 @@
         </button>
         <button class="btn" id="btn-grouped-library" title="Colección de Agrupados">
             <span>📦</span> Agrupados
+        </button>
+        <button class="btn" id="btn-stkers-library" title="Colección Stkers (animados)">
+            <span>✨</span> Stkers
         </button>
         <button class="btn" id="btn-layers" title="Objetos (O)">
             <span>≡</span> Objetos
@@ -1745,6 +1748,7 @@
             <div class="modal-buttons" style="justify-content:flex-start;">
                 <button class="btn small" id="btn-library-mode-library">Biblioteca</button>
                 <button class="btn small" id="btn-library-mode-grouped">Agrupados</button>
+                <button class="btn small" id="btn-library-mode-stkers">Stkers</button>
             </div>
             <input type="text" id="library-prefix" placeholder="Carpeta (ej: metro/linea-1) (vacío = raíz)">
             <div class="modal-buttons">
@@ -2023,7 +2027,7 @@
 
                 // Navegación de biblioteca
                 this.libraryPrefix = '';
-                this.libraryMode = 'library'; // 'library' | 'grouped'
+                this.libraryMode = 'library'; // 'library' | 'grouped' | 'stkers'
 
                 // "Canal" vivo (IA -> Canvas): polling por sesión (?listen=...)
                 this.listenSession = null;
@@ -2200,6 +2204,7 @@
                 document.getElementById('btn-publish-project').addEventListener('click', () => this.showPublishModal('project'));
                 document.getElementById('btn-library').addEventListener('click', () => this.showLibraryModal());
                 document.getElementById('btn-grouped-library').addEventListener('click', () => this.showLibraryModal('grouped'));
+                document.getElementById('btn-stkers-library').addEventListener('click', () => this.showLibraryModal('stkers'));
                 
                 // Modal de guardado
                 document.getElementById('btn-cancel-save').addEventListener('click', () => this.hideSaveModal());
@@ -2223,6 +2228,7 @@
                 document.getElementById('btn-library-upload').addEventListener('click', () => this.pickLibraryUploadFile());
                 document.getElementById('btn-library-mode-library').addEventListener('click', () => this.setLibraryMode('library'));
                 document.getElementById('btn-library-mode-grouped').addEventListener('click', () => this.setLibraryMode('grouped'));
+                document.getElementById('btn-library-mode-stkers').addEventListener('click', () => this.setLibraryMode('stkers'));
                 document.getElementById('library-prefix').addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') this.refreshLibrary();
                 });
@@ -7168,19 +7174,24 @@
             }
 
             setLibraryMode(modeRaw) {
-                const mode = String(modeRaw || '').toLowerCase() === 'grouped' ? 'grouped' : 'library';
+                const raw = String(modeRaw || '').toLowerCase();
+                const mode = raw === 'grouped' ? 'grouped' : (raw === 'stkers' ? 'stkers' : 'library');
                 this.libraryMode = mode;
 
                 const bLib = document.getElementById('btn-library-mode-library');
                 const bGrp = document.getElementById('btn-library-mode-grouped');
+                const bStk = document.getElementById('btn-library-mode-stkers');
                 if (bLib) bLib.classList.toggle('active', mode === 'library');
                 if (bGrp) bGrp.classList.toggle('active', mode === 'grouped');
+                if (bStk) bStk.classList.toggle('active', mode === 'stkers');
 
                 const input = document.getElementById('library-prefix');
                 if (input) {
                     if (mode === 'grouped' && (!String(input.value || '').trim() || String(input.value || '').trim() === 'grouped')) {
                         input.value = 'grouped';
-                    } else if (mode === 'library' && String(input.value || '').trim() === 'grouped') {
+                    } else if (mode === 'stkers' && (!String(input.value || '').trim() || String(input.value || '').trim() === 'stkers' || String(input.value || '').trim() === 'stickers')) {
+                        input.value = 'stickers';
+                    } else if (mode === 'library' && ['grouped', 'stkers', 'stickers'].includes(String(input.value || '').trim())) {
                         input.value = '';
                     }
                 }
@@ -7192,10 +7203,13 @@
 
                 const input = document.getElementById('library-prefix');
                 const mode = String(modeRaw || '').toLowerCase();
-                this.setLibraryMode(mode === 'grouped' ? 'grouped' : this.libraryMode);
+                const nextMode = mode === 'grouped' ? 'grouped' : (mode === 'stkers' ? 'stkers' : this.libraryMode);
+                this.setLibraryMode(nextMode);
                 input.value = this.libraryMode === 'grouped'
                     ? (this.libraryPrefix || 'grouped')
-                    : (this.libraryPrefix === 'grouped' ? '' : (this.libraryPrefix || ''));
+                    : (this.libraryMode === 'stkers'
+                        ? ((this.libraryPrefix && this.libraryPrefix !== 'grouped') ? this.libraryPrefix : 'stickers')
+                        : (['grouped', 'stkers', 'stickers'].includes(this.libraryPrefix) ? '' : (this.libraryPrefix || '')));
                 input.focus();
 
                 const uploadStatus = document.getElementById('library-upload-status');
@@ -7232,6 +7246,9 @@
                 if (this.libraryMode === 'grouped' && !prefix) {
                     prefix = 'grouped';
                     if (input) input.value = prefix;
+                } else if (this.libraryMode === 'stkers' && !prefix) {
+                    prefix = 'stickers';
+                    if (input) input.value = prefix;
                 }
 
                 this.libraryPrefix = prefix;
@@ -7261,7 +7278,9 @@
                 }
 
                 const currentPrefix = (data.prefix || '').replace(/\/+$/, '');
-                const modeLabel = this.libraryMode === 'grouped' ? 'Agrupados' : 'Biblioteca';
+                const modeLabel = this.libraryMode === 'grouped'
+                    ? 'Agrupados'
+                    : (this.libraryMode === 'stkers' ? 'Stkers' : 'Biblioteca');
                 status.textContent = `${modeLabel} · ${currentPrefix ? `Carpeta: /${currentPrefix}` : 'Carpeta: /'}`;
 
                 const folders = Array.isArray(data.folders) ? data.folders.slice() : [];
@@ -7269,6 +7288,8 @@
 
                 folders.sort((a, b) => String(a).localeCompare(String(b)));
                 blobs.sort((a, b) => String(a.pathname).localeCompare(String(b.pathname)));
+                let previewFrameCount = 0;
+                const previewFrameLimit = this.libraryMode === 'stkers' ? 28 : 18;
 
                 const addRow = ({ name, type, path, id, actions }) => {
                     const row = document.createElement('div');
@@ -7285,14 +7306,19 @@
                     if (type === 'folder') {
                         thumb.textContent = '📁';
                     } else if (type === 'sticker' && id) {
-                        try {
-                            const frame = document.createElement('iframe');
-                            frame.setAttribute('loading', 'lazy');
-                            frame.setAttribute('title', `preview-${id}`);
-                            frame.src = `${window.location.origin}/?mode=sticker&id=${encodeURIComponent(id)}`;
-                            thumb.appendChild(frame);
-                        } catch {
-                            thumb.textContent = '✨';
+                        if (previewFrameCount < previewFrameLimit) {
+                            try {
+                                const frame = document.createElement('iframe');
+                                frame.setAttribute('loading', 'lazy');
+                                frame.setAttribute('title', `preview-${id}`);
+                                frame.src = `${window.location.origin}/?mode=sticker&id=${encodeURIComponent(id)}`;
+                                thumb.appendChild(frame);
+                                previewFrameCount += 1;
+                            } catch {
+                                thumb.textContent = this.libraryMode === 'stkers' ? '🎞️' : '✨';
+                            }
+                        } else {
+                            thumb.textContent = this.libraryMode === 'stkers' ? '🎞️' : '✨';
                         }
                     } else {
                         thumb.textContent = '✨';
