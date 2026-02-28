@@ -8096,12 +8096,39 @@
 		                        } else if (elem.crop != null) {
 		                            delete elem.crop;
 		                        }
-			                    } else if (elem.type === 'polygon' || elem.type === 'path') {
-			                        if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#e94560';
-			                        if (typeof elem.fillColor !== 'string') elem.fillColor = '#0f3460';
-			                        if (!Number.isFinite(elem.lineWidth)) elem.lineWidth = 3;
-                                    if (typeof elem.routeRole !== 'boolean') elem.routeRole = false;
-                                } else if (elem.type === 'mover') {
+		                    } else if (elem.type === 'polygon' || elem.type === 'path') {
+		                        if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#e94560';
+		                        if (typeof elem.fillColor !== 'string') elem.fillColor = '#0f3460';
+		                        if (!Number.isFinite(elem.lineWidth)) elem.lineWidth = 3;
+                                // Compat PNG-TO-JSON: aceptar puntos como [x,y] además de {x,y}
+                                if (Array.isArray(elem.points)) {
+                                    elem.points = elem.points
+                                        .map((p) => {
+                                            if (Array.isArray(p) && p.length >= 2) {
+                                                const x = Number(p[0]);
+                                                const y = Number(p[1]);
+                                                if (Number.isFinite(x) && Number.isFinite(y)) return { x, y };
+                                                return null;
+                                            }
+                                            if (p && typeof p === 'object') {
+                                                const x = Number(
+                                                    Number.isFinite(p.x) ? p.x :
+                                                    (Number.isFinite(p[0]) ? p[0] : NaN)
+                                                );
+                                                const y = Number(
+                                                    Number.isFinite(p.y) ? p.y :
+                                                    (Number.isFinite(p[1]) ? p[1] : NaN)
+                                                );
+                                                if (Number.isFinite(x) && Number.isFinite(y)) return { x, y };
+                                            }
+                                            return null;
+                                        })
+                                        .filter(Boolean);
+                                } else {
+                                    elem.points = [];
+                                }
+                                if (typeof elem.routeRole !== 'boolean') elem.routeRole = false;
+                            } else if (elem.type === 'mover') {
                                     if (!Number.isFinite(elem.x)) elem.x = 0;
                                     if (!Number.isFinite(elem.y)) elem.y = 0;
                                     if (!Number.isFinite(elem.width)) elem.width = 44;
