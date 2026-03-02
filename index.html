@@ -2334,6 +2334,8 @@
                 safe('init.setupBuilderPreview', () => this.setupBuilderPreview());
                 safe('init.setupContextMenu', () => this.setupContextMenu());
                 safe('init.setupLayersPanel', () => this.setupLayersPanel());
+                // Activar modo visor lo antes posible para evitar mutaciones de rutas antes del primer render.
+                safe('init.applyViewerModeFromUrlEarly', () => this.applyViewerModeFromUrl());
                 safe('init.loadFromLocalStorage', () => this.loadFromLocalStorage());
                 safe('init.startAnimationLoop', () => this.startAnimationLoop());
 
@@ -6970,11 +6972,15 @@
                     this.drawGrid();
                 }
 
-                // Animar elementos "montados" a rutas (except movers dedicados).
-                try {
-                    this.updateRouteFollowersInPlace();
-                } catch (err) {
-                    this.reportRenderError(err, 'updateRouteFollowersInPlace');
+                // En viewer (preview/sticker/deck) evitamos mutar seguidores de ruta porque
+                // algunos proyectos con datos sucios pueden "expulsar" todo fuera de cámara.
+                const shouldUpdateFollowers = !this.readOnly && !this.isViewerLikeMode();
+                if (shouldUpdateFollowers) {
+                    try {
+                        this.updateRouteFollowersInPlace();
+                    } catch (err) {
+                        this.reportRenderError(err, 'updateRouteFollowersInPlace');
+                    }
                 }
                 
                 // Dibujar elementos
