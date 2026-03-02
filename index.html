@@ -10844,11 +10844,27 @@
                 const bw = Math.max(1, bounds.maxX - bounds.minX);
                 const bh = Math.max(1, bounds.maxY - bounds.minY);
 
+                // Proteccion: algunos proyectos pueden traer outliers (coordenadas corruptas/extremas)
+                // que dejan todo el diseño fuera de pantalla al auto-fit.
+                const maxSpan = 500000;
+                const cxRaw = (bounds.minX + bounds.maxX) / 2;
+                const cyRaw = (bounds.minY + bounds.maxY) / 2;
+                if (
+                    bw > maxSpan ||
+                    bh > maxSpan ||
+                    !Number.isFinite(cxRaw) ||
+                    !Number.isFinite(cyRaw) ||
+                    Math.abs(cxRaw) > 1000000 ||
+                    Math.abs(cyRaw) > 1000000
+                ) {
+                    return false;
+                }
+
                 const zoom = Math.min(cw / (bw + pad * 2), ch / (bh + pad * 2));
                 const clamped = Math.max(0.05, Math.min(5, zoom));
 
-                const cx = (bounds.minX + bounds.maxX) / 2;
-                const cy = (bounds.minY + bounds.maxY) / 2;
+                const cx = cxRaw;
+                const cy = cyRaw;
 
                 this.camera.zoom = clamped;
                 this.camera.x = cw / 2 - cx * clamped;
