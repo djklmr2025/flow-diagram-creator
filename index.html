@@ -10883,6 +10883,74 @@
                 this.autoFitCameraToElements(padding);
             }
 
+            isViewerLikeMode() {
+                const mode = this.viewerMode;
+                if (mode === 'sticker' || mode === 'deck') return true;
+                try {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const raw = String(urlParams.get('mode') || '').toLowerCase();
+                    return raw === 'preview' || raw === 'sticker' || raw === 'deck';
+                } catch {
+                    return false;
+                }
+            }
+
+            ensureViewerCameraHasVisibleContent() {
+                if (!this.isViewerLikeMode()) return false;
+                const cw = Number(this.canvas && this.canvas.width);
+                const ch = Number(this.canvas && this.canvas.height);
+                if (!Number.isFinite(cw) || !Number.isFinite(ch) || cw <= 0 || ch <= 0) return false;
+
+                const zoom = Number(this.camera && this.camera.zoom) || 1;
+                const camX = Number(this.camera && this.camera.x) || 0;
+                const camY = Number(this.camera && this.camera.y) || 0;
+                const margin = 120;
+
+                const flat = this.flattenGroupElements(this.elements || []);
+                let visible = false;
+                let best = null;
+                let bestScore = Infinity;
+
+                for (let i = 0; i < flat.length; i++) {
+                    const elem = flat[i];
+                    const b = this.getElementBounds(elem);
+                    if (!b) continue;
+                    if (!Number.isFinite(b.minX) || !Number.isFinite(b.minY) || !Number.isFinite(b.maxX) || !Number.isFinite(b.maxY)) continue;
+
+                    const sx1 = b.minX * zoom + camX;
+                    const sy1 = b.minY * zoom + camY;
+                    const sx2 = b.maxX * zoom + camX;
+                    const sy2 = b.maxY * zoom + camY;
+                    const inView = sx2 >= -margin && sy2 >= -margin && sx1 <= (cw + margin) && sy1 <= (ch + margin);
+                    if (inView) {
+                        visible = true;
+                        break;
+                    }
+
+                    const cx = (b.minX + b.maxX) / 2;
+                    const cy = (b.minY + b.maxY) / 2;
+                    const span = Math.max(1, b.maxX - b.minX) + Math.max(1, b.maxY - b.minY);
+                    const score = Math.abs(cx) + Math.abs(cy) + span * 0.25;
+                    if (score < bestScore) {
+                        bestScore = score;
+                        best = b;
+                    }
+                }
+
+                if (visible || !best) return false;
+
+                const bw = Math.max(1, best.maxX - best.minX);
+                const bh = Math.max(1, best.maxY - best.minY);
+                const targetZoom = Math.max(0.05, Math.min(5, Math.min(cw / (bw + 128), ch / (bh + 128))));
+                const cx = (best.minX + best.maxX) / 2;
+                const cy = (best.minY + best.maxY) / 2;
+                this.camera.zoom = targetZoom;
+                this.camera.x = cw / 2 - cx * targetZoom;
+                this.camera.y = ch / 2 - cy * targetZoom;
+                this.updateZoomIndicator();
+                return true;
+            }
+
             applyStickerMode(modeVariant) {
                 this.setLayersPanelOpen(false, { persist: false });
 
@@ -11516,6 +11584,7 @@
                 this.saveHistory();
                 this.updateZoomIndicator();
                 this.maybeAutoFitViewerCamera();
+                this.ensureViewerCameraHasVisibleContent();
                 this.refreshDeckUI();
                 return project;
             }
