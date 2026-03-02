@@ -10913,6 +10913,7 @@
 
                 for (let i = 0; i < flat.length; i++) {
                     const elem = flat[i];
+                    if (!this.elementHasVisiblePaint(elem)) continue;
                     const b = this.getElementBounds(elem);
                     if (!b) continue;
                     if (!Number.isFinite(b.minX) || !Number.isFinite(b.minY) || !Number.isFinite(b.maxX) || !Number.isFinite(b.maxY)) continue;
@@ -10949,6 +10950,24 @@
                 this.camera.y = ch / 2 - cy * targetZoom;
                 this.updateZoomIndicator();
                 return true;
+            }
+
+            elementHasVisiblePaint(elem) {
+                if (!elem || typeof elem !== 'object') return false;
+                const t = String(elem.type || '');
+                if (t === 'mover' || t === 'portal' || t === 'image' || t === 'video') return true;
+
+                const stroke = this.normalizeCanvasColor(elem.strokeColor);
+                const fill = this.normalizeCanvasColor(elem.fillColor);
+                const hasStroke = !this.isTransparentColor(stroke) && (Number(elem.lineWidth) || 0) > 0;
+                const hasFill = !this.isTransparentColor(fill);
+                const hasGradient = Boolean(this.normalizeFillGradientSpec(elem.fillGradient));
+                const hasTexture = Boolean(this.normalizeFillTextureSpec(elem.fillTexture));
+
+                if (t === 'line') return hasStroke;
+                if (t === 'path') return hasStroke;
+                if (t === 'polygon' || t === 'rectangle' || t === 'circle') return hasStroke || hasFill || hasGradient || hasTexture;
+                return hasStroke || hasFill || hasGradient || hasTexture;
             }
 
             applyStickerMode(modeVariant) {
@@ -10998,6 +11017,10 @@
                 // Recalcular tamaño del canvas con el layout nuevo
                 this.resizeCanvas();
                 this.maybeAutoFitViewerCamera();
+                this.ensureViewerCameraHasVisibleContent();
+                setTimeout(() => {
+                    try { this.ensureViewerCameraHasVisibleContent(); } catch {}
+                }, 120);
             }
 
             applyDeckMode() {
@@ -11043,6 +11066,10 @@
                 this.applyDeckSizing();
                 this.resizeCanvas();
                 this.maybeAutoFitViewerCamera();
+                this.ensureViewerCameraHasVisibleContent();
+                setTimeout(() => {
+                    try { this.ensureViewerCameraHasVisibleContent(); } catch {}
+                }, 120);
 
                 // UI info (lista + diapositiva + link)
                 this.refreshDeckUI();
