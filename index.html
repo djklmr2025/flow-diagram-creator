@@ -10846,21 +10846,28 @@
             applyViewerBackground(defaultBg) {
                 const urlParams = new URLSearchParams(window.location.search);
                 const raw = String(urlParams.get('bg') || '').trim().toLowerCase();
+                const mode = String(urlParams.get('mode') || '').trim().toLowerCase();
 
                 let bg = raw || String(defaultBg || '').trim().toLowerCase();
                 if (!bg) bg = 'transparent';
 
                 if (bg === 'none' || bg === '0' || bg === 'clear') bg = 'transparent';
                 if (bg === '3d' || bg === 'dark') bg = 'studio';
+                // En preview/deck siempre usar studio por defecto para evitar lienzo blanco.
+                if (!raw && (mode === 'preview' || mode === 'deck')) bg = 'studio';
 
                 document.documentElement.classList.remove('viewer-bg-transparent', 'viewer-bg-studio');
                 document.body.classList.remove('viewer-bg-transparent', 'viewer-bg-studio');
 
                 if (bg === 'studio') {
                     document.body.classList.add('viewer-bg-studio');
+                    document.documentElement.style.background = '#050712';
+                    document.body.style.background = 'var(--viewer-studio-bg)';
                 } else {
                     document.documentElement.classList.add('viewer-bg-transparent');
                     document.body.classList.add('viewer-bg-transparent');
+                    document.documentElement.style.background = 'transparent';
+                    document.body.style.background = 'transparent';
                 }
             }
 
@@ -11860,6 +11867,8 @@
                 // En modo liveOnly (ventana/iframe de preview vivo): no cargar fallback local/project.json.
                 // Espera datos en vivo por postMessage/localStorage.
                 if (liveOnly) {
+                    // Blindaje visual del split preview (iframe/ventana): fondo studio siempre.
+                    try { this.applyViewerBackground('studio'); } catch {}
                     this.elements = [];
                     this.selectedElements = [];
                     this.camera = { x: 0, y: 0, zoom: 1 };
