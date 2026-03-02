@@ -7655,13 +7655,17 @@
                 const baseColor =
                     kind === 'female' ? '#f472b6' :
                     (kind === 'male' ? '#3b82f6' : '#93c5fd');
+                const fillColor = this.normalizeCanvasColor(elem.fillColor);
+                const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
+                const resolvedFill = this.isTransparentColor(fillColor) ? baseColor : fillColor;
+                const resolvedStroke = this.isTransparentColor(strokeColor) ? '#0b1027' : strokeColor;
 
                 this.ctx.save();
                 this.ctx.translate(state.x, state.y);
                 this.ctx.rotate(state.angle);
                 this.ctx.lineWidth = 2 / this.camera.zoom;
-                this.ctx.strokeStyle = '#0b1027';
-                this.ctx.fillStyle = baseColor;
+                this.ctx.strokeStyle = resolvedStroke;
+                this.ctx.fillStyle = resolvedFill;
 
                 if (kind === 'metro') {
                     this.ctx.beginPath();
