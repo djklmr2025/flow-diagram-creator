@@ -321,6 +321,11 @@ body {
   z-index: 4;
 }
 
+/* El atributo hidden debe ganar siempre en el overlay de media. */
+.media-overlay[hidden] {
+  display: none !important;
+}
+
 .media-header {
   display: flex;
   justify-content: space-between;
