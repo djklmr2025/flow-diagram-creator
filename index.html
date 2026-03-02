@@ -6967,10 +6967,13 @@
                 
                 // Dibujar elementos
                 this.elements.forEach(elem => {
+                    this.ctx.save();
                     try {
                         this.drawElement(elem);
                     } catch (err) {
                         this.reportRenderError(err, `drawElement:${String(elem && elem.type || 'unknown')}`);
+                    } finally {
+                        this.ctx.restore();
                     }
                 });
                 
@@ -7059,13 +7062,15 @@
                 
                 // Dibujar elemento temporal
                 if (this.tempElement) {
+                    this.ctx.save();
                     this.ctx.globalAlpha = 0.5;
                     try {
                         this.drawElement(this.tempElement);
                     } catch (err) {
                         this.reportRenderError(err, 'drawElement:temp');
+                    } finally {
+                        this.ctx.restore();
                     }
-                    this.ctx.globalAlpha = 1;
                 }
                 
                 const showSelection = !this.readOnly || this.viewerMode === 'deck';
@@ -10910,6 +10915,8 @@
                 let visible = false;
                 let best = null;
                 let bestScore = Infinity;
+                let moverBest = null;
+                let moverBestScore = Infinity;
 
                 for (let i = 0; i < flat.length; i++) {
                     const elem = flat[i];
@@ -10932,12 +10939,19 @@
                     const cy = (b.minY + b.maxY) / 2;
                     const span = Math.max(1, b.maxX - b.minX) + Math.max(1, b.maxY - b.minY);
                     const score = Math.abs(cx) + Math.abs(cy) + span * 0.25;
+                    if (String(elem.type || '') === 'mover') {
+                        if (score < moverBestScore) {
+                            moverBestScore = score;
+                            moverBest = b;
+                        }
+                    }
                     if (score < bestScore) {
                         bestScore = score;
                         best = b;
                     }
                 }
 
+                if (moverBest) best = moverBest;
                 if (visible || !best) return false;
 
                 const bw = Math.max(1, best.maxX - best.minX);
