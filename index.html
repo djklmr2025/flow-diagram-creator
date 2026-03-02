@@ -2139,6 +2139,7 @@
                 this.clipboard = null;
                 this.history = [];
                 this.historyIndex = -1;
+                this.projectRevision = 0;
                 
                 // Estado del canvas
                 this.camera = {
@@ -2219,6 +2220,9 @@
                     forceNext: false,
                     lastSignature: '',
                     lastLivePushAt: 0,
+                    lastStorageWriteAt: 0,
+                    liveAsyncTimer: null,
+                    isPushing: false,
                     externalWindow: null,
                     sessionId: '',
                     externalOnly: false,
@@ -2888,6 +2892,7 @@
 
             buildProjectSnapshot(name, options = {}) {
                 const includeDrafts = Boolean(options.includeDrafts);
+                const includeDate = options.includeDate !== false;
                 const projectName = String(name || 'proyecto-exportado');
                 const safeElements = JSON.parse(JSON.stringify(this.elements, (key, value) => {
                     if (key === 'imageData') return undefined;
@@ -2898,81 +2903,107 @@
                 const elements = includeDrafts ? safeElements.concat(this.getLivePreviewDraftElements()) : safeElements;
                 return {
                     name: projectName,
-                    date: new Date().toISOString(),
+                    date: includeDate ? new Date().toISOString() : undefined,
                     elements,
                     camera: safeCamera
                 };
             }
 
+            computeBuilderPreviewSignature(payload) {
+                const cam = payload && payload.camera ? payload.camera : { x: 0, y: 0, zoom: 1 };
+                const pointerX = Number(this.lastPointerWorld && this.lastPointerWorld.x);
+                const pointerY = Number(this.lastPointerWorld && this.lastPointerWorld.y);
+                const drawingLen = this.drawingPath && Array.isArray(this.drawingPath.points) ? this.drawingPath.points.length : 0;
+                const routeLen = this.routeDraft && Array.isArray(this.routeDraft.points) ? this.routeDraft.points.length : 0;
+                return [
+                    this.projectRevision || 0,
+                    Array.isArray(payload && payload.elements) ? payload.elements.length : 0,
+                    Math.round((Number(cam.x) || 0) * 10),
+                    Math.round((Number(cam.y) || 0) * 10),
+                    Math.round((Number(cam.zoom) || 1) * 1000),
+                    this.isDragging ? 1 : 0,
+                    this.isPanning ? 1 : 0,
+                    Math.round((Number.isFinite(pointerX) ? pointerX : 0) * 10),
+                    Math.round((Number.isFinite(pointerY) ? pointerY : 0) * 10),
+                    drawingLen,
+                    routeLen,
+                    this.builderPreview && this.builderPreview.mode ? this.builderPreview.mode : 'preview'
+                ].join('|');
+            }
+
             pushBuilderPreviewUpdate(force) {
                 if (!this.builderPreview || !this.builderPreview.enabled) return;
+                if (this.builderPreview.isPushing) return;
                 const frame = document.getElementById('builder-preview-frame');
                 const frameReady = Boolean(frame && frame.contentWindow && this.builderPreview.frameReady);
                 const win = this.builderPreview.externalWindow;
                 const winReady = Boolean(win && !win.closed);
                 if (!frameReady && !winReady) return;
-
-                const payload = this.buildProjectSnapshot('builder-live-preview', { includeDrafts: true });
-                let signature = '';
+                this.builderPreview.isPushing = true;
                 try {
-                    signature = JSON.stringify(payload);
-                } catch {
-                    signature = `${Date.now()}`;
-                }
-                if (!force && signature === this.builderPreview.lastSignature) return;
-                this.builderPreview.lastSignature = signature;
+                    const payload = this.buildProjectSnapshot('builder-live-preview', { includeDrafts: true, includeDate: false });
+                    const signature = this.computeBuilderPreviewSignature(payload);
+                    if (!force && signature === this.builderPreview.lastSignature) return;
+                    this.builderPreview.lastSignature = signature;
 
-                try {
-                    safeLocalStorageSet(this.getBuilderPreviewStorageKey(), JSON.stringify({
-                        signature,
-                        at: Date.now(),
-                        project: payload
-                    }));
-                } catch {
-                    // Ignorar fallback de storage
-                }
-
-                try {
-                    const channel = this.ensureBuilderPreviewBroadcastChannel();
-                    if (channel) {
-                        channel.postMessage({
-                            type: 'flow-builder-project',
-                            signature,
-                            project: payload
-                        });
-                    }
-                } catch {
-                    // Ignorar fallback de channel
-                }
-
-                if (frameReady) {
                     try {
-                        frame.contentWindow.postMessage({
-                            type: 'flow-builder-project',
-                            project: payload
-                        }, '*');
+                        const now = Date.now();
+                        if (force || (now - (this.builderPreview.lastStorageWriteAt || 0)) >= 900) {
+                            safeLocalStorageSet(this.getBuilderPreviewStorageKey(), JSON.stringify({
+                                signature,
+                                at: now,
+                                project: payload
+                            }));
+                            this.builderPreview.lastStorageWriteAt = now;
+                        }
                     } catch {
-                        // Ignorar
+                        // Ignorar fallback de storage
                     }
-                }
 
-                if (winReady) {
                     try {
-                        win.postMessage({
-                            type: 'flow-builder-project',
-                            project: payload
-                        }, '*');
+                        const channel = this.ensureBuilderPreviewBroadcastChannel();
+                        if (channel) {
+                            channel.postMessage({
+                                type: 'flow-builder-project',
+                                signature,
+                                project: payload
+                            });
+                        }
                     } catch {
-                        // Ignorar
+                        // Ignorar fallback de channel
                     }
-                } else if (win && win.closed) {
-                    this.builderPreview.externalWindow = null;
-                    this.builderPreview.externalOnly = false;
-                    this.applyBuilderPreviewLayout();
-                    this.resizeCanvas();
-                }
 
-                this.updateBuilderPreviewStatusLine(this.formatBuilderPreviewTickLine(payload.elements.length));
+                    if (frameReady) {
+                        try {
+                            frame.contentWindow.postMessage({
+                                type: 'flow-builder-project',
+                                project: payload
+                            }, '*');
+                        } catch {
+                            // Ignorar
+                        }
+                    }
+
+                    if (winReady) {
+                        try {
+                            win.postMessage({
+                                type: 'flow-builder-project',
+                                project: payload
+                            }, '*');
+                        } catch {
+                            // Ignorar
+                        }
+                    } else if (win && win.closed) {
+                        this.builderPreview.externalWindow = null;
+                        this.builderPreview.externalOnly = false;
+                        this.applyBuilderPreviewLayout();
+                        this.resizeCanvas();
+                    }
+
+                    this.updateBuilderPreviewStatusLine(this.formatBuilderPreviewTickLine(payload.elements.length));
+                } finally {
+                    this.builderPreview.isPushing = false;
+                }
             }
 
             formatBuilderPreviewTickLine(totalElements) {
@@ -3003,15 +3034,19 @@
 
             maybePushBuilderPreviewLiveTick() {
                 if (!this.builderPreview || !this.builderPreview.enabled) return;
-                if (!this.builderPreview.frameReady) return;
+                if (!this.builderPreview.frameReady && !(this.builderPreview.externalWindow && !this.builderPreview.externalWindow.closed)) return;
                 if (!this.isPreviewInteractionActive()) return;
 
                 const now = Date.now();
                 const cfg = this.getBuilderPreviewPerfConfig();
                 const throttleMs = cfg.liveThrottleMs;
                 if ((now - (this.builderPreview.lastLivePushAt || 0)) < throttleMs) return;
+                if (this.builderPreview.liveAsyncTimer) return;
                 this.builderPreview.lastLivePushAt = now;
-                this.pushBuilderPreviewUpdate(false);
+                this.builderPreview.liveAsyncTimer = setTimeout(() => {
+                    this.builderPreview.liveAsyncTimer = null;
+                    this.pushBuilderPreviewUpdate(false);
+                }, 0);
             }
             
 	            setupContextMenu() {
@@ -8239,6 +8274,7 @@
                     this.historyIndex--;
                 }
 
+                this.projectRevision = (this.projectRevision || 0) + 1;
                 this.refreshLayersPanel();
                 this.markBuilderPreviewDirty(false);
             }
