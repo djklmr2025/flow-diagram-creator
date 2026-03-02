@@ -2221,7 +2221,8 @@
                     lastLivePushAt: 0,
                     externalWindow: null,
                     sessionId: '',
-                    externalOnly: false
+                    externalOnly: false,
+                    broadcastChannel: null
                 };
                 
                 // Módulos (permite expandir funcionalidad)
@@ -2553,7 +2554,17 @@
                     safeLocalStorageSet('builder-preview-width', String(this.builderPreview.panelWidth));
                 });
 
-                window.addEventListener('beforeunload', () => this.closeBuilderPreviewWindow(false));
+                window.addEventListener('beforeunload', () => {
+                    this.closeBuilderPreviewWindow(false);
+                    try {
+                        if (this.builderPreview && this.builderPreview.broadcastChannel) {
+                            this.builderPreview.broadcastChannel.close();
+                            this.builderPreview.broadcastChannel = null;
+                        }
+                    } catch {
+                        // Ignorar
+                    }
+                });
 
                 this.updateBuilderPreviewModeButtons();
                 this.applyBuilderPreviewLayout();
@@ -2622,6 +2633,22 @@
 
             getBuilderPreviewStorageKey() {
                 return `flow-builder-live-${this.getBuilderPreviewSessionId()}`;
+            }
+
+            getBuilderPreviewBroadcastName() {
+                return `flow-builder-live-channel-${this.getBuilderPreviewSessionId()}`;
+            }
+
+            ensureBuilderPreviewBroadcastChannel() {
+                if (typeof BroadcastChannel === 'undefined') return null;
+                if (this.builderPreview && this.builderPreview.broadcastChannel) return this.builderPreview.broadcastChannel;
+                try {
+                    const ch = new BroadcastChannel(this.getBuilderPreviewBroadcastName());
+                    this.builderPreview.broadcastChannel = ch;
+                    return ch;
+                } catch {
+                    return null;
+                }
             }
 
             openBuilderPreviewWindow() {
@@ -2903,6 +2930,19 @@
                     }));
                 } catch {
                     // Ignorar fallback de storage
+                }
+
+                try {
+                    const channel = this.ensureBuilderPreviewBroadcastChannel();
+                    if (channel) {
+                        channel.postMessage({
+                            type: 'flow-builder-project',
+                            signature,
+                            project: payload
+                        });
+                    }
+                } catch {
+                    // Ignorar fallback de channel
                 }
 
                 if (frameReady) {
@@ -11946,13 +11986,35 @@
                 pullFromStorage();
                 setInterval(pullFromStorage, 180);
             }
+
+            if (typeof BroadcastChannel !== 'undefined' && session) {
+                try {
+                    const channel = new BroadcastChannel(`flow-builder-live-channel-${session}`);
+                    channel.addEventListener('message', (evt) => {
+                        const data = evt && evt.data ? evt.data : null;
+                        if (!data || typeof data !== 'object') return;
+                        if (String(data.type || '') !== 'flow-builder-project') return;
+                        const sig = String(data.signature || '');
+                        if (sig && sig === lastSignature) return;
+                        if (sig) lastSignature = sig;
+                        applyLivePayload(data.project);
+                    });
+                } catch {
+                    // Ignorar si no hay soporte
+                }
+            }
         }
 
         // Ejecutar al cargar la página
-        window.addEventListener('load', () => {
+        const bootLiveAndModes = () => {
             applyIAmodes();
             setupBuilderLiveReceiver();
-        });
+        };
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            setTimeout(bootLiveAndModes, 0);
+        } else {
+            window.addEventListener('load', bootLiveAndModes);
+        }
     </script>
 </body>
 </html>
