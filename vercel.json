@@ -4,6 +4,8 @@
   "outputDirectory": ".",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/previewer-2.0", "destination": "/previewer-2.0/index.html" },
+    { "source": "/previewer-2.0/(.*)", "destination": "/previewer-2.0/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

@@ -2196,6 +2196,47 @@
         setBuildLabelsFromHtmlAttr();
         installGlobalErrorOverlay();
 
+        function isTruthyQueryValue(raw) {
+            const v = String(raw || '').trim().toLowerCase();
+            return v === '1' || v === 'true' || v === 'yes' || v === 'on';
+        }
+
+        function maybeRedirectToPreviewer2() {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const mode = String(params.get('mode') || '').trim().toLowerCase();
+                const isViewerMode = mode === 'preview' || mode === 'sticker' || mode === 'deck';
+                if (!isViewerMode) return false;
+
+                // Mantener visor local para split-preview vivo del builder y para debug forzado.
+                const builderLive = isTruthyQueryValue(params.get('builderLive')) || isTruthyQueryValue(params.get('builder_live'));
+                const liveOnly = isTruthyQueryValue(params.get('liveOnly'));
+                const forceLegacy =
+                    isTruthyQueryValue(params.get('legacyViewer')) ||
+                    isTruthyQueryValue(params.get('legacy')) ||
+                    isTruthyQueryValue(params.get('localViewer'));
+                if (builderLive || liveOnly || forceLegacy) return false;
+
+                const target = new URL('/previewer-2.0/index.html', window.location.origin);
+                const passKeys = ['id', 'data', 'project', 'v', 'fit', 'pad', 'bg', 'fx', 'labels', 'mode'];
+                passKeys.forEach((k) => {
+                    const val = params.get(k);
+                    if (val != null && val !== '') target.searchParams.set(k, val);
+                });
+                if (!target.searchParams.has('mode')) target.searchParams.set('mode', mode || 'preview');
+
+                if (target.toString() !== window.location.href) {
+                    window.location.replace(target.toString());
+                    return true;
+                }
+            } catch {
+                // Ignorar y seguir con boot local.
+            }
+            return false;
+        }
+
+        window.__FLOW_SKIP_BOOT__ = maybeRedirectToPreviewer2();
+
         class FlowDiagramSystem {
             constructor() {
                 this.canvas = document.getElementById('main-canvas');
@@ -12699,9 +12740,11 @@
         
         let system = null;
         try {
-            system = new FlowDiagramSystem();
-            // Exponer para debug/manual (DevTools) y para integraciones IA.
-            window.system = system;
+            if (!window.__FLOW_SKIP_BOOT__) {
+                system = new FlowDiagramSystem();
+                // Exponer para debug/manual (DevTools) y para integraciones IA.
+                window.system = system;
+            }
         } catch (err) {
             try {
                 if (window.showFatalError) window.showFatalError(err, 'boot');
@@ -12829,6 +12872,7 @@
 
         // Ejecutar al cargar la página
         const bootLiveAndModes = () => {
+            if (window.__FLOW_SKIP_BOOT__) return;
             applyIAmodes();
             setupBuilderLiveReceiver();
         };
