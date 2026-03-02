@@ -2208,6 +2208,12 @@
                 const isViewerMode = mode === 'preview' || mode === 'sticker' || mode === 'deck';
                 if (!isViewerMode) return false;
 
+                // Opt-in explicito: no redirigir por defecto.
+                const usePreviewer2 =
+                    isTruthyQueryValue(params.get('usePreviewer2')) ||
+                    String(params.get('viewer') || '').trim() === '2';
+                if (!usePreviewer2) return false;
+
                 // Mantener visor local para split-preview vivo del builder y para debug forzado.
                 const builderLive = isTruthyQueryValue(params.get('builderLive')) || isTruthyQueryValue(params.get('builder_live'));
                 const liveOnly = isTruthyQueryValue(params.get('liveOnly'));
@@ -2832,6 +2838,7 @@
                 url.searchParams.set('labels', '0');
                 url.searchParams.set('builderLive', '1');
                 url.searchParams.set('liveOnly', '1');
+                url.searchParams.set('legacyViewer', '1');
                 url.searchParams.set('liveSession', this.getBuilderPreviewSessionId());
                 url.searchParams.set('bg', 'studio');
                 url.searchParams.set('fx', '1');
