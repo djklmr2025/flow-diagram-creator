@@ -360,12 +360,133 @@
             cursor: grabbing;
         }
 
-	        #main-canvas {
-	            position: absolute;
-	            top: 0;
-	            left: 0;
-	            touch-action: none; /* Evita scroll/zoom nativo sobre el canvas (mobile) */
-	        }
+        #main-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            touch-action: none; /* Evita scroll/zoom nativo sobre el canvas (mobile) */
+        }
+
+        :root {
+            --builder-preview-width: 460px;
+        }
+
+        #builder-preview-panel {
+            position: fixed;
+            top: 52px;
+            right: 0;
+            bottom: 29px;
+            width: var(--builder-preview-width);
+            min-width: 280px;
+            max-width: 75vw;
+            background: rgba(22, 33, 62, 0.96);
+            border-left: 2px solid #0f3460;
+            box-shadow: -12px 0 24px rgba(0, 0, 0, 0.35);
+            z-index: 1400;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #builder-preview-panel.show {
+            display: flex;
+        }
+
+        #builder-preview-handle {
+            position: absolute;
+            left: -6px;
+            top: 0;
+            bottom: 0;
+            width: 12px;
+            cursor: ew-resize;
+            z-index: 2;
+            background: transparent;
+        }
+
+        #builder-preview-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 8px 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+            background: rgba(15, 52, 96, 0.35);
+        }
+
+        .builder-preview-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        #builder-preview-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #cfe8ff;
+            white-space: nowrap;
+        }
+
+        #builder-preview-modes {
+            display: flex;
+            gap: 6px;
+        }
+
+        #builder-preview-performance {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #builder-preview-performance label {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.8);
+            white-space: nowrap;
+        }
+
+        #builder-preview-performance select {
+            padding: 4px 6px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: #0f3460;
+            color: #eee;
+            font-size: 11px;
+            min-width: 84px;
+        }
+
+        .builder-preview-mode.active {
+            background: #e94560;
+            box-shadow: 0 0 10px rgba(233, 69, 96, 0.35);
+        }
+
+        #builder-preview-status {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.75);
+            padding: 6px 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        #builder-preview-frame-wrap {
+            flex: 1;
+            min-height: 0;
+            background: #0b1226;
+        }
+
+        #builder-preview-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+            background: #0b1226;
+        }
+
+        body.builder-preview-open #properties-panel {
+            right: calc(var(--builder-preview-width) + 12px);
+        }
+
+        body.builder-preview-open #zoom-indicator {
+            right: calc(var(--builder-preview-width) + 20px);
+        }
 
         #properties-panel {
             position: fixed;
@@ -1370,6 +1491,9 @@
         <button class="btn" id="btn-export" title="Exportar JSON">
             <span>⬇️</span> Exportar
         </button>
+        <button class="btn" id="btn-builder-preview" title="Split Preview en tiempo real">
+            <span>🪟</span> Split Preview
+        </button>
         <button class="btn" id="btn-publish" title="Publicar sticker vectorial (Link IA)">
             <span>🔗</span> Publicar Vector
         </button>
@@ -1422,6 +1546,32 @@
 	    <div id="canvas-container">
 	        <canvas id="main-canvas"></canvas>
 	    </div>
+
+        <div id="builder-preview-panel">
+            <div id="builder-preview-handle" title="Redimensionar preview"></div>
+            <div id="builder-preview-header">
+                <div class="builder-preview-left">
+                    <div id="builder-preview-title">Preview en vivo</div>
+                    <div id="builder-preview-modes">
+                        <button class="btn small builder-preview-mode active" id="btn-builder-preview-mode-preview" title="Modo normal">Normal</button>
+                        <button class="btn small builder-preview-mode" id="btn-builder-preview-mode-deck" title="Modo lámina">Lámina</button>
+                    </div>
+                    <div id="builder-preview-performance">
+                        <label for="builder-preview-performance-select">Rendimiento</label>
+                        <select id="builder-preview-performance-select" title="Frecuencia de actualización del preview">
+                            <option value="low">Bajo (250ms)</option>
+                            <option value="normal" selected>Normal (120ms)</option>
+                            <option value="high">Alto (60ms)</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn small" id="btn-builder-preview-close" title="Cerrar preview">Cerrar</button>
+            </div>
+            <div id="builder-preview-status">Esperando cambios del builder...</div>
+            <div id="builder-preview-frame-wrap">
+                <iframe id="builder-preview-frame" title="Builder live preview"></iframe>
+            </div>
+        </div>
 
 	    <!-- Deck Nav (Modo Lámina: columna intermedia para navegar diapositivas) -->
 	    <div id="deck-nav">
@@ -2040,6 +2190,7 @@
                 this.deckLayout = 'horizontal'; // 'horizontal' | 'vertical'
                 this.activeControlPointId = null;
                 this._deckResizing = false;
+                this._builderPreviewResizing = false;
 
                 // Publicación desde archivo
                 this.publishFileProject = null;
@@ -2055,6 +2206,19 @@
                 this.listenTimer = null;
                 this.listenLastDate = null;
                 this._renderErrorNotifiedAt = 0;
+
+                // Split preview en builder (editor + viewer lado a lado)
+                this.builderPreview = {
+                    enabled: false,
+                    mode: String(safeLocalStorageGet('builder-preview-mode', 'preview') || 'preview').toLowerCase() === 'deck' ? 'deck' : 'preview',
+                    performance: String(safeLocalStorageGet('builder-preview-performance', 'normal') || 'normal').toLowerCase(),
+                    panelWidth: 460,
+                    frameReady: false,
+                    updateTimer: null,
+                    forceNext: false,
+                    lastSignature: '',
+                    lastLivePushAt: 0
+                };
                 
                 // Módulos (permite expandir funcionalidad)
                 this.modules = {};
@@ -2081,6 +2245,7 @@
 
                 if (!safe('init.resizeCanvas', () => this.resizeCanvas(), true)) return;
                 if (!safe('init.setupEventListeners', () => this.setupEventListeners(), true)) return;
+                safe('init.setupBuilderPreview', () => this.setupBuilderPreview());
                 safe('init.setupContextMenu', () => this.setupContextMenu());
                 safe('init.setupLayersPanel', () => this.setupLayersPanel());
                 safe('init.loadFromLocalStorage', () => this.loadFromLocalStorage());
@@ -2118,6 +2283,13 @@
                 if (container && this.viewerMode !== 'deck') {
                     container.style.top = `${toolbarHeight}px`;
                     container.style.bottom = `${statusHeight}px`;
+                    container.style.right = this.builderPreview && this.builderPreview.enabled ? `${Math.round(this.builderPreview.panelWidth)}px` : '0';
+                }
+
+                const builderPreviewPanel = document.getElementById('builder-preview-panel');
+                if (builderPreviewPanel && this.builderPreview && this.builderPreview.enabled && this.viewerMode !== 'deck') {
+                    builderPreviewPanel.style.top = `${toolbarHeight}px`;
+                    builderPreviewPanel.style.bottom = `${statusHeight}px`;
                 }
 
                 if (container) {
@@ -2137,6 +2309,9 @@
                 window.addEventListener('resize', () => {
                     if (this.viewerMode === 'deck') {
                         this.applyDeckSizing();
+                    }
+                    if (this.builderPreview && this.builderPreview.enabled) {
+                        this.applyBuilderPreviewLayout();
                     }
                     this.resizeCanvas();
                 });
@@ -2222,6 +2397,10 @@
                 document.getElementById('btn-save').addEventListener('click', () => this.showSaveModal());
                 document.getElementById('btn-load').addEventListener('click', () => this.loadProject());
                 document.getElementById('btn-export').addEventListener('click', () => this.exportProject());
+                const btnBuilderPreview = document.getElementById('btn-builder-preview');
+                if (btnBuilderPreview) {
+                    btnBuilderPreview.addEventListener('click', () => this.toggleBuilderPreview());
+                }
                 document.getElementById('btn-publish').addEventListener('click', () => this.showPublishModal('vector'));
                 document.getElementById('btn-publish-sticker').addEventListener('click', () => this.showPublishModal('sticker'));
                 document.getElementById('btn-publish-project').addEventListener('click', () => this.showPublishModal('project'));
@@ -2299,6 +2478,336 @@
 	                }
 	                this.setupDeckResizer();
 	            }
+
+            setupBuilderPreview() {
+                const panel = document.getElementById('builder-preview-panel');
+                const frame = document.getElementById('builder-preview-frame');
+                const handle = document.getElementById('builder-preview-handle');
+                const btnClose = document.getElementById('btn-builder-preview-close');
+                const btnModePreview = document.getElementById('btn-builder-preview-mode-preview');
+                const btnModeDeck = document.getElementById('btn-builder-preview-mode-deck');
+                const perfSelect = document.getElementById('builder-preview-performance-select');
+
+                if (!panel || !frame) return;
+
+                const storedWidth = Number(safeLocalStorageGet('builder-preview-width', '') || '');
+                if (Number.isFinite(storedWidth) && storedWidth > 220) {
+                    this.builderPreview.panelWidth = Math.round(storedWidth);
+                }
+                this.builderPreview.panelWidth = this.clampBuilderPreviewWidth(this.builderPreview.panelWidth);
+                this.builderPreview.performance = this.normalizeBuilderPreviewPerformance(this.builderPreview.performance);
+
+                if (perfSelect) {
+                    perfSelect.value = this.builderPreview.performance;
+                    perfSelect.addEventListener('change', () => {
+                        this.setBuilderPreviewPerformance(perfSelect.value);
+                    });
+                }
+
+                frame.addEventListener('load', () => {
+                    this.builderPreview.frameReady = true;
+                    this.pushBuilderPreviewUpdate(true);
+                });
+
+                if (btnClose) {
+                    btnClose.addEventListener('click', () => this.setBuilderPreviewEnabled(false));
+                }
+                if (btnModePreview) {
+                    btnModePreview.addEventListener('click', () => this.setBuilderPreviewMode('preview'));
+                }
+                if (btnModeDeck) {
+                    btnModeDeck.addEventListener('click', () => this.setBuilderPreviewMode('deck'));
+                }
+
+                if (handle) {
+                    handle.addEventListener('mousedown', (e) => {
+                        if (!this.builderPreview.enabled || this.readOnly || this.viewerMode === 'deck') return;
+                        e.preventDefault();
+                        this._builderPreviewResizing = true;
+                        this._builderPreviewResizeStartX = e.clientX;
+                        this._builderPreviewResizeStartW = this.builderPreview.panelWidth;
+                    });
+                }
+
+                document.addEventListener('mousemove', (e) => {
+                    if (!this._builderPreviewResizing) return;
+                    const delta = this._builderPreviewResizeStartX - e.clientX;
+                    const next = this._builderPreviewResizeStartW + delta;
+                    this.builderPreview.panelWidth = this.clampBuilderPreviewWidth(next);
+                    this.applyBuilderPreviewLayout();
+                    this.resizeCanvas();
+                });
+
+                document.addEventListener('mouseup', () => {
+                    if (!this._builderPreviewResizing) return;
+                    this._builderPreviewResizing = false;
+                    safeLocalStorageSet('builder-preview-width', String(this.builderPreview.panelWidth));
+                });
+
+                this.updateBuilderPreviewModeButtons();
+                this.applyBuilderPreviewLayout();
+            }
+
+            clampBuilderPreviewWidth(raw) {
+                const value = Number(raw);
+                const min = 280;
+                const max = Math.max(min, Math.min(960, Math.floor(window.innerWidth * 0.78)));
+                if (!Number.isFinite(value)) return Math.min(460, max);
+                return Math.max(min, Math.min(max, Math.round(value)));
+            }
+
+            applyBuilderPreviewLayout() {
+                const panel = document.getElementById('builder-preview-panel');
+                if (!panel) return;
+                const width = this.clampBuilderPreviewWidth(this.builderPreview.panelWidth);
+                this.builderPreview.panelWidth = width;
+                panel.style.width = `${width}px`;
+                document.documentElement.style.setProperty('--builder-preview-width', `${width}px`);
+                panel.classList.toggle('show', Boolean(this.builderPreview.enabled && !this.readOnly && this.viewerMode !== 'deck'));
+                document.body.classList.toggle('builder-preview-open', Boolean(this.builderPreview.enabled && !this.readOnly && this.viewerMode !== 'deck'));
+                const btn = document.getElementById('btn-builder-preview');
+                if (btn) btn.classList.toggle('active', Boolean(this.builderPreview.enabled));
+            }
+
+            updateBuilderPreviewModeButtons() {
+                const isDeck = this.builderPreview.mode === 'deck';
+                const btnModePreview = document.getElementById('btn-builder-preview-mode-preview');
+                const btnModeDeck = document.getElementById('btn-builder-preview-mode-deck');
+                if (btnModePreview) btnModePreview.classList.toggle('active', !isDeck);
+                if (btnModeDeck) btnModeDeck.classList.toggle('active', isDeck);
+            }
+
+            getBuilderPreviewFrameUrl() {
+                const url = new URL(window.location.href);
+                url.search = '';
+                url.hash = '';
+                const mode = this.builderPreview.mode === 'deck' ? 'deck' : 'preview';
+                url.searchParams.set('mode', mode);
+                url.searchParams.set('fit', '1');
+                url.searchParams.set('labels', '0');
+                url.searchParams.set('builderLive', '1');
+                url.searchParams.set('bg', mode === 'deck' ? 'studio' : 'transparent');
+                return url.toString();
+            }
+
+            loadBuilderPreviewFrame() {
+                const frame = document.getElementById('builder-preview-frame');
+                if (!frame || !this.builderPreview.enabled) return;
+                this.builderPreview.frameReady = false;
+                frame.src = this.getBuilderPreviewFrameUrl();
+                const status = document.getElementById('builder-preview-status');
+                if (status) status.textContent = `Cargando modo ${this.builderPreview.mode === 'deck' ? 'Lámina' : 'Normal'}...`;
+            }
+
+            setBuilderPreviewMode(mode) {
+                const next = String(mode || '').toLowerCase() === 'deck' ? 'deck' : 'preview';
+                if (this.builderPreview.mode === next) return;
+                this.builderPreview.mode = next;
+                safeLocalStorageSet('builder-preview-mode', this.builderPreview.mode);
+                this.updateBuilderPreviewModeButtons();
+                if (this.builderPreview.enabled) {
+                    this.loadBuilderPreviewFrame();
+                }
+            }
+
+            setBuilderPreviewEnabled(enabled) {
+                const next = Boolean(enabled) && !this.readOnly && this.viewerMode !== 'deck';
+                if (this.builderPreview.enabled === next) {
+                    this.applyBuilderPreviewLayout();
+                    this.resizeCanvas();
+                    return;
+                }
+                this.builderPreview.enabled = next;
+                this.builderPreview.lastSignature = '';
+                this.applyBuilderPreviewLayout();
+                this.resizeCanvas();
+
+                if (next) {
+                    this.loadBuilderPreviewFrame();
+                    this.markBuilderPreviewDirty(true);
+                }
+            }
+
+            toggleBuilderPreview() {
+                this.setBuilderPreviewEnabled(!this.builderPreview.enabled);
+            }
+
+            markBuilderPreviewDirty(force) {
+                if (!this.builderPreview || !this.builderPreview.enabled) return;
+                if (force) this.builderPreview.forceNext = true;
+                const cfg = this.getBuilderPreviewPerfConfig();
+
+                if (this.builderPreview.updateTimer) {
+                    clearTimeout(this.builderPreview.updateTimer);
+                }
+                this.builderPreview.updateTimer = setTimeout(() => {
+                    this.builderPreview.updateTimer = null;
+                    const useForce = Boolean(this.builderPreview.forceNext);
+                    this.builderPreview.forceNext = false;
+                    this.pushBuilderPreviewUpdate(useForce);
+                }, cfg.debounceMs);
+            }
+
+            normalizeBuilderPreviewPerformance(raw) {
+                const v = String(raw || '').toLowerCase();
+                if (v === 'low' || v === 'high' || v === 'normal') return v;
+                return 'normal';
+            }
+
+            getBuilderPreviewPerfConfig() {
+                const perf = this.normalizeBuilderPreviewPerformance(this.builderPreview && this.builderPreview.performance);
+                if (perf === 'low') return { liveThrottleMs: 250, debounceMs: 300 };
+                if (perf === 'high') return { liveThrottleMs: 60, debounceMs: 90 };
+                return { liveThrottleMs: 120, debounceMs: 180 };
+            }
+
+            setBuilderPreviewPerformance(value) {
+                const next = this.normalizeBuilderPreviewPerformance(value);
+                this.builderPreview.performance = next;
+                safeLocalStorageSet('builder-preview-performance', next);
+                if (this.builderPreview.updateTimer) {
+                    clearTimeout(this.builderPreview.updateTimer);
+                    this.builderPreview.updateTimer = null;
+                }
+                this.builderPreview.lastLivePushAt = 0;
+                this.markBuilderPreviewDirty(true);
+            }
+
+            cloneElementForSnapshot(elem) {
+                if (!elem || typeof elem !== 'object') return null;
+                try {
+                    return JSON.parse(JSON.stringify(elem, (key, value) => {
+                        if (key === 'imageData') return undefined;
+                        if (key === 'videoData') return undefined;
+                        return value;
+                    }));
+                } catch {
+                    return null;
+                }
+            }
+
+            getLivePreviewDraftElements() {
+                const out = [];
+
+                if (this.tempElement && typeof this.tempElement === 'object') {
+                    const tempClone = this.cloneElementForSnapshot(this.tempElement);
+                    if (tempClone) {
+                        tempClone.id = tempClone.id || `draft-temp-${Date.now()}`;
+                        tempClone.__previewDraft = true;
+                        out.push(tempClone);
+                    }
+                }
+
+                if (this.drawingPath && Array.isArray(this.drawingPath.points) && this.drawingPath.points.length > 0) {
+                    const draftPath = {
+                        id: `draft-drawing-${Date.now()}`,
+                        type: this.drawingPath.closed ? 'polygon' : 'path',
+                        points: this.drawingPath.points.map((p) => ({ x: Number(p.x) || 0, y: Number(p.y) || 0 })),
+                        lineWidth: Number(this.drawingPath.lineWidth) || 3,
+                        strokeColor: String(this.drawingPath.strokeColor || '#00d4ff'),
+                        fillColor: this.drawingPath.closed ? String(this.drawingPath.fillColor || '#0f3460') : 'transparent',
+                        closed: Boolean(this.drawingPath.closed),
+                        active: true,
+                        __previewDraft: true
+                    };
+                    out.push(draftPath);
+                }
+
+                if (this.routeDraft && Array.isArray(this.routeDraft.points) && this.routeDraft.points.length > 0) {
+                    const pts = this.routeDraft.points.map((p) => ({ x: Number(p.x) || 0, y: Number(p.y) || 0 }));
+                    if (this.routeDraft.preview && Number.isFinite(this.routeDraft.preview.x) && Number.isFinite(this.routeDraft.preview.y)) {
+                        pts.push({ x: Number(this.routeDraft.preview.x), y: Number(this.routeDraft.preview.y) });
+                    }
+                    if (pts.length >= 2) {
+                        out.push({
+                            id: `draft-route-${Date.now()}`,
+                            type: 'path',
+                            points: pts,
+                            lineWidth: Number(this.routeDraft.lineWidth) || 5,
+                            strokeColor: String(this.routeDraft.strokeColor || '#00d4ff'),
+                            fillColor: 'transparent',
+                            closed: false,
+                            active: true,
+                            routeRole: true,
+                            __previewDraft: true
+                        });
+                    }
+                }
+
+                return out;
+            }
+
+            buildProjectSnapshot(name, options = {}) {
+                const includeDrafts = Boolean(options.includeDrafts);
+                const projectName = String(name || 'proyecto-exportado');
+                const safeElements = JSON.parse(JSON.stringify(this.elements, (key, value) => {
+                    if (key === 'imageData') return undefined;
+                    if (key === 'videoData') return undefined;
+                    return value;
+                }));
+                const safeCamera = JSON.parse(JSON.stringify(this.camera || { x: 0, y: 0, zoom: 1 }));
+                const elements = includeDrafts ? safeElements.concat(this.getLivePreviewDraftElements()) : safeElements;
+                return {
+                    name: projectName,
+                    date: new Date().toISOString(),
+                    elements,
+                    camera: safeCamera
+                };
+            }
+
+            pushBuilderPreviewUpdate(force) {
+                if (!this.builderPreview || !this.builderPreview.enabled) return;
+                const frame = document.getElementById('builder-preview-frame');
+                if (!frame || !frame.contentWindow) return;
+                if (!this.builderPreview.frameReady) return;
+
+                const payload = this.buildProjectSnapshot('builder-live-preview', { includeDrafts: true });
+                let signature = '';
+                try {
+                    signature = JSON.stringify(payload);
+                } catch {
+                    signature = `${Date.now()}`;
+                }
+                if (!force && signature === this.builderPreview.lastSignature) return;
+                this.builderPreview.lastSignature = signature;
+
+                frame.contentWindow.postMessage({
+                    type: 'flow-builder-project',
+                    project: payload
+                }, '*');
+
+                const status = document.getElementById('builder-preview-status');
+                if (status) {
+                    const now = new Date();
+                    const hh = String(now.getHours()).padStart(2, '0');
+                    const mm = String(now.getMinutes()).padStart(2, '0');
+                    const ss = String(now.getSeconds()).padStart(2, '0');
+                    status.textContent = `Actualizado ${hh}:${mm}:${ss} | ${payload.elements.length} elementos`;
+                }
+            }
+
+            isPreviewInteractionActive() {
+                if (this.isDragging) return true;
+                if (this.isPanning) return true;
+                if (this.tempElement) return true;
+                if (this.drawingPath) return true;
+                if (this.routeDraft) return true;
+                if (this.selectionBox) return true;
+                return false;
+            }
+
+            maybePushBuilderPreviewLiveTick() {
+                if (!this.builderPreview || !this.builderPreview.enabled) return;
+                if (!this.builderPreview.frameReady) return;
+                if (!this.isPreviewInteractionActive()) return;
+
+                const now = Date.now();
+                const cfg = this.getBuilderPreviewPerfConfig();
+                const throttleMs = cfg.liveThrottleMs;
+                if ((now - (this.builderPreview.lastLivePushAt || 0)) < throttleMs) return;
+                this.builderPreview.lastLivePushAt = now;
+                this.pushBuilderPreviewUpdate(false);
+            }
             
 	            setupContextMenu() {
 	                document.getElementById('ctx-bring-to-front').addEventListener('click', () => {
@@ -2619,6 +3128,7 @@
 
                 this.setLayersPanelOpen(this.layersPanelOpen, { persist: false });
                 this.refreshLayersPanel();
+                this.markBuilderPreviewDirty(false);
             }
 
             setLayersPanelOpen(open, options) {
@@ -6042,6 +6552,7 @@
                 }
                 
                 this.ctx.restore();
+                this.maybePushBuilderPreviewLiveTick();
             }
             
             drawGrid() {
@@ -7524,6 +8035,7 @@
                 }
 
                 this.refreshLayersPanel();
+                this.markBuilderPreviewDirty(false);
             }
 
             scheduleNudgeHistorySave() {
@@ -7547,6 +8059,7 @@
 	                    this.updateStatusBar();
 	                    this.refreshDeckUI();
 	                    this.refreshLayersPanel();
+                        this.markBuilderPreviewDirty(true);
 	                }
 	            }
             
@@ -7563,20 +8076,7 @@
             
 	            saveProject() {
 	                const name = document.getElementById('project-name').value || 'proyecto-sin-nombre';
-
-	                const safeElements = JSON.parse(JSON.stringify(this.elements, (key, value) => {
-	                    if (key === 'imageData') return undefined;
-	                    if (key === 'videoData') return undefined;
-	                    return value;
-	                }));
-	                const safeCamera = JSON.parse(JSON.stringify(this.camera || { x: 0, y: 0, zoom: 1 }));
-	                
-	                const projectData = {
-	                    name: name,
-	                    date: new Date().toISOString(),
-	                    elements: safeElements,
-	                    camera: safeCamera
-	                };
+	                const projectData = this.buildProjectSnapshot(name);
 	                
 	                // Guardar en localStorage (tolerante a storage bloqueado o datos corruptos)
 	                const parsed = safeLocalStorageGetJSON('flow-diagrams', []);
@@ -10489,12 +10989,7 @@
             }
             
 	            exportProject() {
-	                const projectData = {
-	                    name: 'proyecto-exportado',
-	                    date: new Date().toISOString(),
-	                    elements: this.elements,
-	                    camera: this.camera
-	                };
+	                const projectData = this.buildProjectSnapshot('proyecto-exportado');
 	                
 	                const blob = new Blob([JSON.stringify(projectData, (key, value) => {
 	                    if (key === 'imageData') return undefined;
@@ -11221,8 +11716,38 @@
             system.applyViewerModeFromUrl();
         }
 
+        function setupBuilderLiveReceiver() {
+            if (!system) return;
+            const params = new URLSearchParams(window.location.search);
+            const raw = String(params.get('builderLive') || params.get('builder_live') || '').trim().toLowerCase();
+            const enabled = raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+            if (!enabled) return;
+
+            window.addEventListener('message', (event) => {
+                const data = event && event.data ? event.data : null;
+                if (!data || typeof data !== 'object') return;
+                if (String(data.type || '') !== 'flow-builder-project') return;
+                if (!data.project) return;
+                try {
+                    system.applyLoadedProject(data.project, {
+                        source: 'builder-live',
+                        isDeck: system.viewerMode === 'deck',
+                        requireElements: false
+                    });
+                    if (system.viewerMode === 'deck') {
+                        system.refreshDeckUI();
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Error al aplicar builder-live:', error);
+                }
+            });
+        }
+
         // Ejecutar al cargar la página
-        window.addEventListener('load', applyIAmodes);
+        window.addEventListener('load', () => {
+            applyIAmodes();
+            setupBuilderLiveReceiver();
+        });
     </script>
 </body>
 </html>
