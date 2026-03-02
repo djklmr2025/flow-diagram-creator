@@ -1521,6 +1521,7 @@
         <input type="file" id="library-upload-input" accept=".json">
         <input type="file" id="image-input" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp">
         <input type="file" id="video-input" accept="video/mp4,video/webm,video/ogg">
+        <input type="file" id="texture-input" accept="image/png,image/jpeg,image/jpg,image/webp,image/bmp">
     </div>
 
     <!-- Panel Objetos (Capas) -->
@@ -1674,6 +1675,21 @@
 			                <input type="range" id="prop-fill-gradient-angle" min="0" max="360" step="15" value="90">
 			                <div id="prop-fill-gradient-angle-value" style="margin-top: 4px; font-size: 12px; color: #aaa;">90°</div>
 			            </div>
+                        <label class="property-checkbox" style="margin-top: 8px;">
+                            <input type="checkbox" id="prop-fill-texture-enabled"> Incrustar textura
+                        </label>
+                        <div id="prop-fill-texture-controls" style="display:none; margin-top: 8px;">
+                            <div class="modal-buttons" style="justify-content:flex-start;">
+                                <button class="btn small" id="btn-fill-texture-pick" type="button" title="Seleccionar imagen de textura">Cargar textura</button>
+                                <button class="btn small" id="btn-fill-texture-clear" type="button" title="Quitar textura actual">Quitar</button>
+                            </div>
+                            <div id="prop-fill-texture-name" style="margin-top:4px; font-size:12px; color:#aaa;">Sin textura</div>
+                            <label style="margin-top:8px;">Zoom de textura:</label>
+                            <div class="property-range-row">
+                                <input type="range" id="prop-fill-texture-scale" min="10" max="400" step="5" value="100">
+                                <span id="prop-fill-texture-scale-value">100%</span>
+                            </div>
+                        </div>
 			        </div>
 	        <div class="property-group">
 	            <label>Color de Borde:</label>
@@ -2163,6 +2179,8 @@
                 this.contextMenuElement = null;
                 this.loadedImages = {}; // Cache de imágenes cargadas
                 this.loadedVideos = {}; // Cache de videos cargados (HTMLVideoElement)
+                this.loadedTextures = {}; // Cache de texturas incrustadas (fillTexture)
+                this.pendingFillTextureSpec = null;
                 this.autoClosePathDistance = 15; // Distancia para auto-cerrar paths
                 // Touch (mobile)
                 this.touches = [];
@@ -2452,6 +2470,7 @@
                 document.getElementById('library-upload-input').addEventListener('change', (e) => this.onLibraryUploadSelected(e));
                 document.getElementById('image-input').addEventListener('change', (e) => this.loadImageFile(e));
                 document.getElementById('video-input').addEventListener('change', (e) => this.loadVideoFile(e));
+                document.getElementById('texture-input').addEventListener('change', (e) => this.onTextureFileSelected(e));
 
                 // Deck (lámina informativa)
 	                const deckList = document.getElementById('deck-control-points');
@@ -3179,6 +3198,8 @@
 		                    'prop-slide-image-url',
 		                    'prop-slide-video-url',
 		                    'prop-fill-color',
+                            'prop-fill-texture-enabled',
+                            'prop-fill-texture-scale',
 		                    'prop-stroke-color',
 		                    'prop-anim-color',
 	                    'prop-flow-direction',
@@ -3211,6 +3232,12 @@
 		                const fgB = document.getElementById('prop-fill-gradient-b');
 		                const fgAngle = document.getElementById('prop-fill-gradient-angle');
 		                const fgAngleValue = document.getElementById('prop-fill-gradient-angle-value');
+                        const texEnabled = document.getElementById('prop-fill-texture-enabled');
+                        const texControls = document.getElementById('prop-fill-texture-controls');
+                        const texScale = document.getElementById('prop-fill-texture-scale');
+                        const texScaleValue = document.getElementById('prop-fill-texture-scale-value');
+                        const texPick = document.getElementById('btn-fill-texture-pick');
+                        const texClear = document.getElementById('btn-fill-texture-clear');
 
 		                const syncFillGradientUI = () => {
 		                    const on = Boolean(fgEnabled && fgEnabled.checked);
@@ -3219,11 +3246,19 @@
 		                        const v = String(fgAngle.value || '0');
 		                        fgAngleValue.textContent = `${v}°`;
 		                    }
+                            const ton = Boolean(texEnabled && texEnabled.checked);
+                            if (texControls) texControls.style.display = ton ? 'block' : 'none';
+                            if (texScale && texScaleValue) {
+                                const sv = Number.parseInt(String(texScale.value || '100'), 10);
+                                const safeSv = Number.isFinite(sv) ? Math.max(10, Math.min(400, sv)) : 100;
+                                texScaleValue.textContent = `${safeSv}%`;
+                            }
 		                };
 
 		                if (fillCb) {
 		                    fillCb.addEventListener('change', () => {
 		                        if (fillCb.checked && fgEnabled) fgEnabled.checked = false;
+                                if (fillCb.checked && texEnabled) texEnabled.checked = false;
 		                        syncFillGradientUI();
 		                        this.updateSelectedProperties();
 		                    });
@@ -3232,10 +3267,33 @@
 		                if (fgEnabled) {
 		                    fgEnabled.addEventListener('change', () => {
 		                        if (fgEnabled.checked && fillCb) fillCb.checked = false;
+                                if (fgEnabled.checked && texEnabled) texEnabled.checked = false;
 		                        syncFillGradientUI();
 		                        this.updateSelectedProperties();
 		                    });
 		                }
+                        if (texEnabled) {
+                            texEnabled.addEventListener('change', () => {
+                                if (texEnabled.checked && fillCb) fillCb.checked = false;
+                                if (texEnabled.checked && fgEnabled) fgEnabled.checked = false;
+                                syncFillGradientUI();
+                                this.updateSelectedProperties();
+                            });
+                        }
+                        if (texScale) {
+                            const onTexScale = () => {
+                                syncFillGradientUI();
+                                this.updateSelectedProperties();
+                            };
+                            texScale.addEventListener('input', onTexScale);
+                            texScale.addEventListener('change', onTexScale);
+                        }
+                        if (texPick) {
+                            texPick.addEventListener('click', () => this.pickFillTextureFile());
+                        }
+                        if (texClear) {
+                            texClear.addEventListener('click', () => this.clearSelectedFillTexture());
+                        }
 
 		                if (fgA) fgA.addEventListener('change', () => this.updateSelectedProperties());
 		                if (fgB) fgB.addEventListener('change', () => this.updateSelectedProperties());
@@ -4694,6 +4752,68 @@
                 };
                 reader.readAsDataURL(file);
                 e.target.value = '';
+            }
+
+            pickFillTextureFile() {
+                if (this.readOnly) return;
+                const input = document.getElementById('texture-input');
+                if (input) input.click();
+            }
+
+            onTextureFileSelected(e) {
+                const file = e && e.target && e.target.files ? e.target.files[0] : null;
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const dataUrl = String(event && event.target && event.target.result ? event.target.result : '');
+                    if (!dataUrl || !dataUrl.startsWith('data:image/')) return;
+
+                    const scaleInput = document.getElementById('prop-fill-texture-scale');
+                    const rawScale = scaleInput ? Number.parseInt(String(scaleInput.value || '100'), 10) : 100;
+                    const safeScale = Number.isFinite(rawScale) ? Math.max(10, Math.min(400, rawScale)) / 100 : 1;
+
+                    this.pendingFillTextureSpec = {
+                        dataUrl,
+                        scale: safeScale,
+                        name: file.name || 'textura'
+                    };
+
+                    const texEnabled = document.getElementById('prop-fill-texture-enabled');
+                    const fillCb = document.getElementById('prop-fill-transparent');
+                    const gradEnabled = document.getElementById('prop-fill-gradient-enabled');
+                    if (texEnabled) texEnabled.checked = true;
+                    if (fillCb) fillCb.checked = false;
+                    if (gradEnabled) gradEnabled.checked = false;
+
+                    if (this.selectedElements && this.selectedElements.length > 0) {
+                        this.updateSelectedProperties();
+                        this.updatePropertiesPanel();
+                    } else {
+                        const nameEl = document.getElementById('prop-fill-texture-name');
+                        if (nameEl) nameEl.textContent = `Textura lista: ${file.name}`;
+                    }
+                };
+                reader.readAsDataURL(file);
+                if (e && e.target) e.target.value = '';
+            }
+
+            clearSelectedFillTexture() {
+                this.pendingFillTextureSpec = null;
+                const texEnabled = document.getElementById('prop-fill-texture-enabled');
+                if (texEnabled) texEnabled.checked = false;
+                if (!this.selectedElements || this.selectedElements.length === 0) {
+                    const nameEl = document.getElementById('prop-fill-texture-name');
+                    if (nameEl) nameEl.textContent = 'Sin textura';
+                    return;
+                }
+                this.selectedElements.forEach((elem) => {
+                    if (!elem || typeof elem !== 'object') return;
+                    try { delete elem.fillTexture; } catch {}
+                });
+                this.saveHistory();
+                this.updatePropertiesPanel();
+                this.updateStatusBar();
             }
 
             // ==================== INSERCIÓN DE VIDEO ====================
@@ -7616,14 +7736,19 @@
                             this.restoreElementBoxTransform(didTransform);
 	                    } else if (elem.type === 'rectangle') {
 		                    const didTransform = this.applyElementBoxTransformToContext(elem);
-		                    const fillColor = this.normalizeCanvasColor(elem.fillColor);
-		                    const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
-		                    const doFill = !this.isTransparentColor(fillColor);
-		                    const doStroke = !this.isTransparentColor(strokeColor);
-		                    const fg = this.normalizeFillGradientSpec(elem.fillGradient);
+	                    const fillColor = this.normalizeCanvasColor(elem.fillColor);
+	                    const strokeColor = this.normalizeCanvasColor(elem.strokeColor);
+	                    const doFill = !this.isTransparentColor(fillColor);
+	                    const doStroke = !this.isTransparentColor(strokeColor);
+	                    const fg = this.normalizeFillGradientSpec(elem.fillGradient);
+                        const ft = this.normalizeFillTextureSpec(elem.fillTexture);
+                        const texturePattern = ft ? this.createTexturePatternForElement(elem, ft) : null;
 
 	                    this.ctx.lineWidth = this.getElementLineWidth(elem) / this.camera.zoom;
-	                    if (fg) {
+                        if (texturePattern) {
+                            this.ctx.fillStyle = texturePattern;
+                            this.ctx.fillRect(elem.x, elem.y, elem.width, elem.height);
+                        } else if (fg) {
 	                        const bounds = { minX: elem.x, minY: elem.y, maxX: elem.x + elem.width, maxY: elem.y + elem.height };
 	                        const grad = this.createLinearGradientForBounds(bounds, fg.angle, fg.a, fg.b);
 	                        if (grad) {
@@ -7658,11 +7783,16 @@
 	                    const doFill = !this.isTransparentColor(fillColor);
 	                    const doStroke = !this.isTransparentColor(strokeColor);
 	                    const fg = this.normalizeFillGradientSpec(elem.fillGradient);
+                        const ft = this.normalizeFillTextureSpec(elem.fillTexture);
+                        const texturePattern = ft ? this.createTexturePatternForElement(elem, ft) : null;
 	                    this.ctx.lineWidth = this.getElementLineWidth(elem) / this.camera.zoom;
 	                    
 	                    this.ctx.beginPath();
 	                    this.ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
-	                    if (fg) {
+                        if (texturePattern) {
+                            this.ctx.fillStyle = texturePattern;
+                            this.ctx.fill();
+                        } else if (fg) {
 	                        const bounds = { minX: elem.x, minY: elem.y, maxX: elem.x + elem.width, maxY: elem.y + elem.height };
 	                        const grad = this.createLinearGradientForBounds(bounds, fg.angle, fg.a, fg.b);
 	                        if (grad) {
@@ -7760,6 +7890,8 @@
 	                        const doStroke = !this.isTransparentColor(strokeColor);
 	                        const doFill = !this.isTransparentColor(fillColor);
 	                        const fg = this.normalizeFillGradientSpec(elem.fillGradient);
+                            const ft = this.normalizeFillTextureSpec(elem.fillTexture);
+                            const texturePattern = ft ? this.createTexturePatternForElement(elem, ft) : null;
 
 	                        this.ctx.strokeStyle = strokeColor;
 	                        this.ctx.lineWidth = this.getElementLineWidth(elem) / this.camera.zoom;
@@ -7776,7 +7908,10 @@
 	                        // Si es polígono cerrado, cerrar y rellenar
 	                        if (elem.type === 'polygon' || elem.closed) {
 	                            this.ctx.closePath();
-	                            if (fg) {
+                                if (texturePattern) {
+                                    this.ctx.fillStyle = texturePattern;
+                                    this.ctx.fill();
+                                } else if (fg) {
 	                                const bounds = this.getElementBounds(elem);
 	                                const grad = bounds ? this.createLinearGradientForBounds(bounds, fg.angle, fg.a, fg.b) : null;
 	                                if (grad) {
@@ -9368,6 +9503,16 @@
 	                    } else if (elem.fillGradient != null) {
 	                        try { delete elem.fillGradient; } catch {}
 	                    }
+                        if (this.elementSupportsFillTexture(elem)) {
+                            const ft = this.normalizeFillTextureSpec(elem.fillTexture);
+                            if (ft) {
+                                elem.fillTexture = ft;
+                            } else if (elem.fillTexture != null) {
+                                try { delete elem.fillTexture; } catch {}
+                            }
+                        } else if (elem.fillTexture != null) {
+                            try { delete elem.fillTexture; } catch {}
+                        }
 
 	                    if (typeof elem.name !== 'string') elem.name = '';
 	                    if (typeof elem.locked !== 'boolean') elem.locked = false;
@@ -11389,13 +11534,21 @@
 	                    const fgB = document.getElementById('prop-fill-gradient-b');
 	                    const fgAngle = document.getElementById('prop-fill-gradient-angle');
 	                    const fgAngleValue = document.getElementById('prop-fill-gradient-angle-value');
+                        const texEnabled = document.getElementById('prop-fill-texture-enabled');
+                        const texControls = document.getElementById('prop-fill-texture-controls');
+                        const texScale = document.getElementById('prop-fill-texture-scale');
+                        const texScaleValue = document.getElementById('prop-fill-texture-scale-value');
+                        const texName = document.getElementById('prop-fill-texture-name');
 
 	                    const supportsGradient = this.elementSupportsFillGradient(elem);
 	                    const fg = supportsGradient ? this.normalizeFillGradientSpec(elem.fillGradient) : null;
 	                    const gradientOn = Boolean(fg && !fillTransparent);
+                        const supportsTexture = this.elementSupportsFillTexture(elem);
+                        const tex = supportsTexture ? this.normalizeFillTextureSpec(elem.fillTexture) : null;
+                        const textureOn = Boolean(tex && !fillTransparent);
 
 	                    if (fgEnabled) {
-	                        fgEnabled.disabled = !supportsGradient || fillTransparent;
+	                        fgEnabled.disabled = !supportsGradient || fillTransparent || textureOn;
 	                        fgEnabled.checked = gradientOn;
 	                    }
 	                    if (fgControls) {
@@ -11405,6 +11558,21 @@
 	                    if (fg && fgB && this.isHexColor(fg.b)) fgB.value = fg.b;
 	                    if (fg && fgAngle) fgAngle.value = String(fg.angle);
 	                    if (fgAngle && fgAngleValue) fgAngleValue.textContent = `${String(fgAngle.value || '0')}°`;
+                        if (texEnabled) {
+                            texEnabled.disabled = !supportsTexture || fillTransparent || gradientOn;
+                            texEnabled.checked = textureOn;
+                        }
+                        if (texControls) texControls.style.display = (texEnabled && texEnabled.checked) ? 'block' : 'none';
+                        if (texScale) {
+                            const scalePct = tex ? Math.max(10, Math.min(400, Math.round((Number(tex.scale) || 1) * 100))) : 100;
+                            texScale.value = String(scalePct);
+                            if (texScaleValue) texScaleValue.textContent = `${scalePct}%`;
+                        } else if (texScaleValue) {
+                            texScaleValue.textContent = '100%';
+                        }
+                        if (texName) {
+                            texName.textContent = tex ? `Textura: ${tex.name || 'incrustada'}` : 'Sin textura';
+                        }
 
 	                    const lwGroup = document.getElementById('prop-line-width-group');
 	                    const lw = document.getElementById('prop-line-width');
@@ -11583,6 +11751,8 @@
 		                const fgAEl = document.getElementById('prop-fill-gradient-a');
 		                const fgBEl = document.getElementById('prop-fill-gradient-b');
 		                const fgAngleEl = document.getElementById('prop-fill-gradient-angle');
+                        const texEnabledEl = document.getElementById('prop-fill-texture-enabled');
+                        const texScaleEl = document.getElementById('prop-fill-texture-scale');
 		                const conn = document.getElementById('prop-connection-status').value;
 	                const active = document.getElementById('prop-active').value === 'true';
 
@@ -11596,6 +11766,9 @@
 	                        angle: fgAngleEl ? fgAngleEl.value : 0
 	                    })
 	                    : null;
+                    const fillTextureEnabled = Boolean(texEnabledEl && texEnabledEl.checked);
+                    const textureScaleRaw = texScaleEl ? Number.parseInt(String(texScaleEl.value || '100'), 10) : 100;
+                    const textureScale = Number.isFinite(textureScaleRaw) ? Math.max(10, Math.min(400, textureScaleRaw)) / 100 : 1;
 
 	                const lw = document.getElementById('prop-line-width');
 	                const lwValue = lw ? Number.parseInt(String(lw.value || ''), 10) : NaN;
@@ -11625,16 +11798,31 @@
 		                    if (!elem || typeof elem !== 'object') return;
 		                    elem.name = name;
 
-		                    if (fillTransparent) {
+	                    if (fillTransparent) {
 	                        elem.fillColor = 'transparent';
 	                        try { delete elem.fillGradient; } catch {}
+                            try { delete elem.fillTexture; } catch {}
 	                    } else if (fillPicker && typeof fillPicker.value === 'string') {
 	                        elem.fillColor = fillPicker.value;
-	                        if (fillGradientSpec && this.elementSupportsFillGradient(elem)) {
-	                            elem.fillGradient = fillGradientSpec;
-	                        } else {
-	                            try { delete elem.fillGradient; } catch {}
-	                        }
+                            if (fillTextureEnabled && this.elementSupportsFillTexture(elem)) {
+                                const currentTexture = this.normalizeFillTextureSpec(elem.fillTexture);
+                                const pendingTexture = this.normalizeFillTextureSpec(this.pendingFillTextureSpec);
+                                const sourceTexture = pendingTexture || currentTexture;
+                                if (sourceTexture) {
+                                    elem.fillTexture = {
+                                        dataUrl: sourceTexture.dataUrl,
+                                        scale: textureScale,
+                                        name: sourceTexture.name || 'textura'
+                                    };
+                                }
+                                try { delete elem.fillGradient; } catch {}
+                            } else if (fillGradientSpec && this.elementSupportsFillGradient(elem)) {
+                                elem.fillGradient = fillGradientSpec;
+                                try { delete elem.fillTexture; } catch {}
+                            } else {
+                                try { delete elem.fillGradient; } catch {}
+                                try { delete elem.fillTexture; } catch {}
+                            }
 	                    }
 
 	                    if (strokeTransparent) {
@@ -11733,6 +11921,11 @@
 	                        }
 	                    }
 	                });
+                    this.pendingFillTextureSpec = null;
+                    this.projectRevision = (this.projectRevision || 0) + 1;
+                    this.markBuilderPreviewDirty(true);
+                    this.updateStatusBar();
+                    this.refreshDeckUI();
 	            }
 
             isTransparentColor(value) {
@@ -11822,6 +12015,83 @@
                 return grad;
             }
 
+            elementSupportsFillTexture(elem) {
+                if (!elem || typeof elem !== 'object') return false;
+                const t = String(elem.type || '');
+                return t === 'rectangle' || t === 'circle' || t === 'polygon' || t === 'path';
+            }
+
+            normalizeFillTextureSpec(spec) {
+                if (!spec || typeof spec !== 'object' || Array.isArray(spec)) return null;
+                const raw = String(spec.dataUrl || spec.src || spec.image || '').trim();
+                if (!raw) return null;
+                const isData = raw.startsWith('data:image/');
+                const isRemote = /^https?:\/\//i.test(raw);
+                if (!isData && !isRemote) return null;
+
+                const scaleRaw = Number(spec.scale != null ? spec.scale : 1);
+                const scale = Number.isFinite(scaleRaw) ? Math.max(0.1, Math.min(6, scaleRaw)) : 1;
+                const name = String(spec.name || '').trim();
+                return {
+                    dataUrl: raw,
+                    scale,
+                    name: name || 'textura'
+                };
+            }
+
+            getTextureImageForSpec(spec) {
+                const normalized = this.normalizeFillTextureSpec(spec);
+                if (!normalized) return null;
+                const key = normalized.dataUrl;
+                if (!this.loadedTextures || typeof this.loadedTextures !== 'object') this.loadedTextures = {};
+
+                const cached = this.loadedTextures[key];
+                if (cached && cached.img && cached.status === 'ready' && cached.img.complete) {
+                    return cached.img;
+                }
+                if (cached && cached.status === 'loading') return null;
+
+                try {
+                    const img = new Image();
+                    img.decoding = 'async';
+                    this.loadedTextures[key] = { status: 'loading', img };
+                    img.onload = () => {
+                        this.loadedTextures[key] = { status: 'ready', img };
+                    };
+                    img.onerror = () => {
+                        this.loadedTextures[key] = { status: 'error', img: null };
+                    };
+                    img.src = normalized.dataUrl;
+                } catch {
+                    this.loadedTextures[key] = { status: 'error', img: null };
+                }
+                return null;
+            }
+
+            createTexturePatternForElement(elem, textureSpec) {
+                if (!this.ctx) return null;
+                const tex = this.normalizeFillTextureSpec(textureSpec);
+                if (!tex) return null;
+                const img = this.getTextureImageForSpec(tex);
+                if (!img) return null;
+
+                const pattern = this.ctx.createPattern(img, 'repeat');
+                if (!pattern) return null;
+
+                if (typeof pattern.setTransform === 'function' && typeof DOMMatrix !== 'undefined') {
+                    const b = this.getElementBounds(elem) || { minX: Number(elem.x) || 0, minY: Number(elem.y) || 0 };
+                    try {
+                        const m = new DOMMatrix();
+                        m.translateSelf(Number(b.minX) || 0, Number(b.minY) || 0);
+                        m.scaleSelf(tex.scale, tex.scale);
+                        pattern.setTransform(m);
+                    } catch {
+                        // Si falla setTransform, usar patrón por defecto.
+                    }
+                }
+                return pattern;
+            }
+
             applyBucketFillToElement(elem) {
                 if (!elem || typeof elem !== 'object') return;
 
@@ -11832,6 +12102,8 @@
                 const fgAEl = document.getElementById('prop-fill-gradient-a');
                 const fgBEl = document.getElementById('prop-fill-gradient-b');
                 const fgAngleEl = document.getElementById('prop-fill-gradient-angle');
+                const texEnabledEl = document.getElementById('prop-fill-texture-enabled');
+                const texScaleEl = document.getElementById('prop-fill-texture-scale');
 
                 const fillTransparent = Boolean(fillCb && fillCb.checked);
 
@@ -11846,6 +12118,10 @@
                         angle: fgAngleEl ? fgAngleEl.value : 90
                     })
                     : null;
+                const fillTextureEnabled = Boolean(texEnabledEl && texEnabledEl.checked);
+                const fillTextureScaleRaw = texScaleEl ? Number.parseInt(String(texScaleEl.value || '100'), 10) : 100;
+                const fillTextureScale = Number.isFinite(fillTextureScaleRaw) ? Math.max(10, Math.min(400, fillTextureScaleRaw)) / 100 : 1;
+                const pendingTex = this.normalizeFillTextureSpec(this.pendingFillTextureSpec);
 
                 const applyTo = (target) => {
                     if (!target || typeof target !== 'object') return;
@@ -11863,14 +12139,28 @@
                     if (fillTransparent) {
                         target.fillColor = 'transparent';
                         try { delete target.fillGradient; } catch {}
+                        try { delete target.fillTexture; } catch {}
                         return;
                     }
 
                     target.fillColor = fillColorValue;
-                    if (fillGradientSpec && this.elementSupportsFillGradient(target)) {
+                    if (fillTextureEnabled && this.elementSupportsFillTexture(target)) {
+                        const currentTex = this.normalizeFillTextureSpec(target.fillTexture);
+                        const sourceTex = pendingTex || currentTex;
+                        if (sourceTex) {
+                            target.fillTexture = {
+                                dataUrl: sourceTex.dataUrl,
+                                scale: fillTextureScale,
+                                name: sourceTex.name || 'textura'
+                            };
+                        }
+                        try { delete target.fillGradient; } catch {}
+                    } else if (fillGradientSpec && this.elementSupportsFillGradient(target)) {
                         target.fillGradient = fillGradientSpec;
+                        try { delete target.fillTexture; } catch {}
                     } else {
                         try { delete target.fillGradient; } catch {}
+                        try { delete target.fillTexture; } catch {}
                     }
                 };
 
