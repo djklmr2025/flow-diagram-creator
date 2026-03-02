@@ -2220,7 +2220,8 @@
                     lastSignature: '',
                     lastLivePushAt: 0,
                     externalWindow: null,
-                    sessionId: ''
+                    sessionId: '',
+                    externalOnly: false
                 };
                 
                 // Módulos (permite expandir funcionalidad)
@@ -2286,7 +2287,8 @@
                 if (container && this.viewerMode !== 'deck') {
                     container.style.top = `${toolbarHeight}px`;
                     container.style.bottom = `${statusHeight}px`;
-                    container.style.right = this.builderPreview && this.builderPreview.enabled ? `${Math.round(this.builderPreview.panelWidth)}px` : '0';
+                    const reserveRightSpace = Boolean(this.builderPreview && this.builderPreview.enabled && !this.builderPreview.externalOnly);
+                    container.style.right = reserveRightSpace ? `${Math.round(this.builderPreview.panelWidth)}px` : '0';
                 }
 
                 const builderPreviewPanel = document.getElementById('builder-preview-panel');
@@ -2572,8 +2574,9 @@
                 this.builderPreview.panelWidth = width;
                 panel.style.width = `${width}px`;
                 document.documentElement.style.setProperty('--builder-preview-width', `${width}px`);
-                panel.classList.toggle('show', Boolean(this.builderPreview.enabled && !this.readOnly && this.viewerMode !== 'deck'));
-                document.body.classList.toggle('builder-preview-open', Boolean(this.builderPreview.enabled && !this.readOnly && this.viewerMode !== 'deck'));
+                const showDockedPanel = Boolean(this.builderPreview.enabled && !this.readOnly && this.viewerMode !== 'deck' && !this.builderPreview.externalOnly);
+                panel.classList.toggle('show', showDockedPanel);
+                document.body.classList.toggle('builder-preview-open', showDockedPanel);
                 const btn = document.getElementById('btn-builder-preview');
                 if (btn) btn.classList.toggle('active', Boolean(this.builderPreview.enabled));
             }
@@ -2596,7 +2599,8 @@
                 url.searchParams.set('labels', '0');
                 url.searchParams.set('builderLive', '1');
                 url.searchParams.set('liveSession', this.getBuilderPreviewSessionId());
-                url.searchParams.set('bg', mode === 'deck' ? 'studio' : 'transparent');
+                url.searchParams.set('bg', 'studio');
+                url.searchParams.set('fx', '1');
                 return url.toString();
             }
 
@@ -2627,6 +2631,9 @@
                     try {
                         win.location.href = url;
                         win.focus();
+                        this.builderPreview.externalOnly = true;
+                        this.applyBuilderPreviewLayout();
+                        this.resizeCanvas();
                         this.updateBuilderPreviewStatusLine('Ventana externa enfocada');
                         return;
                     } catch {
@@ -2646,12 +2653,19 @@
                 }
 
                 this.builderPreview.externalWindow = win;
+                this.builderPreview.externalOnly = true;
+                this.applyBuilderPreviewLayout();
+                this.resizeCanvas();
                 this.updateBuilderPreviewStatusLine('Ventana externa abierta (puedes moverla/maximizarla).');
 
                 const ping = () => {
                     if (!this.builderPreview || !this.builderPreview.externalWindow) return;
                     if (this.builderPreview.externalWindow.closed) {
                         this.builderPreview.externalWindow = null;
+                        this.builderPreview.externalOnly = false;
+                        this.applyBuilderPreviewLayout();
+                        this.resizeCanvas();
+                        this.updateBuilderPreviewStatusLine('Ventana externa cerrada. Preview volvió al panel lateral.');
                         return;
                     }
                     this.pushBuilderPreviewUpdate(true);
@@ -2664,6 +2678,7 @@
                 const win = this.builderPreview && this.builderPreview.externalWindow;
                 if (!win || win.closed) {
                     this.builderPreview.externalWindow = null;
+                    this.builderPreview.externalOnly = false;
                     return;
                 }
                 try {
@@ -2672,6 +2687,9 @@
                     // Ignorar
                 }
                 this.builderPreview.externalWindow = null;
+                this.builderPreview.externalOnly = false;
+                this.applyBuilderPreviewLayout();
+                this.resizeCanvas();
                 if (focusBack) {
                     try { window.focus(); } catch {}
                 }
@@ -2718,9 +2736,11 @@
                 this.resizeCanvas();
 
                 if (next) {
+                    this.builderPreview.externalOnly = false;
                     this.loadBuilderPreviewFrame();
                     this.markBuilderPreviewDirty(true);
                 } else {
+                    this.builderPreview.externalOnly = false;
                     this.closeBuilderPreviewWindow(false);
                 }
             }
@@ -2855,8 +2875,10 @@
             pushBuilderPreviewUpdate(force) {
                 if (!this.builderPreview || !this.builderPreview.enabled) return;
                 const frame = document.getElementById('builder-preview-frame');
-                if (!frame || !frame.contentWindow) return;
-                if (!this.builderPreview.frameReady) return;
+                const frameReady = Boolean(frame && frame.contentWindow && this.builderPreview.frameReady);
+                const win = this.builderPreview.externalWindow;
+                const winReady = Boolean(win && !win.closed);
+                if (!frameReady && !winReady) return;
 
                 const payload = this.buildProjectSnapshot('builder-live-preview', { includeDrafts: true });
                 let signature = '';
@@ -2868,13 +2890,18 @@
                 if (!force && signature === this.builderPreview.lastSignature) return;
                 this.builderPreview.lastSignature = signature;
 
-                frame.contentWindow.postMessage({
-                    type: 'flow-builder-project',
-                    project: payload
-                }, '*');
+                if (frameReady) {
+                    try {
+                        frame.contentWindow.postMessage({
+                            type: 'flow-builder-project',
+                            project: payload
+                        }, '*');
+                    } catch {
+                        // Ignorar
+                    }
+                }
 
-                const win = this.builderPreview.externalWindow;
-                if (win && !win.closed) {
+                if (winReady) {
                     try {
                         win.postMessage({
                             type: 'flow-builder-project',
@@ -2885,6 +2912,9 @@
                     }
                 } else if (win && win.closed) {
                     this.builderPreview.externalWindow = null;
+                    this.builderPreview.externalOnly = false;
+                    this.applyBuilderPreviewLayout();
+                    this.resizeCanvas();
                 }
 
                 this.updateBuilderPreviewStatusLine(this.formatBuilderPreviewTickLine(payload.elements.length));
