@@ -58,6 +58,7 @@
 
   const state = {
     project: { elements: [], camera: { x: 0, y: 0, zoom: 1 } },
+    viewMode: 'preview', // preview | deck | sticker
     zoom: 1,
     rotateDeg: 0,
     flipX: 1,
@@ -84,7 +85,28 @@
 
     modelViewerReadyPromise: null,
     threeModules: null,
-    threeRuntime: null
+    threeRuntime: null,
+
+    // Animacion runtime para visor (rutas + movers)
+    animation: {
+      rafId: 0,
+      lastTs: 0,
+      lineNodes: [],
+      moverNodes: []
+    },
+
+    // Deck/Lamina runtime
+    deck: {
+      panelEl: null,
+      listEl: null,
+      titleEl: null,
+      textEl: null,
+      mediaWrapEl: null,
+      mediaImageEl: null,
+      mediaVideoEl: null,
+      controlPoints: [],
+      activeIndex: -1
+    }
   };
 
   function setStatus(msg) {
@@ -197,6 +219,14 @@
     els.defs.innerHTML = '';
   }
 
+  function readQueryMode() {
+    const params = new URLSearchParams(window.location.search);
+    const raw = String(params.get('mode') || '').trim().toLowerCase();
+    if (raw === 'deck') return 'deck';
+    if (raw === 'sticker') return 'sticker';
+    return 'preview';
+  }
+
   function getRectLike(elem) {
     const x = Number(elem.x ?? 0);
     const y = Number(elem.y ?? 0);
@@ -287,14 +317,11 @@
       });
 
       if (elem.active) {
-        const anim = svgEl('animate', {
-          attributeName: 'stroke-dashoffset',
-          from: '0',
-          to: '-16',
-          dur: `${Math.max(0.2, 2 / (Number(elem.speed) || 1))}s`,
-          repeatCount: 'indefinite'
+        state.animation.lineNodes.push({
+          node,
+          speed: Math.max(0.2, Number(elem.speed) || 1),
+          offset: 0
         });
-        node.appendChild(anim);
       }
     } else if (elem.type === 'rectangle') {
       const { x, y, w, h } = getRectLike(elem);
@@ -345,6 +372,45 @@
           preserveAspectRatio: 'none'
         });
       }
+    } else if (elem.type === 'mover') {
+      const { x, y, w, h } = getRectLike(elem);
+      const moverW = Math.max(8, Number(w) || 44);
+      const moverH = Math.max(8, Number(h) || 28);
+      const fillSafe = elem.fillColor || '#93c5fd';
+      const strokeSafe = elem.strokeColor || '#0b1027';
+      const g = svgEl('g');
+      const r = svgEl('rect', {
+        x,
+        y,
+        width: moverW,
+        height: moverH,
+        rx: Math.max(3, Math.min(moverW, moverH) * 0.25),
+        fill: fillSafe,
+        stroke: strokeSafe,
+        'stroke-width': Math.max(1, lineWidth * 0.75)
+      });
+      const eye = svgEl('rect', {
+        x: x + moverW * 0.22,
+        y: y + moverH * 0.3,
+        width: moverW * 0.56,
+        height: moverH * 0.4,
+        rx: Math.max(2, moverH * 0.12),
+        fill: '#dbeafe',
+        opacity: '0.9'
+      });
+      g.appendChild(r);
+      g.appendChild(eye);
+      node = g;
+
+      state.animation.moverNodes.push({
+        node,
+        elem,
+        baseX: x,
+        baseY: y,
+        width: moverW,
+        height: moverH,
+        progress: Number(elem.animOffset || 0)
+      });
     }
 
     if (!node) return;
@@ -361,10 +427,259 @@
   }
 
   function renderProject() {
+    stopSceneAnimation();
     clearScene();
+    state.animation.lineNodes = [];
+    state.animation.moverNodes = [];
     const elements = Array.isArray(state.project.elements) ? state.project.elements : [];
     elements.forEach((elem) => renderElement(elem, els.world));
+    buildDeckControlPoints(elements);
+    renderDeckPanel();
     updateWorldTransform();
+    startSceneAnimation();
+  }
+
+  function ensureDeckUI() {
+    if (state.deck.panelEl) return;
+    const panel = document.createElement('aside');
+    panel.id = 'deck-panel-v2';
+    panel.className = 'deck-panel-v2';
+    panel.innerHTML = `
+      <div class="deck-head-v2">
+        <strong>Lámina</strong>
+        <span id="deck-count-v2">0</span>
+      </div>
+      <div id="deck-list-v2" class="deck-list-v2"></div>
+      <div class="deck-slide-v2">
+        <div id="deck-title-v2" class="deck-title-v2">Sin selección</div>
+        <div id="deck-text-v2" class="deck-text-v2">Selecciona un punto de control.</div>
+        <div id="deck-media-v2" class="deck-media-v2">
+          <img id="deck-image-v2" alt="slide image" hidden />
+          <video id="deck-video-v2" controls playsinline hidden></video>
+        </div>
+      </div>
+    `;
+    els.workspace.appendChild(panel);
+    state.deck.panelEl = panel;
+    state.deck.listEl = panel.querySelector('#deck-list-v2');
+    state.deck.titleEl = panel.querySelector('#deck-title-v2');
+    state.deck.textEl = panel.querySelector('#deck-text-v2');
+    state.deck.mediaWrapEl = panel.querySelector('#deck-media-v2');
+    state.deck.mediaImageEl = panel.querySelector('#deck-image-v2');
+    state.deck.mediaVideoEl = panel.querySelector('#deck-video-v2');
+  }
+
+  function buildDeckControlPoints(elements) {
+    const flat = flattenElements(elements || []);
+    const cps = [];
+    flat.forEach((elem) => {
+      if (!elem || typeof elem !== 'object') return;
+      const meta = (elem.meta && typeof elem.meta === 'object') ? elem.meta : null;
+      if (!meta || !meta.controlPoint) return;
+
+      const slideFromMeta = (meta.slide && typeof meta.slide === 'object') ? meta.slide : {};
+      const slideFromElem = (elem.slide && typeof elem.slide === 'object') ? elem.slide : {};
+      const title = String(
+        slideFromMeta.title || slideFromElem.title || meta.slideTitle || elem.slideTitle || elem.name || `Punto ${cps.length + 1}`
+      );
+      const text = String(slideFromMeta.text || slideFromElem.text || meta.slideText || elem.slideText || '');
+      const imageUrl = String(
+        slideFromMeta.imageUrl || slideFromElem.imageUrl || meta.slideImageUrl || elem.slideImageUrl || ''
+      ).trim();
+      const videoUrl = String(
+        slideFromMeta.videoUrl || slideFromElem.videoUrl || meta.slideVideoUrl || elem.slideVideoUrl || ''
+      ).trim();
+      cps.push({
+        id: String(elem.id || `cp-${cps.length + 1}`),
+        title,
+        text,
+        imageUrl,
+        videoUrl
+      });
+    });
+    state.deck.controlPoints = cps;
+    if (state.deck.activeIndex >= cps.length) state.deck.activeIndex = cps.length ? 0 : -1;
+    if (state.deck.activeIndex < 0 && cps.length) state.deck.activeIndex = 0;
+  }
+
+  function renderDeckPanel() {
+    const isDeck = state.viewMode === 'deck';
+    els.workspace.classList.toggle('deck-open-v2', isDeck);
+    if (!isDeck) return;
+
+    ensureDeckUI();
+    const listEl = state.deck.listEl;
+    if (!listEl) return;
+    listEl.innerHTML = '';
+
+    const countEl = state.deck.panelEl.querySelector('#deck-count-v2');
+    if (countEl) countEl.textContent = String(state.deck.controlPoints.length);
+
+    if (!state.deck.controlPoints.length) {
+      const empty = document.createElement('div');
+      empty.className = 'deck-empty-v2';
+      empty.textContent = '(No hay puntos de control en este diseño)';
+      listEl.appendChild(empty);
+      updateDeckSlide();
+      return;
+    }
+
+    state.deck.controlPoints.forEach((cp, idx) => {
+      const b = document.createElement('button');
+      b.className = `deck-item-v2 ${idx === state.deck.activeIndex ? 'active' : ''}`;
+      b.textContent = cp.title;
+      b.addEventListener('click', () => {
+        state.deck.activeIndex = idx;
+        renderDeckPanel();
+      });
+      listEl.appendChild(b);
+    });
+
+    updateDeckSlide();
+  }
+
+  function updateDeckSlide() {
+    if (!state.deck.titleEl || !state.deck.textEl) return;
+    const cp = state.deck.controlPoints[state.deck.activeIndex] || null;
+    const img = state.deck.mediaImageEl;
+    const vid = state.deck.mediaVideoEl;
+
+    if (vid) {
+      try {
+        vid.pause();
+        vid.removeAttribute('src');
+        vid.load();
+      } catch (_) {
+        // no-op
+      }
+      vid.hidden = true;
+    }
+    if (img) {
+      img.removeAttribute('src');
+      img.hidden = true;
+    }
+
+    if (!cp) {
+      state.deck.titleEl.textContent = 'Sin selección';
+      state.deck.textEl.textContent = 'Selecciona un punto de control.';
+      return;
+    }
+
+    state.deck.titleEl.textContent = cp.title || 'Diapositiva';
+    state.deck.textEl.textContent = cp.text || '(Sin texto)';
+
+    if (cp.videoUrl && vid) {
+      vid.src = cp.videoUrl;
+      vid.hidden = false;
+      return;
+    }
+    if (cp.imageUrl && img) {
+      img.src = cp.imageUrl;
+      img.hidden = false;
+    }
+  }
+
+  function flattenElements(elements, out = []) {
+    (elements || []).forEach((elem) => {
+      if (!elem || typeof elem !== 'object') return;
+      out.push(elem);
+      if (elem.type === 'group' && Array.isArray(elem.elements)) {
+        flattenElements(elem.elements, out);
+      }
+    });
+    return out;
+  }
+
+  function getRoutePoints(elem) {
+    if (!elem || typeof elem !== 'object') return [];
+    if (elem.type === 'line') {
+      return [
+        { x: Number(elem.x ?? elem.x1 ?? 0), y: Number(elem.y ?? elem.y1 ?? 0) },
+        { x: Number(elem.endX ?? elem.x2 ?? 0), y: Number(elem.endY ?? elem.y2 ?? 0) }
+      ];
+    }
+    if ((elem.type === 'path' || elem.type === 'polygon') && Array.isArray(elem.points)) {
+      return elem.points
+        .map((p) => ({ x: Number(p?.x ?? 0), y: Number(p?.y ?? 0) }))
+        .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+    }
+    return [];
+  }
+
+  function pointAtPolyline(points, t01) {
+    if (!Array.isArray(points) || points.length < 2) return null;
+    const t = ((Number(t01) || 0) % 1 + 1) % 1;
+    const segLens = [];
+    let total = 0;
+    for (let i = 1; i < points.length; i += 1) {
+      const dx = points[i].x - points[i - 1].x;
+      const dy = points[i].y - points[i - 1].y;
+      const len = Math.hypot(dx, dy);
+      segLens.push(len);
+      total += len;
+    }
+    if (total <= 0) return { x: points[0].x, y: points[0].y };
+    let d = t * total;
+    for (let i = 1; i < points.length; i += 1) {
+      const len = segLens[i - 1];
+      if (d <= len || i === points.length - 1) {
+        const p0 = points[i - 1];
+        const p1 = points[i];
+        const u = len > 0 ? d / len : 0;
+        return {
+          x: p0.x + (p1.x - p0.x) * u,
+          y: p0.y + (p1.y - p0.y) * u
+        };
+      }
+      d -= len;
+    }
+    return { x: points[points.length - 1].x, y: points[points.length - 1].y };
+  }
+
+  function startSceneAnimation() {
+    if (state.animation.rafId) return;
+    const flat = flattenElements(state.project.elements || []);
+    const byId = new Map(flat.map((e) => [String(e.id || ''), e]));
+
+    // Resolver ruta de cada mover una sola vez por render.
+    state.animation.moverNodes.forEach((m) => {
+      const routeId = String(m?.elem?.routePathId || m?.elem?.followPathId || m?.elem?.routeId || '');
+      const routeElem = routeId ? byId.get(routeId) : null;
+      m.routePoints = getRoutePoints(routeElem);
+      m.routeSpeed = Math.max(0.03, Number(m?.elem?.speed || m?.elem?.velocity || 1) * 0.12);
+    });
+
+    const tick = (ts) => {
+      const last = state.animation.lastTs || ts;
+      const dt = Math.max(0.001, Math.min(0.05, (ts - last) / 1000));
+      state.animation.lastTs = ts;
+
+      state.animation.lineNodes.forEach((ln) => {
+        ln.offset -= dt * 64 * ln.speed;
+        ln.node.setAttribute('stroke-dashoffset', String(ln.offset));
+      });
+
+      state.animation.moverNodes.forEach((m) => {
+        if (!m.routePoints || m.routePoints.length < 2) return;
+        m.progress = ((m.progress || 0) + dt * m.routeSpeed) % 1;
+        const p = pointAtPolyline(m.routePoints, m.progress);
+        if (!p) return;
+        const dx = p.x - (m.baseX + m.width / 2);
+        const dy = p.y - (m.baseY + m.height / 2);
+        m.node.setAttribute('transform', `translate(${dx} ${dy})`);
+      });
+
+      state.animation.rafId = requestAnimationFrame(tick);
+    };
+
+    state.animation.lastTs = 0;
+    state.animation.rafId = requestAnimationFrame(tick);
+  }
+
+  function stopSceneAnimation() {
+    if (state.animation.rafId) cancelAnimationFrame(state.animation.rafId);
+    state.animation.rafId = 0;
+    state.animation.lastTs = 0;
   }
 
   async function parseAndApplyProject(rawText, source = 'archivo') {
@@ -394,7 +709,7 @@
       };
     }
 
-    if (elem.type === 'rectangle' || elem.type === 'image' || elem.type === 'circle') {
+    if (elem.type === 'rectangle' || elem.type === 'image' || elem.type === 'circle' || elem.type === 'mover') {
       const { x, y, w, h } = getRectLike(elem);
       if (elem.type === 'circle' && Number.isFinite(elem.radius)) {
         const r = Number(elem.radius);
@@ -494,6 +809,13 @@
       const src = elem.imageSrc || '';
       if (!src) return '';
       return `<image x="${x}" y="${y}" width="${w}" height="${h}" href="${escapeAttr(src)}" preserveAspectRatio="none" />`;
+    }
+
+    if (elem.type === 'mover') {
+      const { x, y, w, h } = getRectLike(elem);
+      const mw = Math.max(8, Number(w) || 44);
+      const mh = Math.max(8, Number(h) || 28);
+      return `<rect x="${x}" y="${y}" width="${mw}" height="${mh}" rx="${Math.max(3, Math.min(mw, mh) * 0.25)}" fill="${escapeAttr(fill)}" stroke="${escapeAttr(stroke)}" stroke-width="${Math.max(1, lineWidth * 0.75)}"/>`;
     }
 
     return '';
@@ -1240,6 +1562,8 @@
 
   async function loadFromQuery() {
     const params = new URLSearchParams(window.location.search);
+    state.viewMode = readQueryMode();
+    closeMediaOverlay();
 
     const jsonData = params.get('data');
     if (jsonData) {
@@ -1444,6 +1768,7 @@
   }
 
   async function boot() {
+    state.viewMode = readQueryMode();
     bindEvents();
     updateWorldTransform();
     renderMediaList();

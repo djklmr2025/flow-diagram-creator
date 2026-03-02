@@ -134,6 +134,103 @@ body {
   border-left-width: 1px;
 }
 
+.deck-panel-v2 {
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background: linear-gradient(180deg, #0d1f3f, #081327);
+  border-left: 0 solid #28558e;
+  transition: width 0.28s ease, opacity 0.2s ease, border-left-width 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace.deck-open-v2 .deck-panel-v2 {
+  width: 380px;
+  min-width: 380px;
+  opacity: 1;
+  pointer-events: auto;
+  border-left-width: 1px;
+}
+
+.deck-head-v2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #28558e;
+}
+
+.deck-list-v2 {
+  max-height: 34vh;
+  overflow: auto;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  border-bottom: 1px solid rgba(147, 197, 253, 0.2);
+}
+
+.deck-empty-v2 {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.deck-item-v2 {
+  background: rgba(2, 6, 23, 0.35);
+  border: 1px solid rgba(147, 197, 253, 0.25);
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.deck-item-v2.active {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.2);
+}
+
+.deck-slide-v2 {
+  min-height: 0;
+  flex: 1;
+  padding: 12px;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 10px;
+}
+
+.deck-title-v2 {
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.deck-text-v2 {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
+.deck-media-v2 {
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(147, 197, 253, 0.25);
+  border-radius: 12px;
+  background: rgba(2, 6, 23, 0.45);
+  padding: 10px;
+}
+
+#deck-image-v2,
+#deck-video-v2 {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(147, 197, 253, 0.2);
+}
+
 .panel-head {
   display: flex;
   justify-content: space-between;
@@ -413,6 +510,17 @@ body {
   }
 
   .workspace.media-open .media-panel {
+    width: 100%;
+    min-width: 0;
+    position: absolute;
+    z-index: 20;
+    inset: 52px 8px auto 8px;
+    max-height: 68vh;
+    border: 1px solid #28558e;
+    border-radius: 12px;
+  }
+
+  .workspace.deck-open-v2 .deck-panel-v2 {
     width: 100%;
     min-width: 0;
     position: absolute;
