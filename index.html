@@ -1564,6 +1564,7 @@
                             <option value="high">Alto (60ms)</option>
                         </select>
                     </div>
+                    <button class="btn small" id="btn-builder-preview-popout" title="Abrir en ventana externa">Ventana</button>
                 </div>
                 <button class="btn small" id="btn-builder-preview-close" title="Cerrar preview">Cerrar</button>
             </div>
@@ -2217,7 +2218,9 @@
                     updateTimer: null,
                     forceNext: false,
                     lastSignature: '',
-                    lastLivePushAt: 0
+                    lastLivePushAt: 0,
+                    externalWindow: null,
+                    sessionId: ''
                 };
                 
                 // Módulos (permite expandir funcionalidad)
@@ -2487,6 +2490,7 @@
                 const btnModePreview = document.getElementById('btn-builder-preview-mode-preview');
                 const btnModeDeck = document.getElementById('btn-builder-preview-mode-deck');
                 const perfSelect = document.getElementById('builder-preview-performance-select');
+                const btnPopout = document.getElementById('btn-builder-preview-popout');
 
                 if (!panel || !frame) return;
 
@@ -2518,6 +2522,9 @@
                 if (btnModeDeck) {
                     btnModeDeck.addEventListener('click', () => this.setBuilderPreviewMode('deck'));
                 }
+                if (btnPopout) {
+                    btnPopout.addEventListener('click', () => this.openBuilderPreviewWindow());
+                }
 
                 if (handle) {
                     handle.addEventListener('mousedown', (e) => {
@@ -2543,6 +2550,8 @@
                     this._builderPreviewResizing = false;
                     safeLocalStorageSet('builder-preview-width', String(this.builderPreview.panelWidth));
                 });
+
+                window.addEventListener('beforeunload', () => this.closeBuilderPreviewWindow(false));
 
                 this.updateBuilderPreviewModeButtons();
                 this.applyBuilderPreviewLayout();
@@ -2586,8 +2595,86 @@
                 url.searchParams.set('fit', '1');
                 url.searchParams.set('labels', '0');
                 url.searchParams.set('builderLive', '1');
+                url.searchParams.set('liveSession', this.getBuilderPreviewSessionId());
                 url.searchParams.set('bg', mode === 'deck' ? 'studio' : 'transparent');
                 return url.toString();
+            }
+
+            getBuilderPreviewSessionId() {
+                if (this.builderPreview && this.builderPreview.sessionId) {
+                    return String(this.builderPreview.sessionId);
+                }
+                const persisted = String(safeLocalStorageGet('builder-preview-session-id', '') || '').trim();
+                if (persisted) {
+                    this.builderPreview.sessionId = persisted;
+                    return persisted;
+                }
+                const session = `bp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+                this.builderPreview.sessionId = session;
+                safeLocalStorageSet('builder-preview-session-id', session);
+                return session;
+            }
+
+            openBuilderPreviewWindow() {
+                if (!this.builderPreview) return;
+                if (!this.builderPreview.enabled) {
+                    this.setBuilderPreviewEnabled(true);
+                }
+
+                const url = this.getBuilderPreviewFrameUrl();
+                let win = this.builderPreview.externalWindow;
+                if (win && !win.closed) {
+                    try {
+                        win.location.href = url;
+                        win.focus();
+                        this.updateBuilderPreviewStatusLine('Ventana externa enfocada');
+                        return;
+                    } catch {
+                        // continuar para reabrir
+                    }
+                }
+
+                win = window.open(
+                    url,
+                    'flow-builder-preview-window',
+                    'popup=yes,width=1400,height=900,resizable=yes,scrollbars=yes'
+                );
+
+                if (!win) {
+                    this.updateBuilderPreviewStatusLine('⚠️ Bloqueador de ventanas activo. Permite popups para usar Ventana.');
+                    return;
+                }
+
+                this.builderPreview.externalWindow = win;
+                this.updateBuilderPreviewStatusLine('Ventana externa abierta (puedes moverla/maximizarla).');
+
+                const ping = () => {
+                    if (!this.builderPreview || !this.builderPreview.externalWindow) return;
+                    if (this.builderPreview.externalWindow.closed) {
+                        this.builderPreview.externalWindow = null;
+                        return;
+                    }
+                    this.pushBuilderPreviewUpdate(true);
+                    setTimeout(ping, 350);
+                };
+                setTimeout(ping, 350);
+            }
+
+            closeBuilderPreviewWindow(focusBack = true) {
+                const win = this.builderPreview && this.builderPreview.externalWindow;
+                if (!win || win.closed) {
+                    this.builderPreview.externalWindow = null;
+                    return;
+                }
+                try {
+                    win.close();
+                } catch {
+                    // Ignorar
+                }
+                this.builderPreview.externalWindow = null;
+                if (focusBack) {
+                    try { window.focus(); } catch {}
+                }
             }
 
             loadBuilderPreviewFrame() {
@@ -2595,8 +2682,16 @@
                 if (!frame || !this.builderPreview.enabled) return;
                 this.builderPreview.frameReady = false;
                 frame.src = this.getBuilderPreviewFrameUrl();
-                const status = document.getElementById('builder-preview-status');
-                if (status) status.textContent = `Cargando modo ${this.builderPreview.mode === 'deck' ? 'Lámina' : 'Normal'}...`;
+                this.updateBuilderPreviewStatusLine(`Cargando modo ${this.builderPreview.mode === 'deck' ? 'Lámina' : 'Normal'}...`);
+
+                const win = this.builderPreview.externalWindow;
+                if (win && !win.closed) {
+                    try {
+                        win.location.href = this.getBuilderPreviewFrameUrl();
+                    } catch {
+                        // Ignorar
+                    }
+                }
             }
 
             setBuilderPreviewMode(mode) {
@@ -2625,6 +2720,8 @@
                 if (next) {
                     this.loadBuilderPreviewFrame();
                     this.markBuilderPreviewDirty(true);
+                } else {
+                    this.closeBuilderPreviewWindow(false);
                 }
             }
 
@@ -2776,13 +2873,36 @@
                     project: payload
                 }, '*');
 
+                const win = this.builderPreview.externalWindow;
+                if (win && !win.closed) {
+                    try {
+                        win.postMessage({
+                            type: 'flow-builder-project',
+                            project: payload
+                        }, '*');
+                    } catch {
+                        // Ignorar
+                    }
+                } else if (win && win.closed) {
+                    this.builderPreview.externalWindow = null;
+                }
+
+                this.updateBuilderPreviewStatusLine(this.formatBuilderPreviewTickLine(payload.elements.length));
+            }
+
+            formatBuilderPreviewTickLine(totalElements) {
+                const now = new Date();
+                const hh = String(now.getHours()).padStart(2, '0');
+                const mm = String(now.getMinutes()).padStart(2, '0');
+                const ss = String(now.getSeconds()).padStart(2, '0');
+                const extOpen = Boolean(this.builderPreview && this.builderPreview.externalWindow && !this.builderPreview.externalWindow.closed);
+                return `Actualizado ${hh}:${mm}:${ss} | ${totalElements} elementos${extOpen ? ' | Ventana externa ON' : ''}`;
+            }
+
+            updateBuilderPreviewStatusLine(text) {
                 const status = document.getElementById('builder-preview-status');
                 if (status) {
-                    const now = new Date();
-                    const hh = String(now.getHours()).padStart(2, '0');
-                    const mm = String(now.getMinutes()).padStart(2, '0');
-                    const ss = String(now.getSeconds()).padStart(2, '0');
-                    status.textContent = `Actualizado ${hh}:${mm}:${ss} | ${payload.elements.length} elementos`;
+                    status.textContent = String(text || '');
                 }
             }
 
