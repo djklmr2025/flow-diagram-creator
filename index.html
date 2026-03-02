@@ -339,6 +339,40 @@
             box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.22);
         }
 
+        .route-quick-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 6px;
+            border-radius: 6px;
+            background: rgba(15, 52, 96, 0.65);
+            border: 1px solid rgba(0, 212, 255, 0.18);
+            color: #dbeafe;
+            font-size: 11px;
+            height: 30px;
+        }
+
+        .route-quick-group select,
+        .route-quick-group input[type="number"] {
+            height: 22px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: #0f3460;
+            color: #eee;
+            padding: 0 6px;
+            font-size: 11px;
+        }
+
+        .route-quick-group input[type="number"] {
+            width: 62px;
+        }
+
+        .route-quick-group .btn.small {
+            height: 22px;
+            padding: 2px 8px;
+            font-size: 11px;
+        }
+
         .separator {
             width: 2px;
             background: #0f3460;
@@ -1399,6 +1433,22 @@
         <button class="btn" id="btn-route" title="Ruta / Vía (U)">
             <span>🛤️</span> Ruta
         </button>
+        <div class="route-quick-group" id="route-quick-group" title="Modo rápido de ruta para nuevas líneas o aplicar a selección">
+            <span>Ruta:</span>
+            <select id="route-quick-curve">
+                <option value="line">Línea</option>
+                <option value="semi">Semicírculo</option>
+                <option value="quarter">1/4 círculo</option>
+                <option value="circle">Círculo</option>
+                <option value="custom">Grados</option>
+            </select>
+            <select id="route-quick-side">
+                <option value="left">Izquierda</option>
+                <option value="right">Derecha</option>
+            </select>
+            <input id="route-quick-deg" type="number" min="5" max="355" step="5" value="120" title="Grados de arco">
+            <button class="btn small" id="btn-route-quick-apply" type="button" title="Aplicar a selección">Aplicar</button>
+        </div>
         <button class="btn" id="btn-metro" title="Mover Metro (N)">
             <span>🚇</span> Metro
         </button>
@@ -2194,6 +2244,15 @@
                 this.lastPointerWorld = null; // Última posición world del cursor
                 // Herramienta "Formas" (plantillas vectoriales)
                 this.shapeType = safeLocalStorageGet('flow-diagram-shape-type', 'triangle') || 'triangle';
+                this.routeDrawDefaults = {
+                    curve: this.normalizeRouteCurveValue(safeLocalStorageGet('flow-diagram-route-curve', 'line')),
+                    side: String(safeLocalStorageGet('flow-diagram-route-arc-side', 'left') || 'left') === 'right' ? 'right' : 'left',
+                    degrees: (() => {
+                        const raw = Number.parseInt(String(safeLocalStorageGet('flow-diagram-route-arc-deg', '120') || '120'), 10);
+                        if (!Number.isFinite(raw)) return 120;
+                        return Math.max(5, Math.min(355, raw));
+                    })()
+                };
                 // Panel Objetos (Capas)
                 this.layersPanelOpen = (safeLocalStorageGet('flow-diagram-layers-open', '1') || '1') !== '0';
                 this.layersFilter = '';
@@ -2392,6 +2451,7 @@
                 }
                 document.getElementById('btn-line').addEventListener('click', () => this.setTool('line'));
                 document.getElementById('btn-route').addEventListener('click', () => this.setTool('route'));
+                this.setupRouteQuickToolbar();
                 document.getElementById('btn-metro').addEventListener('click', () => this.setTool('mover-metro'));
                 document.getElementById('btn-person-male').addEventListener('click', () => this.setTool('mover-male'));
                 document.getElementById('btn-person-female').addEventListener('click', () => this.setTool('mover-female'));
@@ -2507,6 +2567,102 @@
 	                }
 	                this.setupDeckResizer();
 	            }
+
+            normalizeRouteCurveValue(raw) {
+                const v = String(raw || 'line').toLowerCase();
+                if (v === 'circle' || v === 'semi' || v === 'quarter' || v === 'custom') return v;
+                return 'line';
+            }
+
+            getRouteDrawDefaults() {
+                const src = this.routeDrawDefaults || {};
+                const curve = this.normalizeRouteCurveValue(src.curve);
+                const side = String(src.side || 'left') === 'right' ? 'right' : 'left';
+                const degRaw = Number(src.degrees);
+                const degrees = Number.isFinite(degRaw) ? Math.max(5, Math.min(355, Math.round(degRaw))) : 120;
+                return { curve, side, degrees };
+            }
+
+            saveRouteDrawDefaults() {
+                const cfg = this.getRouteDrawDefaults();
+                this.routeDrawDefaults = cfg;
+                safeLocalStorageSet('flow-diagram-route-curve', cfg.curve);
+                safeLocalStorageSet('flow-diagram-route-arc-side', cfg.side);
+                safeLocalStorageSet('flow-diagram-route-arc-deg', String(cfg.degrees));
+            }
+
+            refreshRouteQuickToolbar() {
+                const curveSel = document.getElementById('route-quick-curve');
+                const sideSel = document.getElementById('route-quick-side');
+                const degInput = document.getElementById('route-quick-deg');
+                const cfg = this.getRouteDrawDefaults();
+
+                if (curveSel) curveSel.value = cfg.curve;
+                if (sideSel) {
+                    sideSel.value = cfg.side;
+                    sideSel.disabled = !(cfg.curve === 'semi' || cfg.curve === 'quarter' || cfg.curve === 'custom');
+                }
+                if (degInput) {
+                    degInput.value = String(cfg.degrees);
+                    degInput.style.display = cfg.curve === 'custom' ? 'inline-block' : 'none';
+                }
+            }
+
+            setupRouteQuickToolbar() {
+                const curveSel = document.getElementById('route-quick-curve');
+                const sideSel = document.getElementById('route-quick-side');
+                const degInput = document.getElementById('route-quick-deg');
+                const applyBtn = document.getElementById('btn-route-quick-apply');
+                if (!curveSel || !sideSel || !degInput || !applyBtn) return;
+
+                const syncFromUI = () => {
+                    const nextCurve = this.normalizeRouteCurveValue(curveSel.value);
+                    const nextSide = String(sideSel.value || 'left') === 'right' ? 'right' : 'left';
+                    const nextDegRaw = Number.parseInt(String(degInput.value || '120'), 10);
+                    const nextDeg = Number.isFinite(nextDegRaw) ? Math.max(5, Math.min(355, nextDegRaw)) : 120;
+                    this.routeDrawDefaults = { curve: nextCurve, side: nextSide, degrees: nextDeg };
+                    this.saveRouteDrawDefaults();
+                    this.refreshRouteQuickToolbar();
+                };
+
+                curveSel.addEventListener('change', syncFromUI);
+                sideSel.addEventListener('change', syncFromUI);
+                degInput.addEventListener('change', syncFromUI);
+                applyBtn.addEventListener('click', () => this.applyRouteQuickToSelection());
+
+                this.refreshRouteQuickToolbar();
+            }
+
+            applyRouteQuickToSelection() {
+                if (!Array.isArray(this.selectedElements) || this.selectedElements.length === 0) {
+                    this.updateStatusBar('Selecciona líneas/rutas y vuelve a aplicar.');
+                    return;
+                }
+
+                const cfg = this.getRouteDrawDefaults();
+                let changed = 0;
+                this.selectedElements.forEach((elem) => {
+                    if (!elem || typeof elem !== 'object') return;
+                    const isRouteCandidate = elem.type === 'line' || elem.type === 'path' || elem.type === 'polygon';
+                    if (!isRouteCandidate) return;
+                    elem.routeRole = true;
+                    if (elem.type === 'line') {
+                        elem.routeCurve = cfg.curve;
+                        elem.routeArcSide = cfg.side;
+                        elem.routeArcDegrees = cfg.degrees;
+                        elem.routeCircular = cfg.curve === 'circle';
+                    }
+                    changed += 1;
+                });
+
+                if (!changed) {
+                    this.updateStatusBar('La selección no tiene elementos de ruta/línea.');
+                    return;
+                }
+                this.saveHistory();
+                this.updatePropertiesPanel();
+                this.updateStatusBar(`Ruta rápida aplicada a ${changed} elemento(s).`);
+            }
 
             setupBuilderPreview() {
                 const panel = document.getElementById('builder-preview-panel');
@@ -3206,8 +3362,6 @@
 	                    'prop-connection-status',
 	                    'prop-active',
 	                    'prop-stroke-transparent',
-                        'prop-is-route',
-                        'prop-route-curve',
                         'prop-route-arc-side',
                         'prop-route-arc-deg',
                         'prop-route-id',
@@ -3364,6 +3518,20 @@
 
                     const routeArcDeg = document.getElementById('prop-route-arc-deg');
                     const routeArcDegVal = document.getElementById('prop-route-arc-deg-value');
+                    const routeCurveInput = document.getElementById('prop-route-curve');
+                    const routeToggleInput = document.getElementById('prop-is-route');
+                    if (routeCurveInput) {
+                        routeCurveInput.addEventListener('change', () => {
+                            this.updateSelectedProperties();
+                            this.updatePropertiesPanel();
+                        });
+                    }
+                    if (routeToggleInput) {
+                        routeToggleInput.addEventListener('change', () => {
+                            this.updateSelectedProperties();
+                            this.updatePropertiesPanel();
+                        });
+                    }
                     if (routeArcDeg) {
                         const onArcDeg = () => {
                             if (routeArcDegVal) routeArcDegVal.textContent = `${String(routeArcDeg.value || '0')}°`;
@@ -4037,6 +4205,7 @@
 	            }
 
             startRouteDraftAt(x, y) {
+                const routeCfg = this.getRouteDrawDefaults();
                 this.routeDraft = {
                     id: Date.now() + Math.random(),
                     type: 'path',
@@ -4046,6 +4215,10 @@
                     fillColor: 'transparent',
                     lineWidth: 5,
                     routeRole: true,
+                    routeCurve: routeCfg.curve,
+                    routeArcSide: routeCfg.side,
+                    routeArcDegrees: routeCfg.degrees,
+                    routeCircular: routeCfg.curve === 'circle',
                     locked: false,
                     active: true,
                     connectionStatus: 'none',
@@ -4078,8 +4251,38 @@
                 if (hint) hint.classList.remove('show');
 
                 if (!Array.isArray(draft.points) || draft.points.length < 2) return;
-                this.elements.push(draft);
-                this.selectedElements = [draft];
+                let finalElem = draft;
+                const draftCurve = this.normalizeRouteCurveValue(draft.routeCurve);
+                if (draft.points.length === 2 && draftCurve !== 'line') {
+                    const p0 = draft.points[0];
+                    const p1 = draft.points[1];
+                    finalElem = {
+                        id: draft.id,
+                        type: 'line',
+                        name: draft.name || `Ruta ${Date.now()}`,
+                        x: Number(p0 && p0.x) || 0,
+                        y: Number(p0 && p0.y) || 0,
+                        endX: Number(p1 && p1.x) || 0,
+                        endY: Number(p1 && p1.y) || 0,
+                        fillColor: 'transparent',
+                        strokeColor: String(draft.strokeColor || '#00d4ff'),
+                        lineWidth: Number(draft.lineWidth) || 5,
+                        routeRole: true,
+                        routeCurve: draftCurve,
+                        routeArcSide: String(draft.routeArcSide || 'left') === 'right' ? 'right' : 'left',
+                        routeArcDegrees: this.getRouteArcDegrees(draft),
+                        routeCircular: draftCurve === 'circle',
+                        locked: Boolean(draft.locked),
+                        active: draft.active !== false,
+                        connectionStatus: String(draft.connectionStatus || 'none'),
+                        animColor: '#00d4ff',
+                        flowDirection: 'right',
+                        animOffset: 0,
+                        controlPoints: []
+                    };
+                }
+                this.elements.push(finalElem);
+                this.selectedElements = [finalElem];
                 this.saveHistory();
                 this.updatePropertiesPanel();
                 this.updateStatusBar();
@@ -6427,6 +6630,8 @@
                         shapeType
                     };
 	                } else if (this.tool === 'line') {
+                        const routeCfg = this.getRouteDrawDefaults();
+                        const asRoute = routeCfg.curve !== 'line';
 	                    return {
 	                        ...baseElement,
 	                        type: 'line',
@@ -6436,9 +6641,15 @@
 	                        animColor: '#4caf50',
 	                        flowDirection: 'right',
 	                        animOffset: 0,
+                            routeRole: asRoute,
+                            routeCurve: routeCfg.curve,
+                            routeArcSide: routeCfg.side,
+                            routeArcDegrees: routeCfg.degrees,
+                            routeCircular: routeCfg.curve === 'circle',
 	                        controlPoints: [] // Para curvas editables
 	                    };
                     } else if (this.tool === 'route') {
+                        const routeCfg = this.getRouteDrawDefaults();
                         return {
                             ...baseElement,
                             type: 'line',
@@ -6446,10 +6657,10 @@
                             endY: y,
                             lineWidth: 5,
                             routeRole: true,
-                            routeCircular: false,
-                            routeCurve: 'line',
-                            routeArcSide: 'left',
-                            routeArcDegrees: 120,
+                            routeCircular: routeCfg.curve === 'circle',
+                            routeCurve: routeCfg.curve,
+                            routeArcSide: routeCfg.side,
+                            routeArcDegrees: routeCfg.degrees,
                             name: `Ruta ${Date.now()}`,
                             animColor: '#00d4ff',
                             flowDirection: 'right',
@@ -6964,9 +7175,7 @@
             getRouteCurve(elem) {
                 if (!elem || typeof elem !== 'object') return 'line';
                 if (elem.routeCircular === true) return 'circle';
-                const c = String(elem.routeCurve || 'line').toLowerCase();
-                if (c === 'circle' || c === 'semi' || c === 'quarter' || c === 'custom') return c;
-                return 'line';
+                return this.normalizeRouteCurveValue(elem.routeCurve);
             }
 
             getRouteArcDegrees(elem) {
@@ -11607,13 +11816,13 @@
                     if (routeToggle) routeToggle.checked = this.isRouteElement(elem);
                     if (routeCurveInput) {
                         routeCurveInput.value = (elem.type === 'line') ? this.getRouteCurve(elem) : 'line';
-                        routeCurveInput.disabled = !(elem.type === 'line' && this.isRouteElement(elem));
+                        routeCurveInput.disabled = !(elem.type === 'line');
                     }
                     if (routeArcSideInput) {
                         routeArcSideInput.value = String(elem.routeArcSide || 'left');
                         const curve = (elem.type === 'line') ? this.getRouteCurve(elem) : 'line';
-                        const canSide = curve === 'semi' || curve === 'quarter';
-                        routeArcSideInput.disabled = !(elem.type === 'line' && this.isRouteElement(elem) && canSide);
+                        const canSide = curve === 'semi' || curve === 'quarter' || curve === 'custom';
+                        routeArcSideInput.disabled = !(elem.type === 'line' && canSide);
                     }
                     const curve = (elem.type === 'line') ? this.getRouteCurve(elem) : 'line';
                     if (routeArcDegWrap) routeArcDegWrap.style.display = (curve === 'custom') ? 'block' : 'none';
@@ -11773,8 +11982,9 @@
 	                const lw = document.getElementById('prop-line-width');
 	                const lwValue = lw ? Number.parseInt(String(lw.value || ''), 10) : NaN;
                     const lineWidth = Number.isFinite(lwValue) ? Math.max(1, Math.min(20, lwValue)) : null;
-                    const routeFlag = Boolean(document.getElementById('prop-is-route') && document.getElementById('prop-is-route').checked);
-                    const routeCurve = String((document.getElementById('prop-route-curve') && document.getElementById('prop-route-curve').value) || 'line');
+                    const routeToggleChecked = Boolean(document.getElementById('prop-is-route') && document.getElementById('prop-is-route').checked);
+                    const routeCurve = this.normalizeRouteCurveValue((document.getElementById('prop-route-curve') && document.getElementById('prop-route-curve').value) || 'line');
+                    const routeFlag = routeToggleChecked || routeCurve !== 'line';
                     const routeArcSide = String((document.getElementById('prop-route-arc-side') && document.getElementById('prop-route-arc-side').value) || 'left');
                     const routeArcDegRaw = Number((document.getElementById('prop-route-arc-deg') && document.getElementById('prop-route-arc-deg').value) || 120);
                     const routeArcDegrees = Number.isFinite(routeArcDegRaw) ? Math.max(5, Math.min(355, routeArcDegRaw)) : 120;
