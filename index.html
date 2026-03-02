@@ -1848,7 +1848,7 @@
                 <option value="export">Export</option>
             </select>
             <label>Canal (key):</label>
-            <input type="text" id="prop-portal-key" placeholder="A1">
+            <input type="text" id="prop-portal-key" placeholder="A1 / B1 / C1 / D1">
         </div>
         <div class="property-group" id="prop-geometry-tools" style="display:none;">
             <label>Geometría:</label>
@@ -3670,7 +3670,7 @@
                 }
                 if (elem.type === 'portal') {
                     const k = String(elem.portalKind || 'import');
-                    const key = String(elem.portalKey || 'A1');
+                    const key = this.normalizePortalKey(elem.portalKey) || 'A1';
                     return `${k === 'export' ? 'Portal Export' : 'Portal Import'} · ${key}`;
                 }
 
@@ -6697,7 +6697,7 @@
                             width: 36,
                             height: 36,
                             portalKind,
-                            portalKey: 'A1',
+                            portalKey: portalKind === 'export' ? 'B1' : 'A1',
                             fillColor: portalKind === 'import' ? '#22d3ee' : '#a78bfa',
                             strokeColor: '#0b1027',
                             lineWidth: 3
@@ -7436,16 +7436,66 @@
                 return found;
             }
 
+            normalizePortalKey(rawKey) {
+                const raw = String(rawKey || '').trim().toUpperCase().replace(/\s+/g, '');
+                if (!raw) return '';
+                return raw.replace(/[^A-Z0-9]/g, '');
+            }
+
+            parsePortalKey(rawKey) {
+                const key = this.normalizePortalKey(rawKey);
+                if (!key) return null;
+                const match = /^([A-Z])([0-9]+)?$/.exec(key);
+                if (!match) return { key, letter: '', index: null, counterpart: '', family: key };
+                const letter = String(match[1] || '');
+                const index = Number.isFinite(Number(match[2])) ? Number(match[2]) : null;
+                let counterpart = letter;
+                let family = letter;
+                if (letter === 'A' || letter === 'B') {
+                    counterpart = letter === 'A' ? 'B' : 'A';
+                    family = 'AB';
+                } else if (letter === 'C' || letter === 'D') {
+                    counterpart = letter === 'C' ? 'D' : 'C';
+                    family = 'CD';
+                }
+                return { key, letter, index, counterpart, family };
+            }
+
+            scorePortalMatch(importInfo, exportPortal) {
+                const expInfo = this.parsePortalKey(exportPortal && exportPortal.portalKey);
+                if (!importInfo || !expInfo) return -1;
+                if (expInfo.key === importInfo.key) return 1000; // Compatibilidad histórica exacta.
+                if (importInfo.index != null && expInfo.index != null && expInfo.index !== importInfo.index) return -1;
+
+                let score = 0;
+                if (importInfo.family && expInfo.family === importInfo.family) score += 100;
+                if (expInfo.letter && expInfo.letter === importInfo.counterpart) score += 150; // A↔B y C↔D.
+                if (importInfo.index != null && expInfo.index === importInfo.index) score += 80;
+                if (!score && importInfo.letter && expInfo.letter === importInfo.letter) score += 30;
+                return score;
+            }
+
             findMatchingExportPortal(importPortal) {
                 if (!importPortal || importPortal.type !== 'portal') return null;
-                const key = String(importPortal.portalKey || '').trim().toLowerCase();
-                if (!key) return null;
+                const importInfo = this.parsePortalKey(importPortal.portalKey);
+                if (!importInfo || !importInfo.key) return null;
+
+                const importCenter = this.getPortalCenter(importPortal);
                 let out = null;
+                let bestScore = -1;
+                let bestDist = Infinity;
                 (this.elements || []).forEach((elem) => {
                     if (!elem || elem.type !== 'portal') return;
                     if (String(elem.portalKind || '') !== 'export') return;
-                    if (String(elem.portalKey || '').trim().toLowerCase() !== key) return;
-                    out = elem;
+                    const score = this.scorePortalMatch(importInfo, elem);
+                    if (score < 0) return;
+                    const c = this.getPortalCenter(elem);
+                    const d = (c && importCenter) ? Math.sqrt(Math.pow(c.x - importCenter.x, 2) + Math.pow(c.y - importCenter.y, 2)) : Infinity;
+                    if (score > bestScore || (score === bestScore && d < bestDist)) {
+                        bestScore = score;
+                        bestDist = d;
+                        out = elem;
+                    }
                 });
                 return out;
             }
@@ -7479,23 +7529,36 @@
                 return { x: cOut.x, y: cOut.y, angle: state.angle || 0, routeFound: true };
             }
 
+            autoAssignNearestRoute(elem) {
+                if (!elem || typeof elem !== 'object') return false;
+                const canFollow = elem.type === 'mover' || Boolean(elem.followRoute);
+                if (!canFollow) return false;
+
+                const center = elem.type === 'mover'
+                    ? {
+                        x: Number.isFinite(Number(elem.x)) ? Number(elem.x) : 0,
+                        y: Number.isFinite(Number(elem.y)) ? Number(elem.y) : 0
+                    }
+                    : this.getElementCenterPoint(elem);
+                const nearest = this.findNearestRouteForPoint(center.x, center.y);
+                if (!nearest) return false;
+
+                elem.routeId = String(nearest.id);
+                const t = this.projectPointToRouteProgress(nearest, center.x, center.y);
+                if (elem.type === 'mover') {
+                    elem.progress = Math.max(0, Math.min(1, t));
+                } else {
+                    elem.routeProgress = Math.max(0, Math.min(1, t));
+                }
+                return true;
+            }
+
             bindSelectedMoversToNearestRoute() {
                 if (!Array.isArray(this.selectedElements) || this.selectedElements.length === 0) return;
                 let changed = 0;
                 this.selectedElements.forEach((elem) => {
                     if (!elem || typeof elem !== 'object' || elem.locked) return;
-                    const canFollow = elem.type === 'mover' || Boolean(elem.followRoute);
-                    if (!canFollow) return;
-                    const state = this.resolveElementRouteState(elem, false);
-                    const nearest = this.findNearestRouteForPoint(state.x, state.y);
-                    if (!nearest) return;
-                    elem.routeId = String(nearest.id);
-                    if (elem.type === 'mover') {
-                        elem.progress = Math.max(0, Math.min(1, Number(elem.progress) || 0));
-                    } else {
-                        elem.routeProgress = Math.max(0, Math.min(1, Number(elem.routeProgress) || 0));
-                    }
-                    changed++;
+                    if (this.autoAssignNearestRoute(elem)) changed++;
                 });
                 if (changed > 0) {
                     this.saveHistory();
@@ -7513,12 +7576,24 @@
                     ? { x: Number.isFinite(elem.x) ? elem.x : 0, y: Number.isFinite(elem.y) ? elem.y : 0 }
                     : this.getElementCenterPoint(elem);
                 const enabled = isMover ? true : Boolean(elem.followRoute);
-                const routeId = String(elem.routeId || '');
-                if (!enabled || !routeId) {
+                const autoConnect = Boolean(elem.autoConnectRoute);
+                if (!enabled) {
                     return { x: defaultCenter.x, y: defaultCenter.y, angle: 0, routeFound: false };
                 }
 
+                let routeId = String(elem.routeId || '');
+                if (!routeId && autoConnect) {
+                    this.autoAssignNearestRoute(elem);
+                    routeId = String(elem.routeId || '');
+                }
+                if (!routeId) return { x: defaultCenter.x, y: defaultCenter.y, angle: 0, routeFound: false };
+
                 let route = this.getRouteElementById(routeId);
+                if (!route && autoConnect) {
+                    this.autoAssignNearestRoute(elem);
+                    routeId = String(elem.routeId || '');
+                    route = this.getRouteElementById(routeId);
+                }
                 if (!route) return { x: defaultCenter.x, y: defaultCenter.y, angle: 0, routeFound: false };
                 let points = this.getRoutePoints(route);
                 if (points.length <= 1) return { x: defaultCenter.x, y: defaultCenter.y, angle: 0, routeFound: false };
@@ -7529,7 +7604,6 @@
 
                 const dirRaw = isMover ? elem.flowDirection : (elem.routeDirection || elem.flowDirection);
                 let dir = String(dirRaw || 'right') === 'left' ? -1 : 1;
-                const autoConnect = Boolean(elem.autoConnectRoute);
                 const routeMode = String(elem.routeMode || 'loop');
 
                 if (updateProgress && elem.active !== false) {
@@ -9699,8 +9773,8 @@
                                     if (!Number.isFinite(elem.y)) elem.y = 0;
                                     if (!Number.isFinite(elem.width)) elem.width = 36;
                                     if (!Number.isFinite(elem.height)) elem.height = 36;
-                                    if (typeof elem.portalKind !== 'string') elem.portalKind = 'import';
-                                    if (typeof elem.portalKey !== 'string') elem.portalKey = 'A1';
+                                    elem.portalKind = String(elem.portalKind || 'import').toLowerCase() === 'export' ? 'export' : 'import';
+                                    elem.portalKey = this.normalizePortalKey(elem.portalKey) || 'A1';
                                     if (typeof elem.fillColor !== 'string') elem.fillColor = (elem.portalKind === 'export') ? '#a78bfa' : '#22d3ee';
                                     if (typeof elem.strokeColor !== 'string') elem.strokeColor = '#0b1027';
 			                    }
@@ -11836,6 +11910,7 @@
                     const moverTools = document.getElementById('prop-mover-tools');
                     const followRouteInput = document.getElementById('prop-follow-route');
                     const routeIdInput = document.getElementById('prop-route-id');
+                    const bindNearestRouteBtn = document.getElementById('btn-bind-nearest-route');
                     const routeModeInput = document.getElementById('prop-route-mode');
                     const autoConnectRouteInput = document.getElementById('prop-auto-connect-route');
                     const moverSpeed = document.getElementById('prop-mover-speed');
@@ -11866,6 +11941,9 @@
                         routeIdInput.value = '';
                         if (autoConnectRouteInput) autoConnectRouteInput.checked = false;
                     }
+                    const autoConnectOn = Boolean(autoConnectRouteInput && autoConnectRouteInput.checked);
+                    if (routeIdInput) routeIdInput.disabled = autoConnectOn;
+                    if (bindNearestRouteBtn) bindNearestRouteBtn.disabled = autoConnectOn;
                     if (moverSizeTools) moverSizeTools.style.display = isMover ? 'block' : 'none';
                     if (isMover) {
                         const w = Math.max(12, Math.min(320, Math.round(Math.abs(Number(elem.width) || 44))));
@@ -11883,7 +11961,7 @@
                     if (portalTools) portalTools.style.display = isPortal ? 'block' : 'none';
                     if (isPortal) {
                         if (portalKindInput) portalKindInput.value = String(elem.portalKind || 'import');
-                        if (portalKeyInput) portalKeyInput.value = String(elem.portalKey || 'A1');
+                        if (portalKeyInput) portalKeyInput.value = this.normalizePortalKey(elem.portalKey) || 'A1';
                     }
                     
                     document.getElementById('prop-connection-status').value = elem.connectionStatus || 'none';
@@ -11997,7 +12075,7 @@
                     const routeId = String((document.getElementById('prop-route-id') && document.getElementById('prop-route-id').value) || '').trim();
                     const routeMode = String((document.getElementById('prop-route-mode') && document.getElementById('prop-route-mode').value) || 'loop');
                     const portalKind = String((document.getElementById('prop-portal-kind') && document.getElementById('prop-portal-kind').value) || 'import');
-                    const portalKey = String((document.getElementById('prop-portal-key') && document.getElementById('prop-portal-key').value) || 'A1').trim();
+                    const portalKey = this.normalizePortalKey((document.getElementById('prop-portal-key') && document.getElementById('prop-portal-key').value) || 'A1') || 'A1';
                     const moverSpeedEl = document.getElementById('prop-mover-speed');
                     const moverSpeedRaw = moverSpeedEl ? Number.parseFloat(String(moverSpeedEl.value || '')) : NaN;
                     const moverSpeed = Number.isFinite(moverSpeedRaw) ? Math.max(1, Math.min(300, moverSpeedRaw)) : 40;
@@ -12066,20 +12144,22 @@
                             }
                         }
                         if (elem.type === 'mover') {
-                            elem.routeId = routeId;
+                            elem.routeId = autoConnectRouteFlag ? String(elem.routeId || '') : routeId;
                             elem.speed = moverSpeed;
                             elem.flowDirection = document.getElementById('prop-flow-direction').value;
                             elem.routeMode = routeMode;
                             elem.autoConnectRoute = autoConnectRouteFlag;
                             elem.width = moverWidth;
                             elem.height = moverHeight;
+                            if (elem.autoConnectRoute) this.autoAssignNearestRoute(elem);
                         } else if (elem.type !== 'line' && elem.type !== 'portal') {
                             elem.followRoute = followRouteFlag;
-                            elem.routeId = routeId;
+                            elem.routeId = autoConnectRouteFlag ? String(elem.routeId || '') : routeId;
                             elem.routeSpeed = moverSpeed;
                             elem.routeDirection = document.getElementById('prop-flow-direction').value;
                             elem.routeMode = routeMode;
                             elem.autoConnectRoute = autoConnectRouteFlag;
+                            if (elem.autoConnectRoute) this.autoAssignNearestRoute(elem);
                         }
                         if (elem.type === 'portal') {
                             elem.portalKind = (portalKind === 'export') ? 'export' : 'import';
