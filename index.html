@@ -2598,6 +2598,7 @@
                 url.searchParams.set('fit', '1');
                 url.searchParams.set('labels', '0');
                 url.searchParams.set('builderLive', '1');
+                url.searchParams.set('liveOnly', '1');
                 url.searchParams.set('liveSession', this.getBuilderPreviewSessionId());
                 url.searchParams.set('bg', 'studio');
                 url.searchParams.set('fx', '1');
@@ -2617,6 +2618,10 @@
                 this.builderPreview.sessionId = session;
                 safeLocalStorageSet('builder-preview-session-id', session);
                 return session;
+            }
+
+            getBuilderPreviewStorageKey() {
+                return `flow-builder-live-${this.getBuilderPreviewSessionId()}`;
             }
 
             openBuilderPreviewWindow() {
@@ -2889,6 +2894,16 @@
                 }
                 if (!force && signature === this.builderPreview.lastSignature) return;
                 this.builderPreview.lastSignature = signature;
+
+                try {
+                    safeLocalStorageSet(this.getBuilderPreviewStorageKey(), JSON.stringify({
+                        signature,
+                        at: Date.now(),
+                        project: payload
+                    }));
+                } catch {
+                    // Ignorar fallback de storage
+                }
 
                 if (frameReady) {
                     try {
@@ -10985,6 +11000,7 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 const mode = String(urlParams.get('mode') || '').trim().toLowerCase();
                 const isDeck = mode === 'deck';
+                const liveOnly = ['1', 'true', 'yes', 'on'].includes(String(urlParams.get('liveOnly') || '').trim().toLowerCase());
 
                 const deckFallback = (reason) => {
                     if (!isDeck) return;
@@ -11080,6 +11096,17 @@
                             console.error('❌ Error al cargar proyecto desde URL:', error);
                             deckFallback('error al cargar proyecto desde URL');
                         });
+                    return;
+                }
+
+                // En modo liveOnly (ventana/iframe de preview vivo): no cargar fallback local/project.json.
+                // Espera datos en vivo por postMessage/localStorage.
+                if (liveOnly) {
+                    this.elements = [];
+                    this.selectedElements = [];
+                    this.camera = { x: 0, y: 0, zoom: 1 };
+                    this.updateZoomIndicator();
+                    this.refreshDeckUI();
                     return;
                 }
 
@@ -11872,14 +11899,14 @@
             const raw = String(params.get('builderLive') || params.get('builder_live') || '').trim().toLowerCase();
             const enabled = raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
             if (!enabled) return;
+            const session = String(params.get('liveSession') || '').trim();
+            const storageKey = session ? `flow-builder-live-${session}` : '';
+            let lastSignature = '';
 
-            window.addEventListener('message', (event) => {
-                const data = event && event.data ? event.data : null;
-                if (!data || typeof data !== 'object') return;
-                if (String(data.type || '') !== 'flow-builder-project') return;
-                if (!data.project) return;
+            const applyLivePayload = (project) => {
+                if (!project) return;
                 try {
-                    system.applyLoadedProject(data.project, {
+                    system.applyLoadedProject(project, {
                         source: 'builder-live',
                         isDeck: system.viewerMode === 'deck',
                         requireElements: false
@@ -11890,7 +11917,35 @@
                 } catch (error) {
                     console.warn('⚠️ Error al aplicar builder-live:', error);
                 }
+            };
+
+            window.addEventListener('message', (event) => {
+                const data = event && event.data ? event.data : null;
+                if (!data || typeof data !== 'object') return;
+                if (String(data.type || '') !== 'flow-builder-project') return;
+                if (!data.project) return;
+                applyLivePayload(data.project);
             });
+
+            // Fallback robusto: si postMessage se pierde, leer snapshot vivo desde localStorage.
+            if (storageKey) {
+                const pullFromStorage = () => {
+                    try {
+                        const rawJson = safeLocalStorageGet(storageKey, '');
+                        if (!rawJson) return;
+                        const parsed = JSON.parse(rawJson);
+                        const sig = String(parsed && parsed.signature || '');
+                        if (!sig || sig === lastSignature) return;
+                        lastSignature = sig;
+                        applyLivePayload(parsed.project);
+                    } catch {
+                        // Ignorar
+                    }
+                };
+
+                pullFromStorage();
+                setInterval(pullFromStorage, 180);
+            }
         }
 
         // Ejecutar al cargar la página
