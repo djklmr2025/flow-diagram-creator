@@ -10890,6 +10890,62 @@
                 return true;
             }
 
+            getVisiblePaintBounds() {
+                const flat = this.flattenGroupElements(this.elements || []);
+                let minX = Infinity;
+                let minY = Infinity;
+                let maxX = -Infinity;
+                let maxY = -Infinity;
+                let count = 0;
+
+                for (let i = 0; i < flat.length; i++) {
+                    const elem = flat[i];
+                    if (!this.elementHasVisiblePaint(elem)) continue;
+                    const b = this.getElementBounds(elem);
+                    if (!b) continue;
+                    if (!Number.isFinite(b.minX) || !Number.isFinite(b.minY) || !Number.isFinite(b.maxX) || !Number.isFinite(b.maxY)) continue;
+
+                    const bw = Math.max(1, b.maxX - b.minX);
+                    const bh = Math.max(1, b.maxY - b.minY);
+                    const cx = (b.minX + b.maxX) / 2;
+                    const cy = (b.minY + b.maxY) / 2;
+                    // Ignorar outliers extremos para viewer.
+                    if (bw > 500000 || bh > 500000 || Math.abs(cx) > 1000000 || Math.abs(cy) > 1000000) continue;
+
+                    minX = Math.min(minX, b.minX);
+                    minY = Math.min(minY, b.minY);
+                    maxX = Math.max(maxX, b.maxX);
+                    maxY = Math.max(maxY, b.maxY);
+                    count += 1;
+                }
+
+                if (!count || !Number.isFinite(minX)) return null;
+                return { minX, minY, maxX, maxY, count };
+            }
+
+            autoFitCameraToVisibleElements(paddingPx) {
+                const bounds = this.getVisiblePaintBounds();
+                if (!bounds) return false;
+
+                const pad = Number.isFinite(Number(paddingPx)) ? Number(paddingPx) : 48;
+                const cw = this.canvas.width;
+                const ch = this.canvas.height;
+                if (!Number.isFinite(cw) || !Number.isFinite(ch) || cw <= 0 || ch <= 0) return false;
+
+                const bw = Math.max(1, bounds.maxX - bounds.minX);
+                const bh = Math.max(1, bounds.maxY - bounds.minY);
+                const zoom = Math.min(cw / (bw + pad * 2), ch / (bh + pad * 2));
+                const clamped = Math.max(0.05, Math.min(5, zoom));
+                const cx = (bounds.minX + bounds.maxX) / 2;
+                const cy = (bounds.minY + bounds.maxY) / 2;
+
+                this.camera.zoom = clamped;
+                this.camera.x = cw / 2 - cx * clamped;
+                this.camera.y = ch / 2 - cy * clamped;
+                this.updateZoomIndicator();
+                return true;
+            }
+
             maybeAutoFitViewerCamera() {
                 if (!this.shouldAutoFitForViewer()) return;
 
@@ -10897,7 +10953,9 @@
                 const pad = Number.parseInt(String(urlParams.get('pad') || ''), 10);
                 const padding = Number.isFinite(pad) ? Math.min(Math.max(pad, 0), 500) : 64;
 
-                this.autoFitCameraToElements(padding);
+                if (!this.autoFitCameraToVisibleElements(padding)) {
+                    this.autoFitCameraToElements(padding);
+                }
             }
 
             isViewerLikeMode() {
