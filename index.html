@@ -7813,8 +7813,26 @@
                 this.ctx.fillStyle = resolvedFill;
 
                 if (kind === 'metro') {
+                    const rx = -w / 2;
+                    const ry = -h / 2;
+                    const rr = Math.max(4, h * 0.2);
                     this.ctx.beginPath();
-                    this.ctx.roundRect(-w / 2, -h / 2, w, h, Math.max(4, h * 0.2));
+                    if (typeof this.ctx.roundRect === 'function') {
+                        this.ctx.roundRect(rx, ry, w, h, rr);
+                    } else {
+                        // Fallback compatible cuando CanvasRenderingContext2D.roundRect no existe.
+                        const r = Math.max(0, Math.min(rr, w / 2, h / 2));
+                        this.ctx.moveTo(rx + r, ry);
+                        this.ctx.lineTo(rx + w - r, ry);
+                        this.ctx.arcTo(rx + w, ry, rx + w, ry + r, r);
+                        this.ctx.lineTo(rx + w, ry + h - r);
+                        this.ctx.arcTo(rx + w, ry + h, rx + w - r, ry + h, r);
+                        this.ctx.lineTo(rx + r, ry + h);
+                        this.ctx.arcTo(rx, ry + h, rx, ry + h - r, r);
+                        this.ctx.lineTo(rx, ry + r);
+                        this.ctx.arcTo(rx, ry, rx + r, ry, r);
+                        this.ctx.closePath();
+                    }
                     this.ctx.fill();
                     this.ctx.stroke();
 
@@ -7852,10 +7870,19 @@
                 this.ctx.restore();
             }
 
-	            drawElement(elem) {
-	                if (elem.type === 'group' && Array.isArray(elem.elements)) {
-	                    // Dibujar elementos dentro del grupo
-	                    elem.elements.forEach(child => this.drawElement(child));
+            drawElement(elem) {
+                if (elem.type === 'group' && Array.isArray(elem.elements)) {
+                    // Dibujar elementos dentro del grupo
+                    elem.elements.forEach((child) => {
+                        this.ctx.save();
+                        try {
+                            this.drawElement(child);
+                        } catch (err) {
+                            this.reportRenderError(err, `drawElement:group-child:${String(child && child.type || 'unknown')}`);
+                        } finally {
+                            this.ctx.restore();
+                        }
+                    });
 
                     // Dibujar nombre si existe
                     if (this.shouldRenderElementLabels() && elem.name) {
