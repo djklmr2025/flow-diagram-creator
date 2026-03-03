@@ -11131,6 +11131,64 @@
                 return true;
             }
 
+            getViewerSafeBounds() {
+                const flat = this.flattenGroupElements(this.elements || []);
+                let minX = Infinity;
+                let minY = Infinity;
+                let maxX = -Infinity;
+                let maxY = -Infinity;
+                let count = 0;
+
+                for (let i = 0; i < flat.length; i++) {
+                    const elem = flat[i];
+                    if (!elem || typeof elem !== 'object') continue;
+                    if (this.isViewerLikeMode() && this.isViewerElementOutlier(elem)) continue;
+                    const b = this.getElementBounds(elem);
+                    if (!b) continue;
+                    if (!Number.isFinite(b.minX) || !Number.isFinite(b.minY) || !Number.isFinite(b.maxX) || !Number.isFinite(b.maxY)) continue;
+                    const bw = Math.max(1, b.maxX - b.minX);
+                    const bh = Math.max(1, b.maxY - b.minY);
+                    const cx = (b.minX + b.maxX) / 2;
+                    const cy = (b.minY + b.maxY) / 2;
+                    if (bw > 500000 || bh > 500000 || Math.abs(cx) > 1000000 || Math.abs(cy) > 1000000) continue;
+
+                    minX = Math.min(minX, b.minX);
+                    minY = Math.min(minY, b.minY);
+                    maxX = Math.max(maxX, b.maxX);
+                    maxY = Math.max(maxY, b.maxY);
+                    count += 1;
+                }
+
+                if (!count || !Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+                    return null;
+                }
+                return { minX, minY, maxX, maxY, count };
+            }
+
+            forceViewerSafeFit(paddingPx) {
+                if (!this.isViewerLikeMode()) return false;
+                const cw = Number(this.canvas && this.canvas.width);
+                const ch = Number(this.canvas && this.canvas.height);
+                if (!Number.isFinite(cw) || !Number.isFinite(ch) || cw <= 0 || ch <= 0) return false;
+
+                const bounds = this.getViewerSafeBounds();
+                if (!bounds) return false;
+
+                const pad = Number.isFinite(Number(paddingPx)) ? Number(paddingPx) : 96;
+                const bw = Math.max(1, bounds.maxX - bounds.minX);
+                const bh = Math.max(1, bounds.maxY - bounds.minY);
+                const zoom = Math.min(cw / (bw + pad * 2), ch / (bh + pad * 2));
+                const clamped = Math.max(0.05, Math.min(5, zoom));
+                const cx = (bounds.minX + bounds.maxX) / 2;
+                const cy = (bounds.minY + bounds.maxY) / 2;
+
+                this.camera.zoom = clamped;
+                this.camera.x = cw / 2 - cx * clamped;
+                this.camera.y = ch / 2 - cy * clamped;
+                this.updateZoomIndicator();
+                return true;
+            }
+
             elementHasVisiblePaint(elem) {
                 if (!elem || typeof elem !== 'object') return false;
                 const t = String(elem.type || '');
@@ -11836,6 +11894,29 @@
                         this.camera = { x: 0, y: 0, zoom: 1 };
                         this.maybeAutoFitViewerCamera();
                         this.ensureViewerCameraHasVisibleContent();
+                    }
+                    // Fallback definitivo: forzar fit por bounds válidos cuando todavía no hay pintura visible
+                    // o cuando la cámara quedó en default (0,0,1).
+                    if (this.isViewerLikeMode()) {
+                        const cam = this.camera || { x: 0, y: 0, zoom: 1 };
+                        const nearDefaultCam =
+                            Math.abs(Number(cam.x) || 0) < 1 &&
+                            Math.abs(Number(cam.y) || 0) < 1 &&
+                            Math.abs((Number(cam.zoom) || 1) - 1) < 0.001;
+                        if (nearDefaultCam || !this.viewerHasVisiblePaintOnScreen()) {
+                            this.forceViewerSafeFit(112);
+                            this.ensureViewerCameraHasVisibleContent();
+                        }
+                        requestAnimationFrame(() => {
+                            try {
+                                if (!this.viewerHasVisiblePaintOnScreen()) {
+                                    this.forceViewerSafeFit(128);
+                                    this.ensureViewerCameraHasVisibleContent();
+                                }
+                            } catch {
+                                // Ignorar
+                            }
+                        });
                     }
                 }
                 this.refreshDeckUI();
@@ -12986,6 +13067,18 @@
                         // En preview vivo respetar la cámara del builder para evitar "pantalla negra" por auto-fit inestable.
                         autoFit: false
                     });
+                    // Rescate por si llega snapshot con cámara inválida/default y deja canvas negro.
+                    try {
+                        if (system.isViewerLikeMode && system.isViewerLikeMode()) {
+                            const hasVisible = system.viewerHasVisiblePaintOnScreen ? system.viewerHasVisiblePaintOnScreen() : true;
+                            if (!hasVisible) {
+                                if (system.forceViewerSafeFit) system.forceViewerSafeFit(112);
+                                if (system.ensureViewerCameraHasVisibleContent) system.ensureViewerCameraHasVisibleContent();
+                            }
+                        }
+                    } catch {
+                        // Ignorar
+                    }
                     if (system.viewerMode === 'deck') {
                         system.refreshDeckUI();
                     }
