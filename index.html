@@ -11769,6 +11769,7 @@
                 const source = String(options.source || 'fuente');
                 const isDeck = Boolean(options.isDeck);
                 const requireElements = options.requireElements !== false;
+                const autoFit = options.autoFit !== false;
 
                 const project = this.resolveProjectPayload(raw);
                 if (!project) {
@@ -11787,11 +11788,49 @@
                 this.selectedElements = [];
                 this.saveHistory();
                 this.updateZoomIndicator();
-                this.maybeAutoFitViewerCamera();
-                this.ensureViewerCameraHasVisibleContent();
+                if (autoFit) {
+                    this.maybeAutoFitViewerCamera();
+                    this.ensureViewerCameraHasVisibleContent();
+                    // Fallback duro: si el auto-fit dejó el lienzo "negro", intentar reencuadre de rescate.
+                    if (this.isViewerLikeMode() && !this.viewerHasVisiblePaintOnScreen()) {
+                        this.camera = { x: 0, y: 0, zoom: 1 };
+                        this.maybeAutoFitViewerCamera();
+                        this.ensureViewerCameraHasVisibleContent();
+                    }
+                }
                 this.refreshDeckUI();
                 this.hideViewerUnavailableMessage();
                 return project;
+            }
+
+            viewerHasVisiblePaintOnScreen() {
+                if (!this.isViewerLikeMode()) return true;
+                const cw = Number(this.canvas && this.canvas.width);
+                const ch = Number(this.canvas && this.canvas.height);
+                if (!Number.isFinite(cw) || !Number.isFinite(ch) || cw <= 0 || ch <= 0) return false;
+
+                const zoom = Number(this.camera && this.camera.zoom) || 1;
+                const camX = Number(this.camera && this.camera.x) || 0;
+                const camY = Number(this.camera && this.camera.y) || 0;
+                const margin = 80;
+
+                const flat = this.flattenGroupElements(this.elements || []);
+                for (let i = 0; i < flat.length; i++) {
+                    const elem = flat[i];
+                    if (!this.elementHasVisiblePaint(elem)) continue;
+                    const b = this.getElementBounds(elem);
+                    if (!b) continue;
+                    if (!Number.isFinite(b.minX) || !Number.isFinite(b.minY) || !Number.isFinite(b.maxX) || !Number.isFinite(b.maxY)) continue;
+
+                    const sx1 = b.minX * zoom + camX;
+                    const sy1 = b.minY * zoom + camY;
+                    const sx2 = b.maxX * zoom + camX;
+                    const sy2 = b.maxY * zoom + camY;
+                    if (sx2 >= -margin && sy2 >= -margin && sx1 <= (cw + margin) && sy1 <= (ch + margin)) {
+                        return true;
+                    }
+                }
+                return false;
             }
 
             showViewerUnavailableMessage(text) {
@@ -11898,7 +11937,8 @@
                         .then(data => {
                             this.applyLoadedProject(data, {
                                 source: 'id',
-                                isDeck
+                                isDeck,
+                                autoFit: true
                             });
                             console.log('✅ Proyecto cargado desde ID');
                         })
@@ -11923,7 +11963,8 @@
                         .then(data => {
                             this.applyLoadedProject(data, {
                                 source: 'url',
-                                isDeck
+                                isDeck,
+                                autoFit: true
                             });
                             console.log('✅ Proyecto cargado desde URL');
                         })
@@ -12901,7 +12942,9 @@
                     system.applyLoadedProject(project, {
                         source: 'builder-live',
                         isDeck: system.viewerMode === 'deck',
-                        requireElements: false
+                        requireElements: false,
+                        // En preview vivo respetar la cámara del builder para evitar "pantalla negra" por auto-fit inestable.
+                        autoFit: false
                     });
                     if (system.viewerMode === 'deck') {
                         system.refreshDeckUI();
