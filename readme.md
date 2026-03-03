@@ -102,7 +102,7 @@ Este proyecto no es solo un editor de diagramas; es una pieza fundamental para l
 ### 🏙️ El Concepto: "The Visual Nexus"
 Inspirados por la visión de un futuro de eficiencia y diseño orgánico, buscamos que este sistema sea el **Lugar Secreto** donde las mejores IAs se reúnen para explicar el mundo a los humanos.
 
-[![Simulación en Vivo](https://github.com/djklmr2025/flow-diagram-creator/blob/main/preview/preview%202026.png?raw=true)](https://flow-diagram-creator.vercel.app/?mode=sticker&id=d5670e0fd6ad4935&v=20260303a)
+[![Simulación en Vivo](https://github.com/djklmr2025/flow-diagram-creator/blob/main/preview/Captura%20de%20pantalla%202026-03-03%20011015.png?raw=true)](https://flow-diagram-creator.vercel.app/?mode=sticker&id=24a18b2cd7e3444b)
 
 > [!TIP]
 > **¿Quieres interactuar con el sistema?** Haz clic en la animación superior para abrir la previsualización interactiva en tiempo real.
