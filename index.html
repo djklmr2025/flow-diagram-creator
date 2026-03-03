@@ -7301,6 +7301,7 @@
                 if (!elem || typeof elem !== 'object') return [];
                 if (elem.type === 'line') {
                     if (!Number.isFinite(elem.x) || !Number.isFinite(elem.y) || !Number.isFinite(elem.endX) || !Number.isFinite(elem.endY)) return [];
+                    if (this.isViewerLikeMode() && this.isViewerElementOutlier(elem)) return [];
                     const curve = this.getRouteCurve(elem);
                     if (curve === 'circle') {
                         const cx = (elem.x + elem.endX) / 2;
@@ -7874,6 +7875,9 @@
             }
 
             drawElement(elem) {
+                if (this.isViewerLikeMode() && this.isViewerElementOutlier(elem)) {
+                    return;
+                }
                 if (elem.type === 'group' && Array.isArray(elem.elements)) {
                     // Dibujar elementos dentro del grupo
                     elem.elements.forEach((child) => {
@@ -11449,6 +11453,42 @@
                 }
 
                 return null;
+            }
+
+            isViewerCoordOutlier(value) {
+                const n = Number(value);
+                if (!Number.isFinite(n)) return true;
+                // Blindaje para payloads corruptos que meten coordenadas extremas y rompen el viewer.
+                return Math.abs(n) > 1000000;
+            }
+
+            isViewerElementOutlier(elem) {
+                if (!elem || typeof elem !== 'object') return true;
+                const t = String(elem.type || '');
+
+                if (t === 'group' && Array.isArray(elem.elements)) {
+                    return !elem.elements.some((child) => !this.isViewerElementOutlier(child));
+                }
+
+                if (t === 'line') {
+                    return (
+                        this.isViewerCoordOutlier(elem.x) ||
+                        this.isViewerCoordOutlier(elem.y) ||
+                        this.isViewerCoordOutlier(elem.endX) ||
+                        this.isViewerCoordOutlier(elem.endY)
+                    );
+                }
+
+                if ((t === 'path' || t === 'polygon') && Array.isArray(elem.points)) {
+                    if (!elem.points.length) return true;
+                    return !elem.points.some((p) => p && !this.isViewerCoordOutlier(p.x) && !this.isViewerCoordOutlier(p.y));
+                }
+
+                if (Number.isFinite(Number(elem.x)) && Number.isFinite(Number(elem.y))) {
+                    return this.isViewerCoordOutlier(elem.x) || this.isViewerCoordOutlier(elem.y);
+                }
+
+                return false;
             }
 
             updateBoxSelectionFromMarquee(options) {
