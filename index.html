@@ -2382,7 +2382,10 @@
                 safe('init.setupContextMenu', () => this.setupContextMenu());
                 safe('init.setupLayersPanel', () => this.setupLayersPanel());
                 // Activar modo visor lo antes posible para evitar mutaciones de rutas antes del primer render.
-                safe('init.applyViewerModeFromUrlEarly', () => this.applyViewerModeFromUrl());
+                safe('init.applyViewerModeFromUrlEarly', () => {
+                    this.applyViewerModeFromUrl();
+                    window.__viewerModeApplied = true;
+                });
                 safe('init.loadFromLocalStorage', () => this.loadFromLocalStorage());
                 safe('init.startAnimationLoop', () => this.startAnimationLoop());
 
@@ -9396,7 +9399,7 @@
                                 const frame = document.createElement('iframe');
                                 frame.setAttribute('loading', previewFrameCount < 8 ? 'eager' : 'lazy');
                                 frame.setAttribute('title', `preview-${id}`);
-                                frame.src = `${window.location.origin}/?mode=${thumbMode}&id=${encodeURIComponent(id)}`;
+                                frame.src = `${window.location.origin}/?mode=${thumbMode}&bg=studio&id=${encodeURIComponent(id)}`;
                                 thumb.appendChild(frame);
                                 previewFrameCount += 1;
                             } catch {
@@ -11638,6 +11641,8 @@
             }
             
             loadFromLocalStorage() {
+                // En modos viewer no inyectar proyecto local del editor.
+                if (this.readOnly) return;
                 // Cargar último proyecto automáticamente
                 const parsed = safeLocalStorageGetJSON('flow-diagrams', []);
                 const projects = Array.isArray(parsed) ? parsed : [];
@@ -11785,7 +11790,41 @@
                 this.maybeAutoFitViewerCamera();
                 this.ensureViewerCameraHasVisibleContent();
                 this.refreshDeckUI();
+                this.hideViewerUnavailableMessage();
                 return project;
+            }
+
+            showViewerUnavailableMessage(text) {
+                if (!this.readOnly) return;
+                const container = document.getElementById('canvas-container');
+                if (!container) return;
+                let box = document.getElementById('viewer-unavailable-msg');
+                if (!box) {
+                    box = document.createElement('div');
+                    box.id = 'viewer-unavailable-msg';
+                    box.style.position = 'absolute';
+                    box.style.left = '50%';
+                    box.style.top = '50%';
+                    box.style.transform = 'translate(-50%, -50%)';
+                    box.style.padding = '12px 16px';
+                    box.style.borderRadius = '12px';
+                    box.style.background = 'rgba(8, 20, 45, 0.88)';
+                    box.style.border = '1px solid rgba(147,197,253,0.5)';
+                    box.style.color = '#dbeafe';
+                    box.style.fontSize = '14px';
+                    box.style.fontWeight = '600';
+                    box.style.zIndex = '20';
+                    box.style.pointerEvents = 'none';
+                    box.style.backdropFilter = 'blur(2px)';
+                    container.appendChild(box);
+                }
+                box.textContent = String(text || '⚠️ Proyecto no disponible');
+                box.style.display = 'block';
+            }
+
+            hideViewerUnavailableMessage() {
+                const box = document.getElementById('viewer-unavailable-msg');
+                if (box) box.style.display = 'none';
             }
             
             loadFromURLParameter() {
@@ -11793,6 +11832,7 @@
                 const mode = String(urlParams.get('mode') || '').trim().toLowerCase();
                 const isDeck = mode === 'deck';
                 const liveOnly = ['1', 'true', 'yes', 'on'].includes(String(urlParams.get('liveOnly') || '').trim().toLowerCase());
+                this.hideViewerUnavailableMessage();
 
                 const deckFallback = (reason) => {
                     if (!isDeck) return;
@@ -11823,12 +11863,13 @@
                     } catch (error) {
                         try {
                             data = JSON.parse(decodeURIComponent(jsonData));
-                        } catch (error2) {
-                            console.error('❌ Error al parsear JSON desde URL:', error2);
-                            deckFallback('error al parsear parámetro data');
-                            return;
-                        }
+                    } catch (error2) {
+                        console.error('❌ Error al parsear JSON desde URL:', error2);
+                        deckFallback('error al parsear parámetro data');
+                        if (!isDeck) this.showViewerUnavailableMessage('⚠️ Proyecto no disponible');
+                        return;
                     }
+                }
                     
                     try {
                         this.applyLoadedProject(data, {
@@ -11839,6 +11880,7 @@
                     } catch (error) {
                         console.error('❌ Error al cargar proyecto desde parámetro data:', error);
                         deckFallback('proyecto inválido/vacío en parámetro data');
+                        if (!isDeck) this.showViewerUnavailableMessage('⚠️ Proyecto no disponible');
                     }
                     return;
                 }
@@ -11863,6 +11905,7 @@
                         .catch(error => {
                             console.error('❌ Error al cargar proyecto desde ID:', error);
                             deckFallback('id no encontrado o proyecto inválido/vacío');
+                            if (!isDeck) this.showViewerUnavailableMessage('⚠️ Proyecto no disponible');
                         });
                     return;
                 }
@@ -11887,6 +11930,7 @@
                         .catch(error => {
                             console.error('❌ Error al cargar proyecto desde URL:', error);
                             deckFallback('error al cargar proyecto desde URL');
+                            if (!isDeck) this.showViewerUnavailableMessage('⚠️ Proyecto no disponible');
                         });
                     return;
                 }
@@ -12916,7 +12960,10 @@
         // Ejecutar al cargar la página
         const bootLiveAndModes = () => {
             if (window.__FLOW_SKIP_BOOT__) return;
-            applyIAmodes();
+            if (!window.__viewerModeApplied) {
+                applyIAmodes();
+                window.__viewerModeApplied = true;
+            }
             setupBuilderLiveReceiver();
         };
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
