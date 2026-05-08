@@ -1,0 +1,12 @@
+npm warn exec The following package was not found and will be installed: serve@14.2.6
+ INFO  Accepting connections at http://localhost:3000
+ HTTP  5/8/2026 11:23:00 PM ::1 GET /previewer-2.0/index.html
+ HTTP  5/8/2026 11:23:00 PM ::1 Returned 301 in 300 ms
+ HTTP  5/8/2026 11:23:05 PM ::1 HEAD /previewer-2.0/index.html
+ HTTP  5/8/2026 11:23:05 PM ::1 Returned 301 in 1 ms
+ HTTP  5/8/2026 11:23:10 PM ::1 GET /previewer-2.0/index.html
+ HTTP  5/8/2026 11:23:10 PM ::1 Returned 301 in 2 ms
+ HTTP  5/8/2026 11:23:10 PM ::1 GET /previewer-2.0/index
+ HTTP  5/8/2026 11:23:10 PM ::1 Returned 301 in 0 ms
+ HTTP  5/8/2026 11:23:10 PM ::1 GET /previewer-2.0
+ HTTP  5/8/2026 11:23:10 PM ::1 Returned 200 in 7 ms
