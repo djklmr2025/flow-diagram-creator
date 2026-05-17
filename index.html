@@ -2166,7 +2166,7 @@
 	                if (msg.includes('chrome-extension://') || msg.includes('moz-extension://') || msg.includes('safari-extension://')) return true;
 	                if (m.startsWith('chrome-extension://') || m.startsWith('moz-extension://') || m.startsWith('safari-extension://')) return true;
 
-	                // Caso común: MetaMask no conectado (no es un bug del editor).
+	                // Caso común: MetaMask no conectado (no es un problema del editor).
 	                if (msg.includes('metamask')) return true;
 	                return false;
 	            };
