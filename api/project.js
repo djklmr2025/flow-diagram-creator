@@ -19,7 +19,7 @@ function getOrigin(req) {
   return `${proto}://${host}`;
 }
 
-function sanitizeId(input) {
+export function sanitizeId(input) {
   if (!input) return '';
   let id = String(input).trim();
   id = id.replace(/^\/+/, '');
