@@ -87,8 +87,8 @@ function countElementsRecursive(elements) {
   return count;
 }
 
-function extForMime(mime) {
-  switch (String(mime || '').toLowerCase()) {
+export function extForMime(mime) {
+  switch (String(mime || '').trim().toLowerCase()) {
     case 'image/png':
       return 'png';
     case 'image/jpeg':
