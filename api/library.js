@@ -29,7 +29,7 @@ function sanitizePrefix(input) {
   return prefix;
 }
 
-function sanitizeScope(input) {
+export function sanitizeScope(input) {
   const scope = String(input || 'library').toLowerCase().trim();
   if (scope === 'projects') return 'projects';
   return 'library';
