@@ -32,11 +32,11 @@ async function readJsonBody(req) {
   return JSON.parse(text);
 }
 
-function sanitizeSession(input) {
+export function sanitizeSession(input) {
   if (!input) return '';
   let session = String(input).trim();
-  session = session.replace(/^\/+/, '');
   session = session.replace(/\\+/g, '/');
+  session = session.replace(/^\/+/, '');
   session = session.replace(/\/+$/, '');
   if (!/^[a-zA-Z0-9/_-]+$/.test(session)) return '';
   if (session.includes('..')) return '';
