@@ -2050,6 +2050,15 @@
             }
         }
 
+        function escapeHTML(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
         function setBuildLabelsFromHtmlAttr() {
             const build = (document.documentElement && document.documentElement.getAttribute('data-build')) || '';
             const bootEl = document.getElementById('boot-build');
@@ -9142,13 +9151,13 @@
 
                 result.innerHTML = `
                     <div><strong>Sticker (transparente):</strong></div>
-                    <input type="text" readonly value="${stickerUrl}">
+                    <input type="text" readonly value="${escapeHTML(stickerUrl)}">
                     <div style="margin-top: 10px;"><strong>Preview (studio):</strong></div>
-                    <input type="text" readonly value="${previewUrl}">
+                    <input type="text" readonly value="${escapeHTML(previewUrl)}">
                     <div style="margin-top: 10px;"><strong>Deck (modo lámina):</strong></div>
-                    <input type="text" readonly value="${deckUrl}">
+                    <input type="text" readonly value="${escapeHTML(deckUrl)}">
                     <div style="margin-top: 10px;"><strong>JSON:</strong></div>
-                    <input type="text" readonly value="${data.jsonUrl}">
+                    <input type="text" readonly value="${escapeHTML(data.jsonUrl)}">
                     <div style="margin-top: 10px;">Tip: el link de preview se intentó copiar al portapapeles.</div>
                 `;
             }
@@ -9251,15 +9260,15 @@
 
                 result.innerHTML = `
                     <div><strong>Preview (studio):</strong></div>
-                    <input type="text" readonly value="${previewUrl}">
+                    <input type="text" readonly value="${escapeHTML(previewUrl)}">
                     <div style="margin-top: 10px;"><strong>Sticker (transparente):</strong></div>
-                    <input type="text" readonly value="${stickerUrl}">
+                    <input type="text" readonly value="${escapeHTML(stickerUrl)}">
                     <div style="margin-top: 10px;"><strong>Deck (modo lámina):</strong></div>
-                    <input type="text" readonly value="${deckUrl}">
+                    <input type="text" readonly value="${escapeHTML(deckUrl)}">
                     <div style="margin-top: 10px;"><strong>Editor (abre en modo edición):</strong></div>
-                    <input type="text" readonly value="${editorUrl}">
+                    <input type="text" readonly value="${escapeHTML(editorUrl)}">
                     <div style="margin-top: 10px;"><strong>JSON:</strong></div>
-                    <input type="text" readonly value="${data.jsonUrl}">
+                    <input type="text" readonly value="${escapeHTML(data.jsonUrl)}">
                     <div style="margin-top: 10px;">Tip: el link de preview se intentó copiar al portapapeles.</div>
                 `;
             }
