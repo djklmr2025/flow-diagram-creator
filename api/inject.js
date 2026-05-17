@@ -45,7 +45,7 @@ function sanitizeSession(input) {
   return session;
 }
 
-function analyzeElements(elements) {
+export function analyzeElements(elements) {
   let count = 0;
   let hasImages = false;
 
