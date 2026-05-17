@@ -78,7 +78,7 @@ function walkElements(elements, visitor) {
   }
 }
 
-function countElementsRecursive(elements) {
+export function countElementsRecursive(elements) {
   let count = 0;
   walkElements(elements, () => {
     count++;
