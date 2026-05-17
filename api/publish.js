@@ -31,12 +31,12 @@ async function readJsonBody(req) {
   return JSON.parse(text);
 }
 
-function sanitizeFolder(input) {
+export function sanitizeFolder(input) {
   if (!input) return '';
   let folder = String(input).trim();
+  folder = folder.replace(/\\/g, '/'); // normalizar
   folder = folder.replace(/^\/+/, ''); // sin slash inicial
   folder = folder.replace(/\/+$/, ''); // sin slash final
-  folder = folder.replace(/\\/g, '/'); // normalizar
 
   // Solo permitimos rutas simples tipo "metro/linea-1/estacion_x".
   if (!/^[a-zA-Z0-9/_-]+$/.test(folder)) return '';
