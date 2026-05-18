@@ -1921,6 +1921,22 @@
         <div class="context-menu-item" id="ctx-save-grouped">
             <span>📦</span> Guardar agrupado en biblioteca
         </div>
+        <div class="context-menu-separator" id="ctx-sep-export"></div>
+        <div class="context-menu-item" id="ctx-export-png">
+            <span>🖼️</span> Exportar PNG
+        </div>
+        <div class="context-menu-item" id="ctx-export-svg">
+            <span>✏️</span> Exportar SVG vectorial
+        </div>
+        <div class="context-menu-item" id="ctx-export-vector">
+            <span>📁</span> Guardar como .vector
+        </div>
+        <div class="context-menu-item" id="ctx-export-webp">
+            <span>📱</span> Sticker WhatsApp (WebP)
+        </div>
+        <div class="context-menu-item" id="ctx-export-gif">
+            <span>🎞️</span> Exportar GIF animado
+        </div>
 	        <div class="context-menu-item" id="ctx-delete">
             <span>🗑️</span> Eliminar
         </div>
@@ -3334,7 +3350,44 @@
                         this.hideContextMenu();
                     });
                 }
-                
+
+                // ── Export Module: listeners del menú contextual ──────────────
+                const _ctxExportName = () => (window.system && window.system.currentProjectName
+                    ? window.system.currentProjectName.replace(/\s+/g,'-').toLowerCase()
+                    : 'creacion');
+
+                const ctxExpPNG = document.getElementById('ctx-export-png');
+                if (ctxExpPNG) ctxExpPNG.addEventListener('click', () => {
+                    this.hideContextMenu();
+                    if (window.ExportModule) window.ExportModule.png(_ctxExportName());
+                    else alert('ExportModule no cargado — revisa export-module.js');
+                });
+
+                const ctxExpSVG = document.getElementById('ctx-export-svg');
+                if (ctxExpSVG) ctxExpSVG.addEventListener('click', () => {
+                    this.hideContextMenu();
+                    if (window.ExportModule) window.ExportModule.svg(_ctxExportName());
+                });
+
+                const ctxExpVector = document.getElementById('ctx-export-vector');
+                if (ctxExpVector) ctxExpVector.addEventListener('click', () => {
+                    this.hideContextMenu();
+                    if (window.ExportModule) window.ExportModule.vector(_ctxExportName());
+                });
+
+                const ctxExpWebP = document.getElementById('ctx-export-webp');
+                if (ctxExpWebP) ctxExpWebP.addEventListener('click', () => {
+                    this.hideContextMenu();
+                    if (window.ExportModule) window.ExportModule.webpStatic(_ctxExportName());
+                });
+
+                const ctxExpGIF = document.getElementById('ctx-export-gif');
+                if (ctxExpGIF) ctxExpGIF.addEventListener('click', () => {
+                    this.hideContextMenu();
+                    if (window.ExportModule) window.ExportModule.gif(_ctxExportName());
+                });
+                // ─────────────────────────────────────────────────────────────
+
                 document.getElementById('ctx-delete').addEventListener('click', () => {
                     this.deleteElements();
                     this.hideContextMenu();
@@ -5389,6 +5442,23 @@
                 if (flattenItem) flattenItem.style.display = canTransform ? 'block' : 'none';
                 const saveGroupedItem = document.getElementById('ctx-save-grouped');
                 if (saveGroupedItem) saveGroupedItem.style.display = (this.selectedElements && this.selectedElements.length > 0) ? 'block' : 'none';
+
+                // Exportar — visible siempre que haya al menos 1 elemento en el canvas
+                const hasElements = this.elements && this.elements.length > 0;
+                const hasSel = this.selectedElements && this.selectedElements.length > 0;
+                const isAnim = hasSel && this.selectedElements.some(el =>
+                    el && (el.isAnim || el.animColor || el.active === 'yes' || el.activo === 'si' ||
+                           el.type === 'mover-metro' || el.type === 'mover-male' || el.type === 'mover-female')
+                );
+                const showExport = hasElements;
+                ['ctx-export-png','ctx-export-svg','ctx-export-vector','ctx-export-webp','ctx-sep-export']
+                    .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = showExport ? 'block' : 'none'; });
+                const gifItem = document.getElementById('ctx-export-gif');
+                if (gifItem) {
+                    gifItem.style.display = showExport ? 'block' : 'none';
+                    gifItem.style.opacity = isAnim ? '1' : '0.45';
+                    gifItem.title = isAnim ? 'Exportar GIF animado' : 'Sin animación detectada en la selección';
+                }
 
                 menu.classList.add('show');
             }
