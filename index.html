@@ -1319,22 +1319,19 @@
             cursor: move;
         }
 
-        /* Menú contextual */
+        /* ── Menú contextual + submenús ─────────────────────────── */
         #context-menu {
             position: fixed;
             background: #16213e;
             border: 2px solid #e94560;
             border-radius: 8px;
             padding: 4px 0;
-            min-width: 156px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            min-width: 200px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.6);
             z-index: 3000;
             display: none;
         }
-
-        #context-menu.show {
-            display: block;
-        }
+        #context-menu.show { display: block; }
 
         .context-menu-item {
             padding: 8px 14px;
@@ -1344,18 +1341,81 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            transition: background 0.2s;
+            transition: background 0.15s;
+            white-space: nowrap;
+            position: relative;
         }
-
-        .context-menu-item:hover {
-            background: #0f3460;
-        }
+        .context-menu-item:hover { background: #0f3460; }
+        .context-menu-item.disabled { opacity: .38; cursor: default; pointer-events: none; }
 
         .context-menu-separator {
             height: 1px;
             background: #0f3460;
-            margin: 5px 0;
+            margin: 4px 0;
         }
+
+        /* ── Grupo colapsable (tiene submenú) ── */
+        .ctx-group-header {
+            padding: 8px 14px;
+            cursor: pointer;
+            color: #aac4ff;
+            font-size: 11.5px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: .4px;
+            transition: background 0.15s;
+            position: relative;
+            user-select: none;
+        }
+        .ctx-group-header:hover { background: #0f3460; }
+        .ctx-group-header .ctx-arrow {
+            margin-left: auto;
+            font-size: 9px;
+            transition: transform .2s;
+            opacity: .7;
+        }
+        .ctx-group-header.open .ctx-arrow { transform: rotate(90deg); }
+
+        .ctx-group-body {
+            overflow: hidden;
+            max-height: 0;
+            transition: max-height .2s ease;
+        }
+        .ctx-group-body.open { max-height: 400px; }
+
+        .ctx-group-body .context-menu-item {
+            padding-left: 30px;
+            font-size: 11.5px;
+            color: #ccc;
+        }
+        .ctx-group-body .context-menu-item:hover { background: #152a50; }
+
+        /* ── Submenú flotante (hover lateral) ── */
+        .ctx-has-fly > .ctx-fly-menu {
+            position: absolute;
+            left: 100%;
+            top: -4px;
+            background: #16213e;
+            border: 2px solid #e94560;
+            border-radius: 8px;
+            padding: 4px 0;
+            min-width: 190px;
+            box-shadow: 0 4px 24px rgba(0,0,0,.6);
+            display: none;
+            z-index: 3100;
+        }
+        .ctx-has-fly:hover > .ctx-fly-menu,
+        .ctx-has-fly:focus-within > .ctx-fly-menu { display: block; }
+        .ctx-has-fly::after {
+            content: '▶';
+            margin-left: auto;
+            font-size: 8px;
+            opacity: .6;
+        }
+        .ctx-fly-menu .context-menu-item { padding-left: 14px; }
+
 
         /* Overlay para cerrar líneas */
         .close-path-hint {
@@ -1868,81 +1928,74 @@
         <span id="cursor-pos">X: 0, Y: 0</span>
     </div>
 
-	    <!-- Menú Contextual -->
-	    <div id="context-menu">
-	        <div class="context-menu-item" id="ctx-bring-to-front">
-	            <span>⬆️</span> Traer al Frente de Todo
-	        </div>
-        <div class="context-menu-item" id="ctx-bring-forward">
-            <span>↑</span> Traer Adelante
+    <!-- Menú Contextual ─────────────────────────────────────────── -->
+    <div id="context-menu">
+
+        <!-- Grupo: Capas -->
+        <div class="ctx-group-header" data-group="capas">
+            <span>🗂️</span> Capas <span class="ctx-arrow">▶</span>
         </div>
-        <div class="context-menu-item" id="ctx-send-backward">
-            <span>↓</span> Enviar Atrás
+        <div class="ctx-group-body" id="ctx-group-capas">
+            <div class="context-menu-item" id="ctx-bring-to-front"><span>⬆️</span> Traer al Frente de Todo</div>
+            <div class="context-menu-item" id="ctx-bring-forward"><span>↑</span> Traer Adelante</div>
+            <div class="context-menu-item" id="ctx-send-backward"><span>↓</span> Enviar Atrás</div>
+            <div class="context-menu-item" id="ctx-send-to-back"><span>⬇️</span> Enviar al Fondo</div>
         </div>
-        <div class="context-menu-item" id="ctx-send-to-back">
-            <span>⬇️</span> Enviar al Fondo
-        </div>
+
         <div class="context-menu-separator"></div>
-	        <div class="context-menu-item" id="ctx-line-width">
-	            <span>📏</span> Cambiar Ancho...
-	        </div>
-	        <div class="context-menu-item" id="ctx-crop">
-	            <span>✂️</span> Recortar...
-	        </div>
-            <div class="context-menu-item" id="ctx-auto-trim-image">
-                <span>🧭</span> Autoajustar PNG al contorno
-            </div>
-            <div class="context-menu-item" id="ctx-vectorize-image">
-                <span>⬟</span> Convertir PNG a vector
-            </div>
-	        <div class="context-menu-separator"></div>
-	        <div class="context-menu-item" id="ctx-rotate-left">
-	            <span>↺</span> Girar -15°
-	        </div>
-	        <div class="context-menu-item" id="ctx-rotate-right">
-	            <span>↻</span> Girar +15°
-	        </div>
-	        <div class="context-menu-item" id="ctx-flip-x">
-	            <span>⇋</span> Voltear (Espejo)
-	        </div>
-	        <div class="context-menu-separator"></div>
-	        <div class="context-menu-item" id="ctx-duplicate">
-	            <span>📋</span> Duplicar
-	        </div>
-        <div class="context-menu-item" id="ctx-scale-up">
-            <span>🔍</span> Agrandar +10%
+
+        <!-- Grupo: Imagen (visible solo en imágenes) -->
+        <div class="ctx-group-header" id="ctx-group-img-header" data-group="img" style="display:none">
+            <span>🖼️</span> Imagen <span class="ctx-arrow">▶</span>
         </div>
-        <div class="context-menu-item" id="ctx-scale-down">
-            <span>🔎</span> Achicar -10%
+        <div class="ctx-group-body" id="ctx-group-img">
+            <div class="context-menu-item" id="ctx-line-width"><span>📏</span> Cambiar Ancho...</div>
+            <div class="context-menu-item" id="ctx-crop"><span>✂️</span> Recortar...</div>
+            <div class="context-menu-item" id="ctx-auto-trim-image"><span>🧭</span> Autoajustar PNG al contorno</div>
+            <div class="context-menu-item" id="ctx-vectorize-image"><span>⬟</span> Convertir PNG a vector</div>
         </div>
-        <div class="context-menu-item" id="ctx-flatten-selection">
-            <span>🧩</span> Combinar a objeto final
+
+        <!-- Grupo: Transformar -->
+        <div class="ctx-group-header" data-group="tr">
+            <span>🔄</span> Transformar <span class="ctx-arrow">▶</span>
         </div>
-        <div class="context-menu-item" id="ctx-save-grouped">
-            <span>📦</span> Guardar agrupado en biblioteca
+        <div class="ctx-group-body" id="ctx-group-tr">
+            <div class="context-menu-item" id="ctx-rotate-left"><span>↺</span> Girar -15°</div>
+            <div class="context-menu-item" id="ctx-rotate-right"><span>↻</span> Girar +15°</div>
+            <div class="context-menu-item" id="ctx-flip-x"><span>⇋</span> Voltear (Espejo)</div>
+            <div class="context-menu-separator"></div>
+            <div class="context-menu-item" id="ctx-scale-up"><span>🔍</span> Agrandar +10%</div>
+            <div class="context-menu-item" id="ctx-scale-down"><span>🔎</span> Achicar -10%</div>
         </div>
-        <div class="context-menu-separator" id="ctx-sep-export"></div>
-        <div class="context-menu-item" id="ctx-export-png">
-            <span>🖼️</span> Exportar PNG
+
+        <div class="context-menu-separator"></div>
+
+        <!-- Acciones directas -->
+        <div class="context-menu-item" id="ctx-duplicate"><span>📋</span> Duplicar</div>
+        <div class="context-menu-item" id="ctx-flatten-selection"><span>🧩</span> Combinar a objeto final</div>
+        <div class="context-menu-item" id="ctx-save-grouped"><span>📦</span> Guardar agrupado en biblioteca</div>
+
+        <div class="context-menu-separator"></div>
+
+        <!-- Grupo: Exportar -->
+        <div class="ctx-group-header" data-group="export">
+            <span>📤</span> Exportar <span class="ctx-arrow">▶</span>
         </div>
-        <div class="context-menu-item" id="ctx-export-svg">
-            <span>✏️</span> Exportar SVG vectorial
+        <div class="ctx-group-body" id="ctx-group-export">
+            <div class="context-menu-item" id="ctx-export-png"><span>🖼️</span> PNG <em style="margin-left:auto;opacity:.5;font-style:normal;font-size:10px">2× transparente</em></div>
+            <div class="context-menu-item" id="ctx-export-svg"><span>✏️</span> SVG vectorial</div>
+            <div class="context-menu-item" id="ctx-export-vector"><span>📁</span> Guardar .vector</div>
+            <div class="context-menu-separator"></div>
+            <div class="context-menu-item" id="ctx-export-webp"><span>📱</span> Sticker WA estático</div>
+            <div class="context-menu-item" id="ctx-export-webp-anim"><span>📱</span> Sticker WA animado</div>
+            <div class="context-menu-item" id="ctx-export-gif"><span>🎞️</span> GIF animado</div>
         </div>
-        <div class="context-menu-item" id="ctx-export-vector">
-            <span>📁</span> Guardar como .vector
-        </div>
-        <div class="context-menu-item" id="ctx-export-webp">
-            <span>📱</span> Sticker WhatsApp (WebP)
-        </div>
-        <div class="context-menu-item" id="ctx-export-gif">
-            <span>🎞️</span> Exportar GIF animado
-        </div>
-	        <div class="context-menu-item" id="ctx-delete">
-            <span>🗑️</span> Eliminar
-        </div>
+
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" id="ctx-delete" style="color:#ff6b6b"><span>🗑️</span> Eliminar</div>
     </div>
 
-    <!-- Hint para cerrar paths -->
+<!-- Hint para cerrar paths -->
     <div class="close-path-hint" id="close-path-hint">
         Haz clic cerca del inicio para cerrar la figura ✨
     </div>
@@ -3351,47 +3404,29 @@
                     });
                 }
 
-                // ── Export Module: listeners del menú contextual ──────────────
-                const _ctxExportName = () => (window.system && window.system.currentProjectName
-                    ? window.system.currentProjectName.replace(/\s+/g,'-').toLowerCase()
-                    : 'creacion');
-
-                const ctxExpPNG = document.getElementById('ctx-export-png');
-                if (ctxExpPNG) ctxExpPNG.addEventListener('click', () => {
-                    this.hideContextMenu();
-                    if (window.ExportModule) window.ExportModule.png(_ctxExportName());
-                    else alert('ExportModule no cargado — revisa export-module.js');
-                });
-
-                const ctxExpSVG = document.getElementById('ctx-export-svg');
-                if (ctxExpSVG) ctxExpSVG.addEventListener('click', () => {
-                    this.hideContextMenu();
-                    if (window.ExportModule) window.ExportModule.svg(_ctxExportName());
-                });
-
-                const ctxExpVector = document.getElementById('ctx-export-vector');
-                if (ctxExpVector) ctxExpVector.addEventListener('click', () => {
-                    this.hideContextMenu();
-                    if (window.ExportModule) window.ExportModule.vector(_ctxExportName());
-                });
-
-                const ctxExpWebP = document.getElementById('ctx-export-webp');
-                if (ctxExpWebP) ctxExpWebP.addEventListener('click', () => {
-                    this.hideContextMenu();
-                    if (window.ExportModule) window.ExportModule.webpStatic(_ctxExportName());
-                });
-
-                const ctxExpGIF = document.getElementById('ctx-export-gif');
-                if (ctxExpGIF) ctxExpGIF.addEventListener('click', () => {
-                    this.hideContextMenu();
-                    if (window.ExportModule) window.ExportModule.gif(_ctxExportName());
-                });
-                // ─────────────────────────────────────────────────────────────
-
                 document.getElementById('ctx-delete').addEventListener('click', () => {
                     this.deleteElements();
                     this.hideContextMenu();
                 });
+                // ── Grupos colapsables del menú contextual ────────────────
+                document.querySelectorAll('.ctx-group-header').forEach(header => {
+                    header.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const groupKey = header.dataset.group;
+                        const body = document.getElementById('ctx-group-' + groupKey);
+                        if (!body) return;
+                        const isOpen = body.classList.contains('open');
+                        // Cierra todos
+                        document.querySelectorAll('.ctx-group-body').forEach(b => b.classList.remove('open'));
+                        document.querySelectorAll('.ctx-group-header').forEach(h => h.classList.remove('open'));
+                        // Abre el clickeado si estaba cerrado
+                        if (!isOpen) {
+                            body.classList.add('open');
+                            header.classList.add('open');
+                        }
+                    });
+                });
+                // ─────────────────────────────────────────────────────────
 
                 const ctxLineWidth = document.getElementById('ctx-line-width');
                 if (ctxLineWidth) {
@@ -5443,24 +5478,7 @@
                 const saveGroupedItem = document.getElementById('ctx-save-grouped');
                 if (saveGroupedItem) saveGroupedItem.style.display = (this.selectedElements && this.selectedElements.length > 0) ? 'block' : 'none';
 
-                // Exportar — visible siempre que haya al menos 1 elemento en el canvas
-                const hasElements = this.elements && this.elements.length > 0;
-                const hasSel = this.selectedElements && this.selectedElements.length > 0;
-                const isAnim = hasSel && this.selectedElements.some(el =>
-                    el && (el.isAnim || el.animColor || el.active === 'yes' || el.activo === 'si' ||
-                           el.type === 'mover-metro' || el.type === 'mover-male' || el.type === 'mover-female')
-                );
-                const showExport = hasElements;
-                ['ctx-export-png','ctx-export-svg','ctx-export-vector','ctx-export-webp','ctx-sep-export']
-                    .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = showExport ? 'block' : 'none'; });
-                const gifItem = document.getElementById('ctx-export-gif');
-                if (gifItem) {
-                    gifItem.style.display = showExport ? 'block' : 'none';
-                    gifItem.style.opacity = isAnim ? '1' : '0.45';
-                    gifItem.title = isAnim ? 'Exportar GIF animado' : 'Sin animación detectada en la selección';
-                }
-
-                menu.classList.add('show');
+                                menu.classList.add('show');
             }
             
             hideContextMenu() {
