@@ -275,21 +275,10 @@
             font-size: 11px;
         }
 
-        #toolbar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: #16213e;
-            padding: 6px 8px;
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-            z-index: 1000;
-            border-bottom: 2px solid #0f3460;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        }
+        /* ── RIBBON (Office-style) ───────────────────────────────────── */
+        #toolbar { display: none !important; }   /* toolbar legacy oculto */
 
+        /* Botones internos siguen funcionando (los escucha el editor) */
         .btn {
             padding: 6px 10px;
             background: #0f3460;
@@ -298,24 +287,192 @@
             color: #eee;
             cursor: pointer;
             font-size: 12px;
-            transition: all 0.3s;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
             gap: 4px;
         }
+        .btn:hover  { background: #e94560; transform: translateY(-1px); }
+        .btn:active { transform: translateY(0); }
+        .btn.active { background: #e94560; box-shadow: 0 0 10px rgba(233,69,96,.5); }
 
-        .btn:hover {
-            background: #e94560;
-            transform: translateY(-2px);
+        /* ── Ribbon wrapper ── */
+        #ribbon {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 1000;
+            background: #12121e;
+            box-shadow: 0 2px 12px rgba(0,0,0,.5);
+            user-select: none;
         }
 
-        .btn:active {
-            transform: translateY(0);
+        /* ── Row 1: menu bar ── */
+        #ribbon-menubar {
+            display: flex;
+            align-items: center;
+            height: 36px;
+            padding: 0 8px;
+            background: #0a0a1a;
+            border-bottom: 1px solid #1e2a4e;
+            gap: 2px;
+        }
+        #ribbon-logo {
+            font-size: 12px;
+            font-weight: 700;
+            color: #e94560;
+            letter-spacing: .5px;
+            padding: 0 10px 0 4px;
+            margin-right: 6px;
+            border-right: 1px solid #1e2a4e;
+            white-space: nowrap;
         }
 
-        .btn.active {
-            background: #e94560;
-            box-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+        /* Dropdown menu */
+        .rb-menu {
+            position: relative;
+        }
+        .rb-trigger {
+            background: none;
+            border: none;
+            color: #bcc8e0;
+            font-size: 12px;
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: background .15s, color .15s;
+            font-family: inherit;
+            white-space: nowrap;
+        }
+        .rb-trigger:hover,
+        .rb-menu.open .rb-trigger {
+            background: #1e3060;
+            color: #fff;
+        }
+        .rb-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: #16213e;
+            border: 1px solid #2a3a6e;
+            border-radius: 0 6px 6px 6px;
+            padding: 4px 0;
+            min-width: 210px;
+            box-shadow: 0 8px 32px rgba(0,0,0,.6);
+            z-index: 2000;
+        }
+        .rb-menu.open .rb-dropdown { display: block; }
+        .rb-item {
+            padding: 7px 16px;
+            font-size: 12px;
+            color: #ccc;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background .12s;
+            white-space: nowrap;
+        }
+        .rb-item:hover { background: #0f3460; color: #fff; }
+        .rb-item.danger { color: #ff6b6b; }
+        .rb-item.danger:hover { background: #3a1020; }
+        .rb-item .kb {
+            margin-left: auto;
+            font-size: 10px;
+            opacity: .45;
+            font-family: monospace;
+        }
+        .rb-sep { height: 1px; background: #1e2a4e; margin: 3px 0; }
+
+        /* Spacer pushes right side items */
+        #ribbon-spacer { flex: 1; }
+
+        /* Quick project buttons (right side of menubar) */
+        .rb-quick {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding-left: 8px;
+            border-left: 1px solid #1e2a4e;
+        }
+        .rb-qbtn {
+            background: none;
+            border: 1px solid transparent;
+            border-radius: 5px;
+            color: #aac4ff;
+            font-size: 11px;
+            cursor: pointer;
+            padding: 3px 9px;
+            transition: all .15s;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+        .rb-qbtn:hover { background: #1e3060; border-color: #2a4090; color: #fff; }
+        .rb-qbtn.danger:hover { background: #3a1020; border-color: #6a2040; color: #ff6b6b; }
+        .rb-qbtn.accent { background: #1e3060; border-color: #2a4090; }
+        .rb-qbtn.accent:hover { background: #e94560; border-color: #e94560; color: #fff; }
+
+        /* ── Row 2: tool ribbon ── */
+        #ribbon-tools {
+            display: flex;
+            align-items: center;
+            height: 38px;
+            padding: 0 8px;
+            gap: 3px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            background: #16213e;
+            border-bottom: 2px solid #0f3460;
+        }
+        #ribbon-tools::-webkit-scrollbar { display: none; }
+
+        .rb-tool {
+            background: none;
+            border: 1px solid transparent;
+            border-radius: 5px;
+            color: #ccc;
+            font-size: 12px;
+            cursor: pointer;
+            padding: 4px 8px;
+            transition: all .15s;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+            height: 28px;
+        }
+        .rb-tool:hover  { background: #0f3460; color: #fff; border-color: #1e3460; }
+        .rb-tool.active { background: #e94560; color: #fff; border-color: #e94560; }
+        .rb-tool-sep {
+            width: 1px;
+            height: 20px;
+            background: #1e2a4e;
+            margin: 0 3px;
+            flex-shrink: 0;
+        }
+
+        /* Route quick group inside ribbon */
+        .rb-route-group {
+            display: none;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: #aac4ff;
+        }
+        .rb-route-group.visible { display: flex; }
+        .rb-route-group select,
+        .rb-route-group input {
+            background: #0f3460;
+            border: 1px solid #2a3a6e;
+            border-radius: 4px;
+            color: #eee;
+            font-size: 11px;
+            padding: 2px 5px;
+            height: 24px;
         }
 
         #shape-type {
@@ -381,7 +538,7 @@
 
         #canvas-container {
             position: fixed;
-            top: 52px;
+            top: 76px;
             left: 0;
             right: 0;
             bottom: 0;
@@ -525,7 +682,7 @@
         #properties-panel {
             position: fixed;
             right: 10px;
-            top: 62px;
+            top: 76px;
             background: #16213e;
             padding: 10px;
             border-radius: 8px;
@@ -1460,6 +1617,178 @@
     </div>
 
     <!-- Toolbar -->
+    <!-- ═══════════════════════════════════════════════════════════
+         RIBBON (Office-style) — reemplaza el toolbar flat
+         Los botones del #toolbar original siguen ocultos pero
+         funcionales; el ribbon hace click() en ellos.
+    ══════════════════════════════════════════════════════════════ -->
+    <div id="ribbon">
+
+      <!-- ── Row 1: Barra de menú ──────────────────────────────── -->
+      <div id="ribbon-menubar">
+        <span id="ribbon-logo">🎨 ARKAIOS</span>
+
+        <!-- Archivo -->
+        <div class="rb-menu" id="rbm-archivo">
+          <button class="rb-trigger">📁 Archivo</button>
+          <div class="rb-dropdown">
+            <div class="rb-item" id="rb-new-project">📄 Proyecto nuevo <span class="kb">Ctrl+N</span></div>
+            <div class="rb-item" id="rb-blank-sheet">🗒️ Hoja en blanco</div>
+            <div class="rb-sep"></div>
+            <div class="rb-item" id="rb-save-project">💾 Guardar proyecto <span class="kb">Ctrl+S</span></div>
+            <div class="rb-item" id="rb-recover-project">📂 Recuperar proyecto</div>
+            <div class="rb-item danger" id="rb-clear-project">🧹 Limpiar lienzo</div>
+            <div class="rb-sep"></div>
+            <div class="rb-item" id="rb-export-menu">⬇️ Exportar...</div>
+            <div class="rb-sep"></div>
+            <div class="rb-item" id="rb-publish-vector">🔗 Publicar Vector</div>
+            <div class="rb-item" id="rb-publish-stiker">✨ Publicar Stiker</div>
+            <div class="rb-item" id="rb-publish-project">🖼️ Publicar Proyecto</div>
+          </div>
+        </div>
+
+        <!-- Editar -->
+        <div class="rb-menu" id="rbm-editar">
+          <button class="rb-trigger">✏️ Editar</button>
+          <div class="rb-dropdown">
+            <div class="rb-item" id="rb-undo">↶ Deshacer <span class="kb">Ctrl+Z</span></div>
+            <div class="rb-sep"></div>
+            <div class="rb-item" id="rb-copy">📋 Copiar <span class="kb">Ctrl+C</span></div>
+            <div class="rb-item" id="rb-paste">📄 Pegar <span class="kb">Ctrl+V</span></div>
+            <div class="rb-item danger" id="rb-delete">🗑️ Eliminar <span class="kb">Del</span></div>
+            <div class="rb-sep"></div>
+            <div class="rb-item" id="rb-group">⊞ Agrupar <span class="kb">Ctrl+G</span></div>
+            <div class="rb-item" id="rb-ungroup">⊟ Desagrupar</div>
+            <div class="rb-item" id="rb-lock">🔒 Fijar / Desfijar <span class="kb">Ctrl+L</span></div>
+            <div class="rb-sep"></div>
+            <div class="rb-item" id="rb-bring-front">⬆️ Al Frente</div>
+            <div class="rb-item" id="rb-send-back">⬇️ Enviar Atrás</div>
+          </div>
+        </div>
+
+        <!-- Insertar -->
+        <div class="rb-menu" id="rbm-insertar">
+          <button class="rb-trigger">➕ Insertar</button>
+          <div class="rb-dropdown">
+            <div class="rb-item" id="rb-ins-image">🖼️ Imagen <span class="kb">I</span></div>
+            <div class="rb-item" id="rb-ins-video">🎞️ Video <span class="kb">M</span></div>
+            <div class="rb-item" id="rb-ins-poi">📍 Punto de información <span class="kb">K</span></div>
+            <div class="rb-sep"></div>
+            <div class="rb-item" id="rb-ins-metro">🚇 Metro animado <span class="kb">N</span></div>
+            <div class="rb-item" id="rb-ins-male">🚹 Persona (H) <span class="kb">H</span></div>
+            <div class="rb-item" id="rb-ins-female">🚺 Persona (M) <span class="kb">J</span></div>
+            <div class="rb-sep"></div>
+            <div class="rb-item" id="rb-ins-portal-in">🌀 Portal Entrada <span class="kb">Q</span></div>
+            <div class="rb-item" id="rb-ins-portal-out">🛸 Portal Salida <span class="kb">W</span></div>
+          </div>
+        </div>
+
+        <!-- Vista -->
+        <div class="rb-menu" id="rbm-vista">
+          <button class="rb-trigger">👁️ Vista</button>
+          <div class="rb-dropdown">
+            <div class="rb-item" id="rb-zoom-in">🔍 Acercar <span class="kb">+</span></div>
+            <div class="rb-item" id="rb-zoom-reset">⊙ Zoom 100% <span class="kb">0</span></div>
+            <div class="rb-item" id="rb-zoom-out">🔎 Alejar <span class="kb">−</span></div>
+            <div class="rb-sep"></div>
+            <div class="rb-item" id="rb-split-preview">🪟 Split Preview</div>
+            <div class="rb-item" id="rb-objects">≡ Panel Objetos <span class="kb">O</span></div>
+          </div>
+        </div>
+
+        <!-- Biblioteca -->
+        <div class="rb-menu" id="rbm-biblioteca">
+          <button class="rb-trigger">📚 Biblioteca</button>
+          <div class="rb-dropdown">
+            <div class="rb-item" id="rb-lib-stickers">📚 Stickers</div>
+            <div class="rb-item" id="rb-lib-grouped">📦 Agrupados</div>
+            <div class="rb-item" id="rb-lib-stkers">✨ Stkers animados</div>
+          </div>
+        </div>
+
+        <div id="ribbon-spacer"></div>
+
+        <!-- Quick actions (derecha) -->
+        <div class="rb-quick">
+          <button class="rb-qbtn" id="rbq-new" title="Proyecto nuevo">📄 Nuevo</button>
+          <button class="rb-qbtn accent" id="rbq-save" title="Guardar proyecto (Ctrl+S)">💾 Guardar</button>
+          <button class="rb-qbtn" id="rbq-recover" title="Recuperar proyecto">📂 Recuperar</button>
+          <button class="rb-qbtn danger" id="rbq-clear" title="Limpiar lienzo">🧹 Limpiar</button>
+        </div>
+      </div>
+
+      <!-- ── Row 2: Herramientas ────────────────────────────────── -->
+      <div id="ribbon-tools">
+
+        <!-- Selección y formas básicas -->
+        <button class="rb-tool" id="rbt-select" title="Seleccionar (V)">✋</button>
+        <div class="rb-tool-sep"></div>
+        <button class="rb-tool" id="rbt-rect"   title="Rectángulo (R)">▭ Rect</button>
+        <button class="rb-tool" id="rbt-circle" title="Círculo (C)">● Círculo</button>
+        <button class="rb-tool" id="rbt-shape"  title="Formas (T)">⬟ Forma</button>
+        <select id="rbt-shape-type" title="Tipo de forma" style="display:none;background:#0f3460;border:1px solid #2a3a6e;border-radius:4px;color:#eee;font-size:11px;padding:2px 5px;height:24px;">
+            <option value="triangle">Triángulo</option>
+            <option value="trapezoid">Trapecio</option>
+            <option value="diamond">Rombo</option>
+            <option value="star5">Estrella 5</option>
+            <option value="star6">Estrella 6</option>
+            <option value="star7">Estrella 7</option>
+            <option value="star8">Estrella 8</option>
+            <option value="gear">Engrane</option>
+        </select>
+        <div class="rb-tool-sep"></div>
+
+        <!-- Línea / Ruta -->
+        <button class="rb-tool" id="rbt-line"  title="Línea Animada (L)">→ Línea</button>
+        <button class="rb-tool" id="rbt-route" title="Ruta / Vía (U)">🛤️ Ruta</button>
+        <!-- Route quick controls (se muestran al activar Ruta) -->
+        <div class="rb-route-group" id="rbt-route-group">
+          <span style="opacity:.6">Ruta:</span>
+          <select id="rbt-route-curve">
+            <option value="line">Línea</option>
+            <option value="semi">Semicírculo</option>
+            <option value="quarter">1/4</option>
+            <option value="circle">Círculo</option>
+            <option value="custom">°</option>
+          </select>
+          <select id="rbt-route-side">
+            <option value="left">Izq</option>
+            <option value="right">Der</option>
+          </select>
+          <input id="rbt-route-deg" type="number" min="5" max="355" step="5" value="120" style="width:48px;background:#0f3460;border:1px solid #2a3a6e;border-radius:4px;color:#eee;font-size:11px;padding:2px 4px;height:24px;" title="Grados">
+          <button class="rb-tool" id="rbt-route-apply" style="font-size:11px;padding:3px 8px">Aplicar</button>
+        </div>
+        <div class="rb-tool-sep"></div>
+
+        <!-- Lápiz / Pintar -->
+        <button class="rb-tool" id="rbt-pencil" title="Dibujo libre (P)">✏️ Lápiz</button>
+        <button class="rb-tool" id="rbt-bucket" title="Pintar (B)">🎨 Pintar</button>
+        <div class="rb-tool-sep"></div>
+
+        <!-- Edición -->
+        <button class="rb-tool" id="rbt-undo"   title="Deshacer (Ctrl+Z)">↶</button>
+        <button class="rb-tool" id="rbt-copy"   title="Copiar (Ctrl+C)">📋</button>
+        <button class="rb-tool" id="rbt-paste"  title="Pegar (Ctrl+V)">📄</button>
+        <button class="rb-tool" id="rbt-delete" title="Eliminar (Del)" style="color:#ff6b6b">🗑️</button>
+        <div class="rb-tool-sep"></div>
+
+        <!-- Organizar -->
+        <button class="rb-tool" id="rbt-group"       title="Agrupar (Ctrl+G)">⊞ Grupo</button>
+        <button class="rb-tool" id="rbt-ungroup"     title="Desagrupar">⊟</button>
+        <button class="rb-tool" id="rbt-lock"        title="Fijar (Ctrl+L)">🔒</button>
+        <button class="rb-tool" id="rbt-bring-front" title="Al Frente">⬆️</button>
+        <button class="rb-tool" id="rbt-send-back"   title="Atrás">⬇️</button>
+        <div class="rb-tool-sep"></div>
+
+        <!-- Zoom -->
+        <button class="rb-tool" id="rbt-zoom-in"    title="Acercar (+)">🔍+</button>
+        <button class="rb-tool" id="rbt-zoom-reset" title="100% (0)">⊙</button>
+        <button class="rb-tool" id="rbt-zoom-out"   title="Alejar (-)">🔎−</button>
+        <span id="rbt-zoom-label" style="font-size:11px;color:#668;padding:0 4px;white-space:nowrap">100%</span>
+      </div>
+    </div>
+    <!-- /ribbon -->
+
     <div id="toolbar">
         <!-- Herramientas de dibujo -->
         <button class="btn" id="btn-select" title="Seleccionar (V)">
@@ -13238,5 +13567,222 @@
     </script>
     <!-- Export Module: PNG · GIF animado · WebP/Sticker WA · SVG · .vector -->
     <script src="export-module.js"></script>
+
+        // ════════════════════════════════════════════════════════════════
+        //  RIBBON — conecta todos los botones visuales con el sistema
+        // ════════════════════════════════════════════════════════════════
+        (function initRibbon() {
+
+          // ── Helper: click en botón oculto del toolbar legacy ──────────
+          const fire = id => { const b = document.getElementById(id); if (b) b.click(); };
+          const sys  = () => window.system;
+
+          // ── Dropdowns: abrir/cerrar ───────────────────────────────────
+          document.querySelectorAll('.rb-menu').forEach(menu => {
+            menu.querySelector('.rb-trigger').addEventListener('click', e => {
+              e.stopPropagation();
+              const wasOpen = menu.classList.contains('open');
+              document.querySelectorAll('.rb-menu').forEach(m => m.classList.remove('open'));
+              if (!wasOpen) menu.classList.add('open');
+            });
+          });
+          document.addEventListener('click', () =>
+            document.querySelectorAll('.rb-menu').forEach(m => m.classList.remove('open'))
+          );
+
+          // ── ARCHIVO ───────────────────────────────────────────────────
+          document.getElementById('rb-new-project')
+            ?.addEventListener('click', () => fire('btn-new'));
+          document.getElementById('rb-blank-sheet')
+            ?.addEventListener('click', () => {
+              if (!sys()) return;
+              if (confirm('¿Crear hoja en blanco? Los cambios no guardados se perderán.')) {
+                sys().elements = [];
+                sys().selectedElements = [];
+                sys().camera = { x: 0, y: 0, zoom: 1 };
+                sys().history = [];
+                sys().historyIndex = -1;
+                if (sys().saveHistory) sys().saveHistory();
+                if (sys().updateZoomIndicator) sys().updateZoomIndicator();
+              }
+            });
+          document.getElementById('rb-save-project')
+            ?.addEventListener('click', () => fire('btn-save'));
+          document.getElementById('rb-recover-project')
+            ?.addEventListener('click', () => fire('btn-load'));
+          document.getElementById('rb-clear-project')
+            ?.addEventListener('click', () => {
+              if (!sys()) return;
+              if (confirm('¿Limpiar el lienzo? Los elementos serán eliminados.')) {
+                sys().elements = [];
+                sys().selectedElements = [];
+                if (sys().saveHistory) sys().saveHistory();
+                if (sys().render) sys().render();
+              }
+            });
+          document.getElementById('rb-export-menu')
+            ?.addEventListener('click', () => {
+              if (window.ExportModule) window.ExportModule.modal();
+              else fire('btn-export');
+            });
+          document.getElementById('rb-publish-vector')
+            ?.addEventListener('click', () => fire('btn-publish'));
+          document.getElementById('rb-publish-stiker')
+            ?.addEventListener('click', () => fire('btn-publish-sticker'));
+          document.getElementById('rb-publish-project')
+            ?.addEventListener('click', () => fire('btn-publish-project'));
+
+          // Quick buttons (right of menubar)
+          document.getElementById('rbq-new')
+            ?.addEventListener('click', () => fire('btn-new'));
+          document.getElementById('rbq-save')
+            ?.addEventListener('click', () => fire('btn-save'));
+          document.getElementById('rbq-recover')
+            ?.addEventListener('click', () => fire('btn-load'));
+          document.getElementById('rbq-clear')
+            ?.addEventListener('click', () => {
+              if (!sys()) return;
+              if (confirm('¿Limpiar el lienzo?')) {
+                sys().elements = [];
+                sys().selectedElements = [];
+                if (sys().saveHistory) sys().saveHistory();
+                if (sys().render) sys().render();
+              }
+            });
+
+          // ── EDITAR ────────────────────────────────────────────────────
+          document.getElementById('rb-undo')?.addEventListener('click', () => fire('btn-undo'));
+          document.getElementById('rb-copy')?.addEventListener('click', () => fire('btn-copy'));
+          document.getElementById('rb-paste')?.addEventListener('click', () => fire('btn-paste'));
+          document.getElementById('rb-delete')?.addEventListener('click', () => fire('btn-delete'));
+          document.getElementById('rb-group')?.addEventListener('click', () => fire('btn-group'));
+          document.getElementById('rb-ungroup')?.addEventListener('click', () => fire('btn-ungroup'));
+          document.getElementById('rb-lock')?.addEventListener('click', () => fire('btn-lock'));
+          document.getElementById('rb-bring-front')?.addEventListener('click', () => fire('btn-bring-front'));
+          document.getElementById('rb-send-back')?.addEventListener('click', () => fire('btn-send-back'));
+
+          // ── INSERTAR ──────────────────────────────────────────────────
+          document.getElementById('rb-ins-image')?.addEventListener('click', () => fire('btn-image'));
+          document.getElementById('rb-ins-video')?.addEventListener('click', () => fire('btn-video'));
+          document.getElementById('rb-ins-poi')?.addEventListener('click', () => fire('btn-poi'));
+          document.getElementById('rb-ins-metro')?.addEventListener('click', () => fire('btn-metro'));
+          document.getElementById('rb-ins-male')?.addEventListener('click', () => fire('btn-person-male'));
+          document.getElementById('rb-ins-female')?.addEventListener('click', () => fire('btn-person-female'));
+          document.getElementById('rb-ins-portal-in')?.addEventListener('click', () => fire('btn-portal-in'));
+          document.getElementById('rb-ins-portal-out')?.addEventListener('click', () => fire('btn-portal-out'));
+
+          // ── VISTA ─────────────────────────────────────────────────────
+          document.getElementById('rb-zoom-in')?.addEventListener('click', () => fire('btn-zoom-in'));
+          document.getElementById('rb-zoom-reset')?.addEventListener('click', () => fire('btn-zoom-reset'));
+          document.getElementById('rb-zoom-out')?.addEventListener('click', () => fire('btn-zoom-out'));
+          document.getElementById('rb-split-preview')?.addEventListener('click', () => fire('btn-builder-preview'));
+          document.getElementById('rb-objects')?.addEventListener('click', () => fire('btn-layers'));
+
+          // ── BIBLIOTECA ────────────────────────────────────────────────
+          document.getElementById('rb-lib-stickers')?.addEventListener('click', () => fire('btn-library'));
+          document.getElementById('rb-lib-grouped')?.addEventListener('click', () => fire('btn-grouped-library'));
+          document.getElementById('rb-lib-stkers')?.addEventListener('click', () => fire('btn-stkers-library'));
+
+          // ── HERRAMIENTAS (Row 2) ──────────────────────────────────────
+          const toolMap = {
+            'rbt-select':      'btn-select',
+            'rbt-rect':        'btn-rectangle',
+            'rbt-circle':      'btn-circle',
+            'rbt-shape':       'btn-shape',
+            'rbt-line':        'btn-line',
+            'rbt-route':       'btn-route',
+            'rbt-pencil':      'btn-pencil',
+            'rbt-bucket':      'btn-bucket',
+            'rbt-undo':        'btn-undo',
+            'rbt-copy':        'btn-copy',
+            'rbt-paste':       'btn-paste',
+            'rbt-delete':      'btn-delete',
+            'rbt-group':       'btn-group',
+            'rbt-ungroup':     'btn-ungroup',
+            'rbt-lock':        'btn-lock',
+            'rbt-bring-front': 'btn-bring-front',
+            'rbt-send-back':   'btn-send-back',
+            'rbt-zoom-in':     'btn-zoom-in',
+            'rbt-zoom-reset':  'btn-zoom-reset',
+            'rbt-zoom-out':    'btn-zoom-out',
+          };
+          Object.entries(toolMap).forEach(([rbtId, btnId]) => {
+            document.getElementById(rbtId)?.addEventListener('click', () => fire(btnId));
+          });
+
+          // Sincronizar state .active del tool ribbon con el toolbar original
+          // Observa cambios en los botones del toolbar legado
+          const drawTools = ['btn-select','btn-rectangle','btn-circle','btn-shape',
+                             'btn-line','btn-route','btn-pencil','btn-bucket',
+                             'btn-metro','btn-person-male','btn-person-female',
+                             'btn-portal-in','btn-portal-out','btn-poi'];
+          const rbtSync = {
+            'btn-select':'rbt-select','btn-rectangle':'rbt-rect','btn-circle':'rbt-circle',
+            'btn-shape':'rbt-shape','btn-line':'rbt-line','btn-route':'rbt-route',
+            'btn-pencil':'rbt-pencil','btn-bucket':'rbt-bucket'
+          };
+
+          function syncActiveState() {
+            drawTools.forEach(btnId => {
+              const src = document.getElementById(btnId);
+              const rbtId = rbtSync[btnId];
+              const dst = rbtId ? document.getElementById(rbtId) : null;
+              if (src && dst) {
+                dst.classList.toggle('active', src.classList.contains('active'));
+              }
+            });
+            // Route group visibility
+            const routeActive = document.getElementById('btn-route')?.classList.contains('active');
+            const rg = document.getElementById('rbt-route-group');
+            if (rg) rg.classList.toggle('visible', !!routeActive);
+            // Shape type select
+            const shapeActive = document.getElementById('btn-shape')?.classList.contains('active');
+            const st = document.getElementById('rbt-shape-type');
+            if (st) st.style.display = shapeActive ? 'block' : 'none';
+          }
+
+          // Sync on click of any legacy tool button
+          drawTools.forEach(id => {
+            document.getElementById(id)?.addEventListener('click', () =>
+              requestAnimationFrame(syncActiveState)
+            );
+          });
+          setInterval(syncActiveState, 500); // fallback sync
+
+          // Route quick controls: sync rbt → original route-quick-group
+          const syncSelect = (srcId, dstId) => {
+            document.getElementById(srcId)?.addEventListener('change', e => {
+              const dst = document.getElementById(dstId);
+              if (dst) { dst.value = e.target.value; dst.dispatchEvent(new Event('change')); }
+            });
+          };
+          syncSelect('rbt-route-curve', 'route-quick-curve');
+          syncSelect('rbt-route-side',  'route-quick-side');
+          document.getElementById('rbt-route-deg')?.addEventListener('input', e => {
+            const dst = document.getElementById('route-quick-deg');
+            if (dst) { dst.value = e.target.value; dst.dispatchEvent(new Event('input')); }
+          });
+          document.getElementById('rbt-route-apply')?.addEventListener('click', () =>
+            fire('btn-route-quick-apply')
+          );
+          // Shape type sync
+          document.getElementById('rbt-shape-type')?.addEventListener('change', e => {
+            const dst = document.getElementById('shape-type');
+            if (dst) { dst.value = e.target.value; dst.dispatchEvent(new Event('change')); }
+          });
+
+          // Zoom label sync
+          function syncZoom() {
+            const s = window.system;
+            const lbl = document.getElementById('rbt-zoom-label');
+            if (lbl && s && s.camera)
+              lbl.textContent = Math.round((s.camera.zoom || 1) * 100) + '%';
+          }
+          setInterval(syncZoom, 300);
+
+          console.info('[Ribbon] ✅ Inicializado — menús, herramientas y sync activos');
+        })();
+        // ════════════════════════════════════════════════════════════════
+
 </body>
 </html>
