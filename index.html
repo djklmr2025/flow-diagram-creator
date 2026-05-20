@@ -1476,6 +1476,121 @@
             cursor: move;
         }
 
+
+        /* ── Panel de Elementos por Tipo (pestañas) ──────────────────── */
+        #elem-tabs-panel {
+            position: fixed;
+            top: 76px;
+            right: 0;
+            width: 220px;
+            background: #12121e;
+            border-left: 2px solid #1e2a4e;
+            border-bottom: 2px solid #1e2a4e;
+            border-radius: 0 0 0 10px;
+            z-index: 900;
+            display: none;
+            flex-direction: column;
+            box-shadow: -4px 4px 20px rgba(0,0,0,.5);
+            max-height: calc(100vh - 80px);
+        }
+        #elem-tabs-panel.open { display: flex; }
+
+        .et-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: #0a0a1a;
+            border-bottom: 1px solid #1e2a4e;
+            font-size: 11px;
+            font-weight: 600;
+            color: #aac4ff;
+        }
+        .et-close {
+            background: none;
+            border: none;
+            color: #445;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            padding: 0;
+        }
+        .et-close:hover { color: #e94560; }
+
+        .et-tabs {
+            display: flex;
+            overflow-x: auto;
+            scrollbar-width: none;
+            border-bottom: 1px solid #1e2a4e;
+            flex-shrink: 0;
+        }
+        .et-tabs::-webkit-scrollbar { display: none; }
+        .et-tab {
+            padding: 5px 10px;
+            font-size: 10.5px;
+            color: #556;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            white-space: nowrap;
+            transition: all .15s;
+            flex-shrink: 0;
+        }
+        .et-tab:hover { color: #aac4ff; }
+        .et-tab.active { color: #e94560; border-bottom-color: #e94560; }
+
+        .et-list {
+            overflow-y: auto;
+            flex: 1;
+            padding: 6px 0;
+        }
+        .et-item {
+            padding: 5px 12px;
+            font-size: 11px;
+            color: #aaa;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            transition: background .12s;
+            border-left: 2px solid transparent;
+        }
+        .et-item:hover { background: #0f1e3a; color: #fff; }
+        .et-item.selected { background: #0f1e3a; border-left-color: #e94560; color: #fff; }
+        .et-item .et-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .et-item .et-idx {
+            font-size: 9px;
+            opacity: .4;
+            font-family: monospace;
+        }
+        .et-empty {
+            padding: 20px 12px;
+            font-size: 11px;
+            color: #334;
+            text-align: center;
+        }
+        .et-search {
+            padding: 6px 8px;
+            border-bottom: 1px solid #1e2a4e;
+            flex-shrink: 0;
+        }
+        .et-search input {
+            width: 100%;
+            background: #0a0a1a;
+            border: 1px solid #1e2a4e;
+            border-radius: 4px;
+            color: #ccc;
+            font-size: 11px;
+            padding: 4px 8px;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+        .et-search input:focus { outline: none; border-color: #e94560; }
+
         /* ── Menú contextual + submenús ─────────────────────────── */
         #context-menu {
             position: fixed;
@@ -13568,6 +13683,12 @@
     <!-- Export Module: PNG · GIF animado · WebP/Sticker WA · SVG · .vector -->
     <script src="export-module.js"></script>
 
+    <script>
+    // Ribbon init — runs after export-module.js loads
+    document.addEventListener("DOMContentLoaded", function() {
+      // Small delay to let window.system boot first
+      setTimeout(function() {
+
         // ════════════════════════════════════════════════════════════════
         //  RIBBON — conecta todos los botones visuales con el sistema
         // ════════════════════════════════════════════════════════════════
@@ -13781,8 +13902,63 @@
           setInterval(syncZoom, 300);
 
           console.info('[Ribbon] ✅ Inicializado — menús, herramientas y sync activos');
+          // ── Indicador nombre de proyecto en ribbon ─────────────────────
+          (function syncProjectName() {
+            let nameEl = document.getElementById('ribbon-project-name');
+            if (!nameEl) {
+              nameEl = document.createElement('span');
+              nameEl.id = 'ribbon-project-name';
+              nameEl.style.cssText = 'font-size:11px;color:#556;padding:0 10px;' +
+                'border-left:1px solid #1e2a4e;margin-left:4px;max-width:180px;' +
+                'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+              const spacer = document.getElementById('ribbon-spacer');
+              if (spacer) spacer.parentNode.insertBefore(nameEl, spacer);
+            }
+            setInterval(() => {
+              const s = sys();
+              const name = (s && s.currentProjectName) ? '📄 ' + s.currentProjectName : '📄 Sin título';
+              if (nameEl.textContent !== name) nameEl.textContent = name;
+            }, 800);
+          })();
+
+          // ── Keyboard shortcuts para ribbon ────────────────────────────
+          document.addEventListener('keydown', e => {
+            const tag = document.activeElement?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+            // Ctrl+N → nuevo proyecto (solo si no está ya manejado por el sistema)
+            if (e.ctrlKey && e.key === 'n') {
+              e.preventDefault();
+              fire('btn-new');
+            }
+          });
+
+          // ── Cerrar dropdowns con Escape ───────────────────────────────
+          document.addEventListener('keydown', e => {
+            if (e.key === 'Escape')
+              document.querySelectorAll('.rb-menu').forEach(m => m.classList.remove('open'));
+          });
+
         })();
         // ════════════════════════════════════════════════════════════════
 
+      }, 600);
+    });
+    </script>
+
+
+    <!-- ── Panel de Elementos por Tipo ───────────────────────── -->
+    <div id="elem-tabs-panel">
+        <div class="et-header">
+            <span>🗂️ Elementos</span>
+            <button class="et-close" id="et-close-btn">✕</button>
+        </div>
+        <div class="et-search">
+            <input type="text" id="et-search-input" placeholder="Buscar elemento...">
+        </div>
+        <div class="et-tabs" id="et-tabs-row">
+            <div class="et-tab active" data-type="all">Todo</div>
+        </div>
+        <div class="et-list" id="et-list"></div>
+    </div>
 </body>
 </html>

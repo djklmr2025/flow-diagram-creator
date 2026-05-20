@@ -527,3 +527,187 @@
   console.info("[ExportModule v2] 🚀 PNG/SVG exportan solo el diseño — sin fondo ni grid");
 
 })(window);
+
+/* ══════════════════════════════════════════════════════════════════
+   PANEL DE ELEMENTOS POR TIPO — "pestañas"
+   Muestra todos los elementos agrupados por tipo, permite
+   seleccionarlos, filtrarlos y navegar por el canvas hasta ellos.
+══════════════════════════════════════════════════════════════════ */
+(function initElemTabs() {
+
+  const ICONS = {
+    rect:'▭', rectangle:'▭', circle:'●', ellipse:'◎',
+    line:'→', route:'🛤️', path:'✏️', pencil:'✏️', freehand:'✏️',
+    text:'T', image:'🖼️', video:'🎞️', group:'⊞',
+    'mover-metro':'🚇', 'mover-male':'🚹', 'mover-female':'🚺',
+    polygon:'⬟', shape:'⬟', triangle:'△', diamond:'◇',
+    star5:'★', star6:'★', gear:'⚙️',
+    poi:'📍', portal:'🌀', default:'◻'
+  };
+
+  const TYPE_LABELS = {
+    rect:'Rectángulos', rectangle:'Rectángulos', circle:'Círculos',
+    ellipse:'Elipses', line:'Líneas', route:'Rutas', path:'Trazos',
+    pencil:'Trazos', freehand:'Trazos', text:'Textos', image:'Imágenes',
+    video:'Videos', group:'Grupos', 'mover-metro':'Metros',
+    'mover-male':'Personas H', 'mover-female':'Personas M',
+    polygon:'Polígonos', shape:'Formas', poi:'Puntos Info',
+    portal:'Portales', gear:'Engranes'
+  };
+
+  function icon(type) { return ICONS[type] || ICONS.default; }
+  function label(type) { return TYPE_LABELS[type] || (type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Sin tipo'); }
+
+  function getAll() {
+    const s = window.system;
+    return (s && s.elements) ? s.elements : [];
+  }
+
+  function getTypes(elems) {
+    const seen = new Set();
+    const types = [];
+    for (const el of elems) {
+      const t = el.type || 'unknown';
+      // Normalize similar types
+      const norm = (['rect','rectangle'].includes(t)) ? 'rect'
+                 : (['pencil','freehand','path'].includes(t)) ? 'path'
+                 : t;
+      if (!seen.has(norm)) { seen.add(norm); types.push(norm); }
+    }
+    return types;
+  }
+
+  function normType(t) {
+    return (['rect','rectangle'].includes(t)) ? 'rect'
+         : (['pencil','freehand','path'].includes(t)) ? 'path'
+         : t || 'unknown';
+  }
+
+  let currentType = 'all';
+  let searchQuery = '';
+
+  function render() {
+    const panel = document.getElementById('elem-tabs-panel');
+    if (!panel || !panel.classList.contains('open')) return;
+
+    const allElems = getAll();
+    const types    = getTypes(allElems);
+
+    // ── Rebuild tabs ──
+    const tabsRow = document.getElementById('et-tabs-row');
+    if (tabsRow) {
+      tabsRow.innerHTML = '<div class="et-tab' + (currentType==='all'?' active':'') + '" data-type="all">Todo (' + allElems.length + ')</div>';
+      for (const t of types) {
+        const count = allElems.filter(e => normType(e.type) === t).length;
+        const active = currentType === t ? ' active' : '';
+        tabsRow.innerHTML += `<div class="et-tab${active}" data-type="${t}">${icon(t)} ${label(t)} (${count})</div>`;
+      }
+      tabsRow.querySelectorAll('.et-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          currentType = tab.dataset.type;
+          render();
+        });
+      });
+    }
+
+    // ── Rebuild list ──
+    const list = document.getElementById('et-list');
+    if (!list) return;
+
+    let filtered = currentType === 'all'
+      ? allElems
+      : allElems.filter(e => normType(e.type) === currentType);
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(e =>
+        (e.name && e.name.toLowerCase().includes(q)) ||
+        (e.text && e.text.toLowerCase().includes(q)) ||
+        (e.type && e.type.toLowerCase().includes(q)) ||
+        (e.id && String(e.id).includes(q))
+      );
+    }
+
+    if (!filtered.length) {
+      list.innerHTML = '<div class="et-empty">Sin elementos' + (searchQuery ? ' que coincidan' : '') + '</div>';
+      return;
+    }
+
+    const s = window.system;
+    const selIds = new Set((s && s.selectedElements || []).map(e => e.id));
+
+    list.innerHTML = '';
+    filtered.forEach((el, i) => {
+      const isSelected = selIds.has(el.id);
+      const name = el.name || el.text || label(el.type || 'unknown') + ' #' + i;
+      const div = document.createElement('div');
+      div.className = 'et-item' + (isSelected ? ' selected' : '');
+      div.innerHTML = `<span>${icon(el.type || 'unknown')}</span><span class="et-name" title="${name}">${name}</span><span class="et-idx">#${i}</span>`;
+      div.addEventListener('click', e => {
+        if (!s) return;
+        if (e.shiftKey) {
+          // Multi-select
+          if (isSelected) s.selectedElements = s.selectedElements.filter(x => x.id !== el.id);
+          else s.selectedElements = [...(s.selectedElements || []), el];
+        } else {
+          s.selectedElements = [el];
+          // Pan camera to element
+          if (s.camera && el.x !== undefined) {
+            const cvs = s.canvas;
+            s.camera.x = (cvs ? cvs.width/2 : 400) - el.x * s.camera.zoom;
+            s.camera.y = (cvs ? cvs.height/2 : 300) - el.y * s.camera.zoom;
+          }
+        }
+        if (s.render) s.render();
+        render(); // refresh selection state
+      });
+      list.appendChild(div);
+    });
+  }
+
+  function openPanel() {
+    const panel = document.getElementById('elem-tabs-panel');
+    if (!panel) return;
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) render();
+  }
+
+  // Close button
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('et-close-btn')
+      ?.addEventListener('click', () => {
+        document.getElementById('elem-tabs-panel')?.classList.remove('open');
+      });
+
+    document.getElementById('et-search-input')
+      ?.addEventListener('input', e => {
+        searchQuery = e.target.value.trim();
+        render();
+      });
+
+    // Auto-refresh when panel is open
+    setInterval(() => render(), 1000);
+  });
+
+  // Hook "Vista → Elementos" in ribbon (added by ribbon JS)
+  // Also expose globally
+  window.ElemTabsPanel = { open: openPanel, render };
+
+  // Add menu item to Vista dropdown
+  const waitVista = setInterval(() => {
+    const vistaMenu = document.querySelector('#rbm-vista .rb-dropdown');
+    if (!vistaMenu) return;
+    clearInterval(waitVista);
+
+    const sep = document.createElement('div');
+    sep.className = 'rb-sep';
+    const item = document.createElement('div');
+    item.className = 'rb-item';
+    item.id = 'rb-elem-tabs';
+    item.innerHTML = '🗂️ Panel de Elementos';
+    item.addEventListener('click', openPanel);
+    vistaMenu.appendChild(sep);
+    vistaMenu.appendChild(item);
+  }, 400);
+
+})();
