@@ -711,3 +711,282 @@
   }, 400);
 
 })();
+
+/* ══════════════════════════════════════════════════════════════════
+   AIDA — Asistente IA nativa del editor
+   Chat flotante con contexto del canvas en tiempo real
+══════════════════════════════════════════════════════════════════ */
+(function initAIDA() {
+
+  // ── CSS ────────────────────────────────────────────────────────
+  const style = document.createElement('style');
+  style.textContent = `
+    #aida-btn {
+      position:fixed;bottom:24px;left:24px;z-index:9998;
+      width:48px;height:48px;border-radius:50%;
+      background:linear-gradient(135deg,#e94560,#0f3460);
+      border:none;cursor:pointer;font-size:22px;
+      box-shadow:0 4px 20px rgba(233,69,96,.5);
+      transition:transform .2s,box-shadow .2s;
+      display:flex;align-items:center;justify-content:center;
+    }
+    #aida-btn:hover{transform:scale(1.1);box-shadow:0 6px 28px rgba(233,69,96,.7);}
+    #aida-btn .aida-pulse {
+      position:absolute;width:100%;height:100%;border-radius:50%;
+      background:rgba(233,69,96,.3);animation:aidaPulse 2s ease-out infinite;
+    }
+    @keyframes aidaPulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.6);opacity:0}}
+
+    #aida-panel {
+      position:fixed;bottom:84px;left:24px;z-index:9998;
+      width:320px;height:440px;
+      background:#12121e;border:1px solid #2a2a4e;
+      border-radius:14px;box-shadow:0 12px 48px rgba(0,0,0,.7);
+      display:none;flex-direction:column;overflow:hidden;
+      font-family:'Segoe UI',system-ui,sans-serif;
+    }
+    #aida-panel.open{display:flex;}
+
+    #aida-header {
+      display:flex;align-items:center;gap:8px;
+      padding:12px 14px;
+      background:linear-gradient(90deg,#0f1e3a,#1a0a2a);
+      border-bottom:1px solid #2a2a4e;flex-shrink:0;
+    }
+    #aida-header .aida-avatar {
+      width:28px;height:28px;border-radius:50%;
+      background:linear-gradient(135deg,#e94560,#7b2fff);
+      display:flex;align-items:center;justify-content:center;
+      font-size:14px;flex-shrink:0;
+    }
+    #aida-header .aida-info { flex:1;min-width:0; }
+    #aida-header .aida-name {font-size:13px;font-weight:600;color:#e0e0ff;}
+    #aida-header .aida-status {font-size:10px;color:#556;display:flex;align-items:center;gap:4px;}
+    #aida-header .aida-dot {
+      width:6px;height:6px;border-radius:50%;background:#00c975;
+      animation:aidaBlink 2s ease-in-out infinite;
+    }
+    @keyframes aidaBlink{0%,100%{opacity:1}50%{opacity:.3}}
+    #aida-close {background:none;border:none;color:#445;cursor:pointer;font-size:16px;padding:0;}
+    #aida-close:hover{color:#e94560;}
+
+    #aida-ctx {
+      padding:6px 12px;background:#0a0a18;
+      border-bottom:1px solid #1a1a3a;font-size:10px;color:#446;
+      flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+
+    #aida-messages {
+      flex:1;overflow-y:auto;padding:12px;
+      display:flex;flex-direction:column;gap:10px;
+      scrollbar-width:thin;scrollbar-color:#1e2a4e transparent;
+    }
+    .aida-msg {
+      max-width:85%;font-size:12px;line-height:1.5;
+      padding:8px 11px;border-radius:10px;word-break:break-word;
+    }
+    .aida-msg.user {
+      align-self:flex-end;background:#1e3060;color:#cce;
+      border-radius:10px 10px 2px 10px;
+    }
+    .aida-msg.aida {
+      align-self:flex-start;background:#1a1a2e;color:#ddd;
+      border-radius:10px 10px 10px 2px;border-left:2px solid #e94560;
+    }
+    .aida-msg.typing {
+      align-self:flex-start;background:#1a1a2e;
+      padding:10px 14px;border-radius:10px;
+    }
+    .aida-typing-dots span {
+      display:inline-block;width:5px;height:5px;border-radius:50%;
+      background:#e94560;margin:0 2px;
+      animation:aidaDot .8s ease-in-out infinite;
+    }
+    .aida-typing-dots span:nth-child(2){animation-delay:.15s;}
+    .aida-typing-dots span:nth-child(3){animation-delay:.3s;}
+    @keyframes aidaDot{0%,80%,100%{transform:scale(.5);opacity:.3}40%{transform:scale(1);opacity:1}}
+
+    #aida-quick {
+      display:flex;gap:5px;padding:6px 10px;
+      flex-wrap:wrap;border-top:1px solid #1a1a3a;flex-shrink:0;
+    }
+    .aida-quick-btn {
+      background:#0f1e3a;border:1px solid #1e2a4e;border-radius:12px;
+      color:#889;font-size:10px;cursor:pointer;padding:3px 8px;
+      transition:all .15s;white-space:nowrap;
+    }
+    .aida-quick-btn:hover{background:#1e3060;color:#aac4ff;border-color:#2a4090;}
+
+    #aida-input-row {
+      display:flex;gap:6px;padding:10px 12px;
+      border-top:1px solid #1a1a3a;flex-shrink:0;
+      background:#0c0c1c;
+    }
+    #aida-input {
+      flex:1;background:#1a1a2e;border:1px solid #2a2a4e;
+      border-radius:8px;color:#ddd;font-size:12px;
+      padding:7px 10px;font-family:inherit;resize:none;
+      max-height:80px;overflow-y:auto;
+      scrollbar-width:none;line-height:1.4;
+    }
+    #aida-input:focus{outline:none;border-color:#e94560;}
+    #aida-send {
+      width:32px;height:32px;border-radius:8px;
+      background:#e94560;border:none;cursor:pointer;
+      color:#fff;font-size:14px;flex-shrink:0;
+      transition:filter .15s;align-self:flex-end;
+    }
+    #aida-send:hover{filter:brightness(1.2);}
+    #aida-send:disabled{opacity:.4;cursor:not-allowed;}
+  `;
+  document.head.appendChild(style);
+
+  // ── HTML ───────────────────────────────────────────────────────
+  const btn = document.createElement('button');
+  btn.id = 'aida-btn';
+  btn.title = 'AIDA — Asistente IA';
+  btn.innerHTML = '<div class="aida-pulse"></div>🤖';
+  document.body.appendChild(btn);
+
+  const panel = document.createElement('div');
+  panel.id = 'aida-panel';
+  panel.innerHTML = `
+    <div id="aida-header">
+      <div class="aida-avatar">🤖</div>
+      <div class="aida-info">
+        <div class="aida-name">AIDA</div>
+        <div class="aida-status"><span class="aida-dot"></span> Asistente de diseño IA</div>
+      </div>
+      <button id="aida-close">✕</button>
+    </div>
+    <div id="aida-ctx">📄 Canvas vacío</div>
+    <div id="aida-messages">
+      <div class="aida-msg aida">¡Hola! Soy AIDA, tu asistente de diseño. Puedo ayudarte con tu diagrama, sugerir elementos, explicar funciones o describir lo que tienes en el canvas. ¿En qué trabajamos hoy?</div>
+    </div>
+    <div id="aida-quick">
+      <button class="aida-quick-btn" data-q="¿Qué elementos tengo en el canvas?">📋 Ver canvas</button>
+      <button class="aida-quick-btn" data-q="Sugiere cómo mejorar el diseño">✨ Mejorar</button>
+      <button class="aida-quick-btn" data-q="¿Cómo exporto mi trabajo?">💾 Exportar</button>
+      <button class="aida-quick-btn" data-q="¿Qué herramientas tiene el editor?">🛠️ Ayuda</button>
+    </div>
+    <div id="aida-input-row">
+      <textarea id="aida-input" placeholder="Escribe a AIDA..." rows="1"></textarea>
+      <button id="aida-send">➤</button>
+    </div>
+  `;
+  document.body.appendChild(panel);
+
+  // ── Logic ──────────────────────────────────────────────────────
+  let isOpen = false;
+  let isThinking = false;
+
+  function getCanvasCtx() {
+    const s = window.system;
+    if (!s || !s.elements || !s.elements.length)
+      return { elemCount: 0, types: [], projectName: 'Sin título' };
+    const types = [...new Set(s.elements.map(e => e.type || 'unknown'))];
+    return {
+      elemCount: s.elements.length,
+      types,
+      projectName: s.currentProjectName || 'Sin título',
+      zoom: s.camera ? Math.round((s.camera.zoom||1)*100) + '%' : '100%',
+      selectedCount: s.selectedElements ? s.selectedElements.length : 0
+    };
+  }
+
+  function updateCtxBar() {
+    const ctx = getCanvasCtx();
+    const ctxEl = document.getElementById('aida-ctx');
+    if (ctxEl) {
+      ctxEl.textContent = ctx.elemCount === 0
+        ? '📄 Canvas vacío'
+        : `📄 ${ctx.projectName} · ${ctx.elemCount} elementos · ${ctx.types.slice(0,3).join(', ')}${ctx.types.length > 3 ? '…' : ''}`;
+    }
+  }
+
+  function addMsg(text, role) {
+    const msgs = document.getElementById('aida-messages');
+    if (!msgs) return;
+    const div = document.createElement('div');
+    div.className = 'aida-msg ' + role;
+    div.textContent = text;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function showTyping() {
+    const msgs = document.getElementById('aida-messages');
+    if (!msgs) return null;
+    const div = document.createElement('div');
+    div.className = 'aida-msg typing';
+    div.id = 'aida-typing';
+    div.innerHTML = '<div class="aida-typing-dots"><span></span><span></span><span></span></div>';
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+    return div;
+  }
+
+  async function sendMessage(text) {
+    if (!text.trim() || isThinking) return;
+    isThinking = true;
+
+    const sendBtn = document.getElementById('aida-send');
+    const inputEl = document.getElementById('aida-input');
+    if (sendBtn) sendBtn.disabled = true;
+    if (inputEl) inputEl.value = '';
+
+    addMsg(text, 'user');
+    const typingEl = showTyping();
+
+    try {
+      const r = await fetch('/api/ai-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, canvasContext: getCanvasCtx() })
+      });
+      const data = await r.json();
+      typingEl?.remove();
+      addMsg(data.reply || 'Sin respuesta', 'aida');
+    } catch (err) {
+      typingEl?.remove();
+      addMsg('⚠️ Error de conexión. Verifica que el servidor esté activo.', 'aida');
+    }
+
+    isThinking = false;
+    if (sendBtn) sendBtn.disabled = false;
+  }
+
+  // ── Event listeners ────────────────────────────────────────────
+  btn.addEventListener('click', () => {
+    isOpen = !isOpen;
+    panel.classList.toggle('open', isOpen);
+    if (isOpen) updateCtxBar();
+  });
+
+  document.getElementById('aida-close')
+    ?.addEventListener('click', () => { isOpen = false; panel.classList.remove('open'); });
+
+  document.getElementById('aida-send')
+    ?.addEventListener('click', () => {
+      const v = document.getElementById('aida-input')?.value || '';
+      sendMessage(v.trim());
+    });
+
+  document.getElementById('aida-input')
+    ?.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const v = e.target.value.trim();
+        if (v) sendMessage(v);
+      }
+    });
+
+  document.querySelectorAll('.aida-quick-btn').forEach(b => {
+    b.addEventListener('click', () => sendMessage(b.dataset.q));
+  });
+
+  // Auto-update context bar
+  setInterval(() => { if (isOpen) updateCtxBar(); }, 1500);
+
+  console.info('[AIDA] 🤖 Asistente IA lista — /api/ai-assistant activo');
+})();
