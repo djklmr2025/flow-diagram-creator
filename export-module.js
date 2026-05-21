@@ -11,9 +11,6 @@
   const CFG = {
     padding: 20,          // px de margen alrededor del contenido
     pngScale: 2,          // resolución 2× para PNG
-    gif: { fps: 15, durationSec: 3, quality: 8,
-      lib: "https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js",
-      worker: "https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js" },
     webp: { size: 512, fps: 15, durationSec: 3 }
   };
 
@@ -251,53 +248,123 @@
     toast("✅ Archivo .vector exportado", "success");
   }
 
-  /* ── 4. GIF animado ────────────────────────────────────────────────── */
-  let _gifLoaded = false;
-  function loadGifJs(cb) {
-    if (_gifLoaded || global.GIF) { _gifLoaded = true; cb(); return; }
-    const s = document.createElement("script");
-    s.src = CFG.gif.lib;
-    s.onload = () => { _gifLoaded = true; cb(); };
-    s.onerror = () => toast("No se pudo cargar gif.js", "error");
-    document.head.appendChild(s);
+
+  /* ── VIDEO EXPORT (WebM via MediaRecorder) ─────────────────────────────
+   *  Duración calculada automáticamente:
+   *  Para cada mover animado, calcula la longitud de su ruta y la divide
+   *  entre la velocidad del metro → tiempo de un recorrido ida y vuelta.
+   *  Usa el máximo entre todos los movers (≥ 3 seg, ≤ 60 seg).
+   * ───────────────────────────────────────────────────────────────────── */
+  function calcVideoDuration() {
+    const s = sys();
+    if (!s || !s.elements || !s.elements.length) return 5;
+
+    const movers = s.elements.filter(e => e && e.type === 'mover' && e.active !== false);
+    if (!movers.length) return 5;
+
+    // Build route map: id → points array
+    const routes = {};
+    s.elements.forEach(e => {
+      if (e && e.routeRole && Array.isArray(e.points)) routes[e.id] = e.points;
+    });
+
+    // Calculate route length from point array
+    function routeLen(pts) {
+      let len = 0;
+      for (let i = 1; i < pts.length; i++) {
+        const dx = pts[i].x - pts[i-1].x;
+        const dy = pts[i].y - pts[i-1].y;
+        len += Math.sqrt(dx*dx + dy*dy);
+      }
+      return len;
+    }
+
+    let maxSec = 3;
+    movers.forEach(m => {
+      const pts  = routes[m.routeId];
+      const spd  = Math.max(m.speed || 40, 1);   // px/s en coords mundo
+      if (!pts || pts.length < 2) return;
+
+      // world length / (speed * zoom) × 2 for round trip
+      const worldLen  = routeLen(pts);
+      const zoom      = (s.camera && s.camera.zoom) || 1;
+      // speed is in screen pixels per second relative to zoom=1
+      const screenSpd = spd * zoom;
+      const oneway    = worldLen * zoom / screenSpd;
+      const roundtrip = oneway * 2;
+
+      if (roundtrip > maxSec) maxSec = roundtrip;
+    });
+
+    // Clamp to [3, 60] seconds
+    return Math.min(Math.max(Math.ceil(maxSec), 3), 60);
   }
 
-  function exportGIF(name, selOnly = false) {
-    const elems = getElements(selOnly);
-    if (!elems.length) return toast("Sin elementos para exportar", "warn");
+  function exportVideo(name, selOnly = false) {
+    const canvas = getCanvas();
+    if (!canvas) return toast('Canvas no encontrado', 'error');
+    if (!canvas.captureStream) return toast('Tu navegador no soporta captureStream. Usa Chrome/Edge.', 'warn');
 
-    toast("⏳ Capturando frames para GIF...", "info");
-    loadGifJs(() => {
-      // Captura el primer frame para conocer dimensiones
-      const first = renderClean(elems, 1);
-      if (!first) return toast("Error al renderizar frames", "error");
+    const durationSec = calcVideoDuration();
+    const fps         = 30;
 
-      const total = CFG.gif.fps * CFG.gif.durationSec;
-      const delay = Math.round(1000 / CFG.gif.fps);
+    // Pick best supported codec
+    const mimeTypes = [
+      'video/webm;codecs=vp9',
+      'video/webm;codecs=vp8',
+      'video/webm',
+      'video/mp4'
+    ];
+    const mime = mimeTypes.find(m => {
+      try { return MediaRecorder.isTypeSupported(m); } catch(_){ return false; }
+    }) || 'video/webm';
 
-      const gif = new global.GIF({
-        workers: 2, quality: CFG.gif.quality,
-        workerScript: CFG.gif.worker,
-        width: first.width, height: first.height,
-        transparent: 0x00000000
-      });
+    const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
 
-      let f = 0;
-      const next = () => {
-        if (f >= total) { toast("🔄 Procesando GIF...", "info"); gif.render(); return; }
-        requestAnimationFrame(() => {
-          const frame = renderClean(elems, 1);
-          if (frame) gif.addFrame(frame, { copy: true, delay });
-          f++; next();
-        });
-      };
-      gif.on("finished", blob => {
-        download(blob, `${name}.gif`);
-        toast("✅ GIF animado listo", "success");
-      });
-      gif.on("error", e => toast("Error GIF: " + e, "error"));
-      next();
-    });
+    toast(`⏳ Grabando ${durationSec}s de video (${Math.round(fps)}fps)...`, 'info');
+
+    // Grab the live canvas stream directly — no renderClean needed
+    // (we want the real animation, not a static snapshot)
+    let stream;
+    try {
+      stream = canvas.captureStream(fps);
+    } catch(e) {
+      return toast('Error al capturar el canvas: ' + e.message, 'error');
+    }
+
+    const chunks = [];
+    let rec;
+    try {
+      rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+    } catch(e) {
+      return toast('MediaRecorder no pudo iniciarse: ' + e.message, 'error');
+    }
+
+    rec.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+
+    rec.onstop = () => {
+      const blob = new Blob(chunks, { type: mime });
+      download(blob, `${name}.${ext}`);
+      const mb = (blob.size / 1048576).toFixed(1);
+      toast(`✅ Video listo — ${durationSec}s · ${mb} MB · ${ext.toUpperCase()}`, 'success');
+    };
+
+    rec.onerror = e => toast('Error de grabación: ' + (e.error?.message || e), 'error');
+
+    rec.start(100); // chunk every 100ms
+
+    // Progress toasts
+    const steps = [0.25, 0.5, 0.75].map(p => ({
+      t: durationSec * p * 1000,
+      msg: `⏺ Grabando... ${Math.round(p * 100)}%`
+    }));
+    steps.forEach(s => setTimeout(() => {
+      if (rec.state === 'recording') toast(s.msg, 'info');
+    }, s.t));
+
+    setTimeout(() => {
+      if (rec.state === 'recording') rec.stop();
+    }, durationSec * 1000);
   }
 
   /* ── 5. WebP estático (WhatsApp Sticker 512×512) ───────────────────── */
@@ -320,50 +387,6 @@
 
     download(off.toDataURL("image/webp", 0.9), `${name}.webp`);
     toast("✅ Sticker WhatsApp estático (512×512 WebP)", "success");
-  }
-
-  /* ── 6. WebP animado (WhatsApp Animated Sticker) ───────────────────── */
-  function exportWebPAnimated(name, selOnly = false) {
-    const elems = getElements(selOnly);
-    if (!elems.length) return toast("Sin elementos para exportar", "warn");
-    if (!HTMLCanvasElement.prototype.captureStream)
-      return toast("captureStream no disponible — usa Chrome/Edge", "warn");
-
-    const sz = CFG.webp.size;
-    const live = document.createElement("canvas");
-    live.width = live.height = sz;
-    const ctx = live.getContext("2d");
-
-    let running = true;
-    const loop = () => {
-      if (!running) return;
-      const frame = renderClean(elems, 1);
-      if (frame) {
-        const ratio = Math.min(sz/frame.width, sz/frame.height);
-        const dw = frame.width*ratio, dh = frame.height*ratio;
-        ctx.clearRect(0,0,sz,sz);
-        ctx.drawImage(frame,(sz-dw)/2,(sz-dh)/2,dw,dh);
-      }
-      requestAnimationFrame(loop);
-    };
-    loop();
-
-    const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-      ? "video/webm;codecs=vp9" : "video/webm";
-    const rec = new MediaRecorder(live.captureStream(CFG.webp.fps), { mimeType: mime });
-    const chunks = [];
-    rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-    rec.onstop = () => {
-      running = false;
-      const blob = new Blob(chunks, { type: mime });
-      download(blob, `${name}.webp`);
-      const kb = Math.round(blob.size/1024);
-      toast(`✅ Sticker animado: ${kb}KB ${kb>500?"⚠️ >500KB":"✓"}`, kb>500?"warn":"success");
-    };
-
-    rec.start();
-    toast(`⏳ Grabando ${CFG.webp.durationSec}s...`, "info");
-    setTimeout(() => rec.stop(), CFG.webp.durationSec * 1000);
   }
 
   /* ── MODAL ─────────────────────────────────────────────────────────── */
@@ -416,12 +439,9 @@
           <button class="_ark-btn" data-f="svg" style="background:#6a1b9a">✏️ SVG vectorial  <em>Figma · Inkscape · Illustrator</em></button>
           <button class="_ark-btn" data-f="vector" style="background:#e65100">📦 .vector  <em>nativo · re-importable</em></button>
           <hr style="border-color:#222;margin:2px 0"/>
-          <button class="_ark-btn" data-f="gif" style="background:${anim?"#00695c":"#222"};${anim?"":"opacity:.45"}">
-            🎞️ GIF animado  <em>${anim?"15fps · 3 seg":"sin animación detectada"}</em>
-          </button>
           <button class="_ark-btn" data-f="webp-s" style="background:#b71c1c">📱 Sticker WA estático  <em>512×512 WebP</em></button>
-          <button class="_ark-btn" data-f="webp-a" style="background:${anim?"#b71c1c":"#222"};${anim?"":"opacity:.45"}">
-            📱 Sticker WA animado  <em>${anim?"512×512 · máx 500KB":"sin animación"}</em>
+          <button class="_ark-btn" data-f="video" style="background:${anim?"#1a5276":"#222"};${anim?"":"opacity:.45"}">
+            🎬 Exportar Video  <em>${anim?"WebM · duración auto":"sin animación"}</em>
           </button>
         </div>
 
@@ -460,7 +480,7 @@
         modal.style.display = "none";
         const n = getProjectName();
         const map = { png: exportPNG, svg: exportSVG, vector: exportVector,
-                      gif: exportGIF, "webp-s": exportWebPStatic, "webp-a": exportWebPAnimated };
+                      "webp-s": exportWebPStatic, "video": exportVideo };
         (map[btn.dataset.f] || (() => {}))(n, selOnly);
       };
     });
@@ -496,10 +516,8 @@
         ?.addEventListener("click", () => exportVector(n(), sel()));
       document.getElementById("ctx-export-webp")
         ?.addEventListener("click", () => exportWebPStatic(n(), sel()));
-      document.getElementById("ctx-export-webp-anim")
-        ?.addEventListener("click", () => exportWebPAnimated(n(), sel()));
-      document.getElementById("ctx-export-gif")
-        ?.addEventListener("click", () => exportGIF(n(), sel()));
+      document.getElementById("ctx-export-video")
+        ?.addEventListener("click", () => exportVideo(n(), sel()));
 
       console.info("[ExportModule v2] ✅ Hooks del menú contextual activos");
     }, 500);
@@ -511,9 +529,8 @@
     png:   (n, s) => exportPNG(n || getProjectName(), s),
     svg:   (n, s) => exportSVG(n || getProjectName(), s),
     vector:(n, s) => exportVector(n || getProjectName(), s),
-    gif:   (n, s) => exportGIF(n || getProjectName(), s),
     webpStatic:   (n, s) => exportWebPStatic(n || getProjectName(), s),
-    webpAnimated: (n, s) => exportWebPAnimated(n || getProjectName(), s),
+    video: (n, s) => exportVideo(n || getProjectName(), s),
     renderClean   // expuesta para debug
   };
 
