@@ -439,6 +439,8 @@
           <button class="_ark-btn" data-f="svg" style="background:#6a1b9a">✏️ SVG vectorial  <em>Figma · Inkscape · Illustrator</em></button>
           <button class="_ark-btn" data-f="vector" style="background:#e65100">📦 .vector  <em>nativo · re-importable</em></button>
           <hr style="border-color:#222;margin:2px 0"/>
+                    <button class="_ark-btn" data-f="html" style="background:#00695c">🌐 HTML standalone  <em>visor interactivo offline</em></button>
+          <hr style="border-color:#222;margin:2px 0"/>
           <button class="_ark-btn" data-f="webp-s" style="background:#b71c1c">📱 Sticker WA estático  <em>512×512 WebP</em></button>
           <button class="_ark-btn" data-f="video" style="background:${anim?"#1a5276":"#222"};${anim?"":"opacity:.45"}">
             🎬 Exportar Video  <em>${anim?"WebM · duración auto":"sin animación"}</em>
@@ -480,7 +482,7 @@
         modal.style.display = "none";
         const n = getProjectName();
         const map = { png: exportPNG, svg: exportSVG, vector: exportVector,
-                      "webp-s": exportWebPStatic, "video": exportVideo };
+                      "webp-s": exportWebPStatic, "video": exportVideo, "html": exportHTML };
         (map[btn.dataset.f] || (() => {}))(n, selOnly);
       };
     });
@@ -516,11 +518,93 @@
         ?.addEventListener("click", () => exportVector(n(), sel()));
       document.getElementById("ctx-export-webp")
         ?.addEventListener("click", () => exportWebPStatic(n(), sel()));
+      document.getElementById("ctx-export-html")
+        ?.addEventListener("click", () => exportHTML(n(), sel()));
       document.getElementById("ctx-export-video")
         ?.addEventListener("click", () => exportVideo(n(), sel()));
 
       console.info("[ExportModule v2] ✅ Hooks del menú contextual activos");
     }, 500);
+  }
+
+
+  /* ── 6. HTML Standalone (Viewer Autónomo) ────────────────────────── */
+  async function exportHTML(name, selOnly = false) {
+    const s = sys();
+    const elems = getElements(selOnly);
+    if (!elems.length) return toast("Sin elementos para exportar", "warn");
+
+    toast("Generando HTML standalone...", "info");
+
+    try {
+      // 1. Fetch current index.html
+      const resp = await fetch(window.location.href);
+      if (!resp.ok) throw new Error("No se pudo obtener el HTML");
+      let html = await resp.text();
+
+      // 2. Build the exact state to embed
+      const payload = {
+        _format: "arkaios-vector-v1",
+        _exported: new Date().toISOString(),
+        name,
+        camera: s ? s.camera : {},
+        elements: elems,
+        // Enforce deck mode or sticker mode if desired. We use preview/sticker setup for standalone
+      };
+
+      const jsonStr = JSON.stringify(payload);
+      const b64Data = btoa(encodeURIComponent(jsonStr)); // Safe embedding
+
+      // 3. Inject the payload and auto-loader script right before </body>
+      const injection = `
+      <!-- ========================================== -->
+      <!-- EMBEDDED PROJECT PAYLOAD (STANDALONE MODE) -->
+      <!-- ========================================== -->
+      <script>
+        window.addEventListener('DOMContentLoaded', () => {
+          setTimeout(() => {
+            if (!window.system) return;
+            try {
+              const b64 = "${b64Data}";
+              const jsonStr = decodeURIComponent(atob(b64));
+              const data = JSON.parse(jsonStr);
+
+              // Force viewer mode
+              const url = new URL(window.location.href);
+              if (!url.searchParams.has('mode')) {
+                url.searchParams.set('mode', 'sticker');
+                window.history.replaceState({}, '', url);
+              }
+
+              window.system.applyLoadedProject(data, {
+                source: 'html-embed',
+                isDeck: false,
+                autoFit: true
+              });
+
+              const rb = document.getElementById('ribbon');
+              if(rb) rb.style.display = 'none';
+
+              console.log("✅ Proyecto embebido cargado exitosamente");
+            } catch (e) {
+              console.error("❌ Error al cargar proyecto embebido:", e);
+            }
+          }, 800); // Give it time to init
+        });
+      </script>
+      `;
+
+      html = html.replace('</body>', injection + '\n</body>');
+
+      // 4. Trigger download
+      const blob = new Blob([html], { type: 'text/html' });
+      download(blob, `${name}.html`);
+      toast("✅ HTML standalone exportado", "success");
+
+    } catch (error) {
+      console.error(error);
+      toast("Error al generar HTML", "error");
+    }
   }
 
   /* ── API PÚBLICA ────────────────────────────────────────────────────── */
@@ -531,6 +615,7 @@
     vector:(n, s) => exportVector(n || getProjectName(), s),
     webpStatic:   (n, s) => exportWebPStatic(n || getProjectName(), s),
     video: (n, s) => exportVideo(n || getProjectName(), s),
+    html:  (n, s) => exportHTML(n || getProjectName(), s),
     renderClean   // expuesta para debug
   };
 
