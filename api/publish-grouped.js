@@ -1,27 +1,10 @@
 import { put } from '@vercel/blob';
+import { getOrigin, setCors, sendJson } from './_utils.js';
+import { STATUS } from './_status.js';
 import { randomUUID } from 'node:crypto';
 
 const MAX_PROJECT_BYTES = 200_000;
 const MAX_ELEMENTS = 2_000;
-
-function setCors(res) {
-  res.setHeader('access-control-allow-origin', '*');
-  res.setHeader('access-control-allow-methods', 'GET,POST,OPTIONS');
-  res.setHeader('access-control-allow-headers', 'content-type');
-}
-
-function sendJson(res, statusCode, data) {
-  setCors(res);
-  res.statusCode = statusCode;
-  res.setHeader('content-type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(data));
-}
-
-function getOrigin(req) {
-  const proto = req.headers['x-forwarded-proto'] || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
-  return `${proto}://${host}`;
-}
 
 async function readJsonBody(req) {
   const chunks = [];
@@ -87,8 +70,8 @@ function normalizeProjectInPlace(project) {
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    setCors(res);
-    res.statusCode = 204;
+    setCors(res, 'GET,POST,OPTIONS', 'content-type');
+    res.statusCode = STATUS.NO_CONTENT;
     res.end();
     return;
   }
@@ -96,7 +79,7 @@ export default async function handler(req, res) {
   const origin = getOrigin(req);
 
   if (req.method === 'GET') {
-    sendJson(res, 200, {
+    sendJson(res, STATUS.OK, {
       ok: true,
       usage: {
         method: 'POST',
@@ -108,12 +91,14 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== 'POST') {
-    sendJson(res, 405, { ok: false, error: 'MethodNotAllowed' });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type');
+    sendJson(res, STATUS.METHOD_NOT_ALLOWED, { ok: false, error: 'MethodNotAllowed' });
     return;
   }
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    sendJson(res, 500, { ok: false, error: 'BlobNotConfigured' });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type');
+    sendJson(res, STATUS.INTERNAL_SERVER_ERROR, { ok: false, error: 'BlobNotConfigured' });
     return;
   }
 
@@ -121,7 +106,8 @@ export default async function handler(req, res) {
   try {
     body = await readJsonBody(req);
   } catch (error) {
-    sendJson(res, 400, { ok: false, error: 'InvalidJSON', details: String(error) });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type');
+    sendJson(res, STATUS.BAD_REQUEST, { ok: false, error: 'InvalidJSON', details: String(error) });
     return;
   }
 
@@ -142,22 +128,26 @@ export default async function handler(req, res) {
 
   const { count, hasImages } = analyzeElements(project.elements);
   if (count === 0) {
-    sendJson(res, 400, { ok: false, error: 'EmptySelection' });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type');
+    sendJson(res, STATUS.BAD_REQUEST, { ok: false, error: 'EmptySelection' });
     return;
   }
   if (count > MAX_ELEMENTS) {
-    sendJson(res, 413, { ok: false, error: 'TooManyElements', details: `${count}` });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type');
+    sendJson(res, STATUS.PAYLOAD_TOO_LARGE, { ok: false, error: 'TooManyElements', details: `${count}` });
     return;
   }
   if (hasImages) {
-    sendJson(res, 400, { ok: false, error: 'ImagesNotAllowed' });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type');
+    sendJson(res, STATUS.BAD_REQUEST, { ok: false, error: 'ImagesNotAllowed' });
     return;
   }
 
   const jsonText = JSON.stringify(project);
   const bytes = Buffer.byteLength(jsonText, 'utf8');
   if (bytes > MAX_PROJECT_BYTES) {
-    sendJson(res, 413, { ok: false, error: 'PayloadTooLarge', details: `${bytes}` });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type');
+    sendJson(res, STATUS.PAYLOAD_TOO_LARGE, { ok: false, error: 'PayloadTooLarge', details: `${bytes}` });
     return;
   }
 
@@ -171,11 +161,12 @@ export default async function handler(req, res) {
       addRandomSuffix: false,
     });
   } catch (error) {
-    sendJson(res, 500, { ok: false, error: 'BlobWriteFailed', details: String(error) });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type');
+    sendJson(res, STATUS.INTERNAL_SERVER_ERROR, { ok: false, error: 'BlobWriteFailed', details: String(error) });
     return;
   }
 
-  sendJson(res, 200, {
+  sendJson(res, STATUS.OK, {
     ok: true,
     id,
     jsonUrl: `${origin}/api/project?id=${encodeURIComponent(id)}`,

@@ -1,0 +1,7 @@
+Title: 🧹 Code Health Improvement: Extract Shared Utilities and Constants
+
+Description:
+* 🎯 **What:** The duplicate `getOrigin` function, along with `setCors` and `sendJson` utility methods scattered across 8 serverless function files, have been refactored into a shared `api/_utils.js` module. Additionally, a new `api/_status.js` module was introduced to centralize HTTP status codes and remove the reliance on "magic numbers" throughout the codebase.
+* 💡 **Why:** By extracting these functions, we vastly reduce code duplication. This improves code maintainability and allows for centralizing logic or modifications that could affect cross-origin behavior or API responses across the entire application without needing to update each file independently.
+* ✅ **Verification:** Modified files were verified manually using `node -c <file>` to ensure valid syntax. We also ran `node --test` to verify no current tests were broken.
+* ✨ **Result:** A cleaner `api/` directory layout with standard utilities reused across endpoints (`ai-assistant.js`, `inject.js`, `library.js`, `moltbook-post.js`, `project.js`, `publish-grouped.js`, `publish-project.js`, `publish.js`).

@@ -1,5 +1,8 @@
 import { put } from '@vercel/blob';
 import { randomUUID } from 'node:crypto';
+import { getOrigin, setCors, sendJson } from './_utils.js';
+import { STATUS } from './_status.js';
+
 
 // Publica un "proyecto" (permite imagenes). Si el JSON trae imagenes embebidas
 // como data URLs (base64), las sube como assets a Blob y reemplaza imageSrc por
@@ -12,25 +15,6 @@ const MAX_ELEMENTS = 2_000;
 const MAX_IMAGES = 40;
 const MAX_IMAGE_BYTES = 2_000_000;
 const MAX_TOTAL_IMAGE_BYTES = 8_000_000;
-
-function setCors(res) {
-  res.setHeader('access-control-allow-origin', '*');
-  res.setHeader('access-control-allow-methods', 'GET,POST,OPTIONS');
-  res.setHeader('access-control-allow-headers', 'content-type,x-publish-key');
-}
-
-function sendJson(res, statusCode, data) {
-  setCors(res);
-  res.statusCode = statusCode;
-  res.setHeader('content-type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(data));
-}
-
-function getOrigin(req) {
-  const proto = req.headers['x-forwarded-proto'] || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
-  return `${proto}://${host}`;
-}
 
 async function readJsonBody(req, maxBytes) {
   const chunks = [];
@@ -326,8 +310,8 @@ async function uploadProjectImagesInPlace(elements, assetPrefix) {
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    setCors(res);
-    res.statusCode = 204;
+    setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    res.statusCode = STATUS.NO_CONTENT;
     res.end();
     return;
   }
@@ -335,7 +319,7 @@ export default async function handler(req, res) {
   const origin = getOrigin(req);
 
   if (req.method === 'GET') {
-    sendJson(res, 200, {
+    sendJson(res, STATUS.OK, {
       ok: true,
       usage: {
         method: 'POST',
@@ -359,7 +343,8 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== 'POST') {
-    sendJson(res, 405, { ok: false, error: 'MethodNotAllowed' });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    sendJson(res, STATUS.METHOD_NOT_ALLOWED, { ok: false, error: 'MethodNotAllowed' });
     return;
   }
 
@@ -368,7 +353,8 @@ export default async function handler(req, res) {
     const url = new URL(req.url, origin);
     const key = req.headers['x-publish-key'] || url.searchParams.get('key') || '';
     if (key !== requiredKey) {
-      sendJson(res, 401, { ok: false, error: 'Unauthorized' });
+      setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    sendJson(res, STATUS.UNAUTHORIZED, { ok: false, error: 'Unauthorized' });
       return;
     }
   }
@@ -378,7 +364,7 @@ export default async function handler(req, res) {
     body = await readJsonBody(req, MAX_BODY_BYTES);
   } catch (error) {
     if (error && error.code === 'PayloadTooLarge') {
-      sendJson(res, 413, {
+      sendJson(res, STATUS.PAYLOAD_TOO_LARGE, {
         ok: false,
         error: 'PayloadTooLarge',
         maxBytes: MAX_BODY_BYTES,
@@ -386,23 +372,26 @@ export default async function handler(req, res) {
       });
       return;
     }
-    sendJson(res, 400, { ok: false, error: 'InvalidJSONBody' });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    sendJson(res, STATUS.BAD_REQUEST, { ok: false, error: 'InvalidJSONBody' });
     return;
   }
 
   if (!body || typeof body !== 'object') {
-    sendJson(res, 400, { ok: false, error: 'ValidationError', details: ['body debe ser un objeto JSON'] });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    sendJson(res, STATUS.BAD_REQUEST, { ok: false, error: 'ValidationError', details: ['body debe ser un objeto JSON'] });
     return;
   }
 
   if (!Array.isArray(body.elements)) {
-    sendJson(res, 400, { ok: false, error: 'ValidationError', details: ['elements debe ser un array'] });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    sendJson(res, STATUS.BAD_REQUEST, { ok: false, error: 'ValidationError', details: ['elements debe ser un array'] });
     return;
   }
 
   const totalElements = countElementsRecursive(body.elements);
   if (totalElements > MAX_ELEMENTS) {
-    sendJson(res, 400, {
+    sendJson(res, STATUS.BAD_REQUEST, {
       ok: false,
       error: 'ValidationError',
       details: [`elements excede el maximo (${MAX_ELEMENTS}): ${totalElements}`],
@@ -422,7 +411,8 @@ export default async function handler(req, res) {
   const assetPrefix = `projects/${id}`;
   const uploadRes = await uploadProjectImagesInPlace(body.elements, assetPrefix);
   if (!uploadRes.ok) {
-    sendJson(res, 400, { ok: false, error: uploadRes.error, details: uploadRes.details || [] });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    sendJson(res, STATUS.BAD_REQUEST, { ok: false, error: uploadRes.error, details: uploadRes.details || [] });
     return;
   }
 
@@ -447,7 +437,7 @@ export default async function handler(req, res) {
   const json = JSON.stringify(project);
   const bytes = Buffer.byteLength(json, 'utf8');
   if (bytes > MAX_PROJECT_BYTES) {
-    sendJson(res, 413, {
+    sendJson(res, STATUS.PAYLOAD_TOO_LARGE, {
       ok: false,
       error: 'PayloadTooLarge',
       maxBytes: MAX_PROJECT_BYTES,
@@ -466,7 +456,8 @@ export default async function handler(req, res) {
       contentType: 'application/json',
     });
   } catch (error) {
-    sendJson(res, 500, { ok: false, error: 'BlobWriteFailed', details: String(error) });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    sendJson(res, STATUS.INTERNAL_SERVER_ERROR, { ok: false, error: 'BlobWriteFailed', details: String(error) });
     return;
   }
 
@@ -474,7 +465,7 @@ export default async function handler(req, res) {
   const jsonUrl = `${origin}/api/project?id=${encodeURIComponent(id)}`;
   const editorUrl = `${origin}/?id=${encodeURIComponent(id)}`;
 
-  sendJson(res, 200, {
+  sendJson(res, STATUS.OK, {
     ok: true,
     id,
     pathname: blob.pathname,

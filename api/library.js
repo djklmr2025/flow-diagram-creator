@@ -1,23 +1,6 @@
 import { list } from '@vercel/blob';
-
-function setCors(res) {
-  res.setHeader('access-control-allow-origin', '*');
-  res.setHeader('access-control-allow-methods', 'GET,OPTIONS');
-  res.setHeader('access-control-allow-headers', 'content-type');
-}
-
-function sendJson(res, statusCode, data) {
-  setCors(res);
-  res.statusCode = statusCode;
-  res.setHeader('content-type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(data));
-}
-
-function getOrigin(req) {
-  const proto = req.headers['x-forwarded-proto'] || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
-  return `${proto}://${host}`;
-}
+import { getOrigin, setCors, sendJson } from './_utils.js';
+import { STATUS } from './_status.js';
 
 function sanitizePrefix(input) {
   if (!input) return '';
@@ -42,13 +25,14 @@ function stripRoot(pathname, root) {
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     setCors(res);
-    res.statusCode = 204;
+    res.statusCode = STATUS.NO_CONTENT;
     res.end();
     return;
   }
 
   if (req.method !== 'GET') {
-    sendJson(res, 405, { ok: false, error: 'MethodNotAllowed' });
+    setCors(res);
+    sendJson(res, STATUS.METHOD_NOT_ALLOWED, { ok: false, error: 'MethodNotAllowed' });
     return;
   }
 
@@ -71,11 +55,12 @@ export default async function handler(req, res) {
   try {
     result = await list({ prefix, mode, limit, cursor });
   } catch (error) {
-    sendJson(res, 500, { ok: false, error: 'BlobListFailed', details: String(error) });
+    setCors(res);
+    sendJson(res, STATUS.INTERNAL_SERVER_ERROR, { ok: false, error: 'BlobListFailed', details: String(error) });
     return;
   }
 
-  sendJson(res, 200, {
+  sendJson(res, STATUS.OK, {
     ok: true,
     scope,
     prefix: stripRoot(prefix, root),
