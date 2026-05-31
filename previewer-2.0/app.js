@@ -1502,19 +1502,18 @@
     resetMediaList();
 
     const byName = new Map();
-    files.forEach((file) => {
-      byName.set(String(file.name || '').toLowerCase(), file);
-    });
-
     const urlByName = new Map();
+    const mtlByBase = new Map();
+
     files.forEach((file) => {
+      const nameKey = String(file.name || '').toLowerCase();
+
+      byName.set(nameKey, file);
+
       const url = URL.createObjectURL(file);
       state.mediaUrls.push(url);
-      urlByName.set(String(file.name || '').toLowerCase(), url);
-    });
+      urlByName.set(nameKey, url);
 
-    const mtlByBase = new Map();
-    files.forEach((file) => {
       if (mediaKindFromFile(file) === 'model-mtl') {
         mtlByBase.set(baseName(file.name).toLowerCase(), file);
       }
