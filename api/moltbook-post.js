@@ -1,24 +1,7 @@
+import { setCors, sendJson, getOrigin } from './_utils.js';
+
 const MAX_BODY_BYTES = 40_000; // Anti-abuso: request chica (solo link + texto).
 const MOLTBOOK_BASE = 'https://www.moltbook.com/api/v1';
-
-function setCors(res) {
-  res.setHeader('access-control-allow-origin', '*');
-  res.setHeader('access-control-allow-methods', 'GET,POST,OPTIONS');
-  res.setHeader('access-control-allow-headers', 'content-type,x-publish-key');
-}
-
-function sendJson(res, statusCode, data) {
-  setCors(res);
-  res.statusCode = statusCode;
-  res.setHeader('content-type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(data));
-}
-
-function getOrigin(req) {
-  const proto = req.headers['x-forwarded-proto'] || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
-  return `${proto}://${host}`;
-}
 
 async function readJsonBody(req, maxBytes) {
   const chunks = [];

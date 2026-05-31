@@ -1,27 +1,9 @@
 import { put } from '@vercel/blob';
 import { randomUUID } from 'node:crypto';
+import { setCors, sendJson, getOrigin } from './_utils.js';
 
 const MAX_PROJECT_BYTES = 200_000;
 const MAX_ELEMENTS = 2_000;
-
-function setCors(res) {
-  res.setHeader('access-control-allow-origin', '*');
-  res.setHeader('access-control-allow-methods', 'GET,POST,OPTIONS');
-  res.setHeader('access-control-allow-headers', 'content-type');
-}
-
-function sendJson(res, statusCode, data) {
-  setCors(res);
-  res.statusCode = statusCode;
-  res.setHeader('content-type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(data));
-}
-
-function getOrigin(req) {
-  const proto = req.headers['x-forwarded-proto'] || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
-  return `${proto}://${host}`;
-}
 
 async function readJsonBody(req) {
   const chunks = [];
