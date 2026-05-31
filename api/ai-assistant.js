@@ -1,22 +1,19 @@
+import { setCors } from './_utils.js';
+import { STATUS } from './_status.js';
+
 /**
  * /api/ai-assistant.js  — Vercel Serverless Function
  * Proxy hacia Arkaios Gateway / Gemini con contexto del canvas
  */
 
-function setCors(res) {
-  res.setHeader('access-control-allow-origin', '*');
-  res.setHeader('access-control-allow-methods', 'POST,OPTIONS');
-  res.setHeader('access-control-allow-headers', 'content-type,authorization');
-}
-
 export default async function handler(req, res) {
-  setCors(res);
-  if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return; }
-  if (req.method !== 'POST')    { res.statusCode = 405; res.end('Method Not Allowed'); return; }
+  setCors(res, 'POST,OPTIONS', 'content-type,authorization');
+  if (req.method === 'OPTIONS') { res.statusCode = STATUS.NO_CONTENT; res.end(); return; }
+  if (req.method !== 'POST')    { res.statusCode = STATUS.METHOD_NOT_ALLOWED; res.end('Method Not Allowed'); return; }
 
   try {
     const { message, canvasContext } = req.body || {};
-    if (!message) { res.statusCode = 400; res.end(JSON.stringify({ error: 'message required' })); return; }
+    if (!message) { res.statusCode = STATUS.BAD_REQUEST; res.end(JSON.stringify({ error: 'message required' })); return; }
 
     // Build system prompt with canvas awareness
     const systemPrompt = `Eres AIDA, asistente de diseño integrada en el editor de diagramas Arkaios.
@@ -78,13 +75,13 @@ El editor tiene: rectángulos, círculos, líneas animadas, rutas, metros animad
       reply = 'No pude conectarme al servicio IA. Verifica las variables de entorno ARKAIOS_API_KEY o VITE_GOOGLE_API_KEY en Vercel.';
     }
 
-    res.statusCode = 200;
+    res.statusCode = STATUS.OK;
     res.setHeader('content-type', 'application/json');
     res.end(JSON.stringify({ reply }));
 
   } catch (err) {
     console.error('ai-assistant error:', err);
-    res.statusCode = 500;
+    res.statusCode = STATUS.INTERNAL_SERVER_ERROR;
     res.end(JSON.stringify({ error: err.message }));
   }
 }

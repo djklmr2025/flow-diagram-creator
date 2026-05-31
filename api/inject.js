@@ -1,28 +1,9 @@
 import { put, list } from '@vercel/blob';
+import { getOrigin, setCors, sendJson } from './_utils.js';
+import { STATUS } from './_status.js';
 
 const MAX_PROJECT_BYTES = 200_000; // Anti-abuso: evita payloads enormes.
 const MAX_ELEMENTS = 2_000;
-
-function setCors(res) {
-  res.setHeader('access-control-allow-origin', '*');
-  res.setHeader('access-control-allow-methods', 'GET,POST,OPTIONS');
-  res.setHeader('access-control-allow-headers', 'content-type,x-publish-key');
-}
-
-function sendJson(res, statusCode, data) {
-  setCors(res);
-  res.statusCode = statusCode;
-  res.setHeader('content-type', 'application/json; charset=utf-8');
-  // Evitar caché: esto se usa como "canal" vivo.
-  res.setHeader('cache-control', 'no-store');
-  res.end(JSON.stringify(data));
-}
-
-function getOrigin(req) {
-  const proto = req.headers['x-forwarded-proto'] || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
-  return `${proto}://${host}`;
-}
 
 async function readJsonBody(req) {
   const chunks = [];
@@ -202,8 +183,8 @@ async function resolveBlobUrl(pathname) {
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    setCors(res);
-    res.statusCode = 204;
+    setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    res.statusCode = STATUS.NO_CONTENT;
     res.end();
     return;
   }
@@ -212,7 +193,8 @@ export default async function handler(req, res) {
   const url = new URL(req.url, origin);
   const session = sanitizeSession(url.searchParams.get('session') || url.searchParams.get('listen'));
   if (!session) {
-    sendJson(res, 400, { ok: false, error: 'MissingOrInvalidSession' });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    sendJson(res, 400, { ok: false, error: 'MissingOrInvalidSession' }, { 'cache-control': 'no-store' });
     return;
   }
 
@@ -223,12 +205,14 @@ export default async function handler(req, res) {
     try {
       blobUrl = await resolveBlobUrl(pathname);
     } catch (error) {
-      sendJson(res, 500, { ok: false, error: 'BlobListFailed', details: String(error) });
+      setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    sendJson(res, 500, { ok: false, error: 'BlobListFailed', details: String(error) }, { 'cache-control': 'no-store' });
       return;
     }
 
     if (!blobUrl) {
-      sendJson(res, 404, { ok: false, error: 'NotFound', session });
+      setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    sendJson(res, 404, { ok: false, error: 'NotFound', session }, { 'cache-control': 'no-store' });
       return;
     }
 
@@ -236,7 +220,8 @@ export default async function handler(req, res) {
     try {
       response = await fetch(blobUrl, { cache: 'no-store' });
     } catch (error) {
-      sendJson(res, 502, { ok: false, error: 'BlobFetchFailed', details: String(error) });
+      setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    sendJson(res, 502, { ok: false, error: 'BlobFetchFailed', details: String(error) }, { 'cache-control': 'no-store' });
       return;
     }
 
@@ -250,7 +235,8 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== 'POST') {
-    sendJson(res, 405, { ok: false, error: 'MethodNotAllowed' });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    sendJson(res, STATUS.METHOD_NOT_ALLOWED, { ok: false, error: 'MethodNotAllowed' }, { 'cache-control': 'no-store' });
     return;
   }
 
@@ -258,7 +244,8 @@ export default async function handler(req, res) {
   if (requiredKey) {
     const key = req.headers['x-publish-key'] || url.searchParams.get('key') || '';
     if (key !== requiredKey) {
-      sendJson(res, 401, { ok: false, error: 'Unauthorized' });
+      setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    sendJson(res, 401, { ok: false, error: 'Unauthorized' }, { 'cache-control': 'no-store' });
       return;
     }
   }
@@ -267,13 +254,15 @@ export default async function handler(req, res) {
   try {
     body = await readJsonBody(req);
   } catch {
-    sendJson(res, 400, { ok: false, error: 'InvalidJSONBody' });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    sendJson(res, STATUS.BAD_REQUEST, { ok: false, error: 'InvalidJSONBody' }, { 'cache-control': 'no-store' });
     return;
   }
 
   const errors = validateProject(body);
   if (errors.length) {
-    sendJson(res, 400, { ok: false, error: 'ValidationError', details: errors });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    sendJson(res, 400, { ok: false, error: 'ValidationError', details: errors }, { 'cache-control': 'no-store' });
     return;
   }
 
@@ -312,7 +301,8 @@ export default async function handler(req, res) {
       contentType: 'application/json',
     });
   } catch (error) {
-    sendJson(res, 500, { ok: false, error: 'BlobWriteFailed', details: String(error) });
+    setCors(res, 'GET,POST,OPTIONS', 'content-type,x-publish-key');
+    sendJson(res, STATUS.INTERNAL_SERVER_ERROR, { ok: false, error: 'BlobWriteFailed', details: String(error) }, { 'cache-control': 'no-store' });
     return;
   }
 
