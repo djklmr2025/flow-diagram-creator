@@ -1,3 +1,4 @@
+import { analyzeElements } from './_analyze-elements.js';
 import { put, list } from '@vercel/blob';
 
 const MAX_PROJECT_BYTES = 200_000; // Anti-abuso: evita payloads enormes.
@@ -45,30 +46,6 @@ function sanitizeSession(input) {
   return session;
 }
 
-function analyzeElements(elements) {
-  let count = 0;
-  let hasImages = false;
-
-  const stack = Array.isArray(elements) ? elements.slice() : [];
-  while (stack.length) {
-    const e = stack.pop();
-    if (!e || typeof e !== 'object') continue;
-
-    count++;
-
-    if (e.type === 'image' || typeof e.imageSrc === 'string' || e.imageData != null) {
-      hasImages = true;
-    }
-
-    if (e.type === 'group' && Array.isArray(e.elements)) {
-      for (let i = e.elements.length - 1; i >= 0; i--) stack.push(e.elements[i]);
-    }
-
-    if (count > MAX_ELEMENTS) break;
-  }
-
-  return { count, hasImages };
-}
 
 function validateProject(project) {
   const errors = [];

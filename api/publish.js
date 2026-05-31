@@ -1,5 +1,6 @@
 import { put } from '@vercel/blob';
 import { randomUUID } from 'node:crypto';
+import { analyzeElements } from './_analyze-elements.js';
 
 const MAX_PROJECT_BYTES = 200_000; // Anti-abuso: evita payloads enormes.
 const MAX_ELEMENTS = 2_000;
@@ -44,33 +45,6 @@ function sanitizeFolder(input) {
   return folder;
 }
 
-function analyzeElements(elements) {
-  let count = 0;
-  let hasImages = false;
-
-  const stack = Array.isArray(elements) ? elements.slice() : [];
-  while (stack.length) {
-    const e = stack.pop();
-    if (!e || typeof e !== 'object') continue;
-
-    count++;
-
-    if (e.type === 'image' || typeof e.imageSrc === 'string' || e.imageData != null) {
-      hasImages = true;
-    }
-
-    if (e.type === 'group' && Array.isArray(e.elements)) {
-      for (let i = e.elements.length - 1; i >= 0; i--) {
-        stack.push(e.elements[i]);
-      }
-    }
-
-    // Early exit para evitar recorridos gigantes.
-    if (count > MAX_ELEMENTS) break;
-  }
-
-  return { count, hasImages };
-}
 
 function validateProject(project) {
   const errors = [];
