@@ -1,54 +1,57 @@
-import { list } from '@vercel/blob';
+import { list } from "@vercel/blob";
 
 function setCors(res) {
-  res.setHeader('access-control-allow-origin', '*');
-  res.setHeader('access-control-allow-methods', 'GET,OPTIONS');
-  res.setHeader('access-control-allow-headers', 'content-type');
+  res.setHeader("access-control-allow-origin", "*");
+  res.setHeader("access-control-allow-methods", "GET,OPTIONS");
+  res.setHeader("access-control-allow-headers", "content-type");
 }
 
 function sendJson(res, statusCode, data) {
   setCors(res);
   res.statusCode = statusCode;
-  res.setHeader('content-type', 'application/json; charset=utf-8');
+  res.setHeader("content-type", "application/json; charset=utf-8");
   res.end(JSON.stringify(data));
 }
 
 function getOrigin(req) {
-  const proto = req.headers['x-forwarded-proto'] || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
+  const proto = req.headers["x-forwarded-proto"] || "https";
+  const host =
+    req.headers["x-forwarded-host"] || req.headers.host || "localhost";
   return `${proto}://${host}`;
 }
 
 function sanitizePrefix(input) {
-  if (!input) return '';
+  if (!input) return "";
   let prefix = String(input).trim();
-  prefix = prefix.replace(/^\/+/, '');
-  prefix = prefix.replace(/\\+/g, '/');
-  if (!/^[a-zA-Z0-9/_-]*$/.test(prefix)) return '';
-  if (prefix.includes('..')) return '';
+  prefix = prefix.replace(/^\/+/, "");
+  prefix = prefix.replace(/\\+/g, "/");
+  if (!/^[a-zA-Z0-9/_-]*$/.test(prefix)) return "";
+  if (prefix.includes("..")) return "";
   return prefix;
 }
 
 function sanitizeScope(input) {
-  const scope = String(input || 'library').toLowerCase().trim();
-  if (scope === 'projects') return 'projects';
-  return 'library';
+  const scope = String(input || "library")
+    .toLowerCase()
+    .trim();
+  if (scope === "projects") return "projects";
+  return "library";
 }
 
 function stripRoot(pathname, root) {
-  return String(pathname || '').replace(new RegExp(`^${root}/`), '');
+  return String(pathname || "").replace(new RegExp(`^${root}/`), "");
 }
 
 export default async function handler(req, res) {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     setCors(res);
     res.statusCode = 204;
     res.end();
     return;
   }
 
-  if (req.method !== 'GET') {
-    sendJson(res, 405, { ok: false, error: 'MethodNotAllowed' });
+  if (req.method !== "GET") {
+    sendJson(res, 405, { ok: false, error: "MethodNotAllowed" });
     return;
   }
 
@@ -56,22 +59,32 @@ export default async function handler(req, res) {
   const url = new URL(req.url, origin);
 
   // Prefijo "humano" sin el root interno.
-  const prefixParam = sanitizePrefix(url.searchParams.get('prefix'));
-  const scope = sanitizeScope(url.searchParams.get('scope'));
-  const modeParam = String(url.searchParams.get('mode') || 'folded').toLowerCase();
-  const limitParam = Number(url.searchParams.get('limit') || '200');
-  const cursor = url.searchParams.get('cursor') || undefined;
+  const prefixParam = sanitizePrefix(url.searchParams.get("prefix"));
+  const scope = sanitizeScope(url.searchParams.get("scope"));
+  const modeParam = String(
+    url.searchParams.get("mode") || "folded",
+  ).toLowerCase();
+  const limitParam = Number(url.searchParams.get("limit") || "200");
+  const cursor = url.searchParams.get("cursor") || undefined;
 
-  const root = scope === 'projects' ? 'projects' : 'library';
-  const prefix = prefixParam ? `${root}/${prefixParam.replace(/\/+$/, '')}/` : `${root}/`;
-  const mode = modeParam === 'expanded' ? 'expanded' : 'folded';
-  const limit = Number.isFinite(limitParam) ? Math.min(Math.max(1, limitParam), 1000) : 200;
+  const root = scope === "projects" ? "projects" : "library";
+  const prefix = prefixParam
+    ? `${root}/${prefixParam.replace(/\/+$/, "")}/`
+    : `${root}/`;
+  const mode = modeParam === "expanded" ? "expanded" : "folded";
+  const limit = Number.isFinite(limitParam)
+    ? Math.min(Math.max(1, limitParam), 1000)
+    : 200;
 
   let result;
   try {
     result = await list({ prefix, mode, limit, cursor });
   } catch (error) {
-    sendJson(res, 500, { ok: false, error: 'BlobListFailed', details: String(error) });
+    sendJson(res, 500, {
+      ok: false,
+      error: "BlobListFailed",
+      details: String(error),
+    });
     return;
   }
 
@@ -81,9 +94,11 @@ export default async function handler(req, res) {
     prefix: stripRoot(prefix, root),
     mode,
     limit,
-    folders: (result.folders || []).map((f) => stripRoot(String(f), root).replace(/\/+$/, '')),
+    folders: (result.folders || []).map((f) =>
+      stripRoot(String(f), root).replace(/\/+$/, ""),
+    ),
     blobs: (result.blobs || []).map((b) => ({
-      pathname: stripRoot(b.pathname, root).replace(/\.json$/i, ''),
+      pathname: stripRoot(b.pathname, root).replace(/\.json$/i, ""),
       url: b.url,
       size: b.size,
       uploadedAt: b.uploadedAt,
