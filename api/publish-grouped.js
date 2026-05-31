@@ -1,3 +1,5 @@
+import { normalizeProjectInPlace, normalizeElementInPlace, walkElements } from './_utils/normalize.js';
+
 import { put } from '@vercel/blob';
 import { randomUUID } from 'node:crypto';
 
@@ -50,40 +52,9 @@ function analyzeElements(elements) {
   return { count, hasImages };
 }
 
-function normalizeElementInPlace(elem) {
-  if (!elem || typeof elem !== 'object') return;
-  if (typeof elem.name !== 'string') elem.name = '';
-  if (typeof elem.locked !== 'boolean') elem.locked = false;
-  if (typeof elem.active !== 'boolean') elem.active = true;
-  if (typeof elem.connectionStatus !== 'string') elem.connectionStatus = 'none';
-}
 
-function normalizeProjectInPlace(project) {
-  if (!project || typeof project !== 'object') return;
-  if (!Array.isArray(project.elements)) project.elements = [];
 
-  const stack = project.elements.slice();
-  while (stack.length) {
-    const elem = stack.pop();
-    if (!elem || typeof elem !== 'object') continue;
-    normalizeElementInPlace(elem);
-    if (elem.type === 'group' && Array.isArray(elem.elements)) {
-      for (let i = elem.elements.length - 1; i >= 0; i--) stack.push(elem.elements[i]);
-    }
-  }
 
-  if (!project.camera || typeof project.camera !== 'object') {
-    project.camera = { x: 0, y: 0, zoom: 1 };
-  } else {
-    const cam = project.camera;
-    if (!Number.isFinite(cam.x)) cam.x = 0;
-    if (!Number.isFinite(cam.y)) cam.y = 0;
-    if (!Number.isFinite(cam.zoom)) cam.zoom = 1;
-  }
-
-  if (typeof project.name !== 'string') project.name = '';
-  if (typeof project.date !== 'string') project.date = new Date().toISOString();
-}
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
