@@ -586,18 +586,27 @@
     for (const el of elems) {
       const t = el.type || 'unknown';
       // Normalize similar types
-      const norm = (['rect','rectangle'].includes(t)) ? 'rect'
-                 : (['pencil','freehand','path'].includes(t)) ? 'path'
-                 : t;
+      let norm = t;
+      if (t === 'rect' || t === 'rectangle') {
+        norm = 'rect';
+      } else if (t === 'pencil' || t === 'freehand' || t === 'path') {
+        norm = 'path';
+      } else if (t === 'line' || t === 'arrow') {
+        norm = 'line';
+      } else if (t === 'text' || t === 'label') {
+        norm = 'text';
+      }
       if (!seen.has(norm)) { seen.add(norm); types.push(norm); }
     }
     return types;
   }
 
   function normType(t) {
-    return (['rect','rectangle'].includes(t)) ? 'rect'
-         : (['pencil','freehand','path'].includes(t)) ? 'path'
-         : t || 'unknown';
+    if (t === 'rect' || t === 'rectangle') return 'rect';
+    if (t === 'pencil' || t === 'freehand' || t === 'path') return 'path';
+    if (t === 'line' || t === 'arrow') return 'line';
+    if (t === 'text' || t === 'label') return 'text';
+    return t || 'unknown';
   }
 
   let currentType = 'all';
