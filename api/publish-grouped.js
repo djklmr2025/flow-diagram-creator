@@ -1,3 +1,4 @@
+import { readJsonBody } from './_utils.js';
 import { put } from '@vercel/blob';
 import { randomUUID } from 'node:crypto';
 
@@ -23,13 +24,6 @@ function getOrigin(req) {
   return `${proto}://${host}`;
 }
 
-async function readJsonBody(req) {
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  const text = Buffer.concat(chunks).toString('utf8');
-  if (!text) return null;
-  return JSON.parse(text);
-}
 
 function analyzeElements(elements) {
   let count = 0;
