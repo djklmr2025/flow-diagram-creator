@@ -580,13 +580,15 @@
   }
 
   function flattenElements(elements, out = []) {
-    (elements || []).forEach((elem) => {
-      if (!elem || typeof elem !== 'object') return;
+    if (!elements) return out;
+    for (let i = 0, len = elements.length; i < len; i++) {
+      const elem = elements[i];
+      if (!elem || typeof elem !== "object") continue;
       out.push(elem);
-      if (elem.type === 'group' && Array.isArray(elem.elements)) {
+      if (elem.type === "group" && Array.isArray(elem.elements)) {
         flattenElements(elem.elements, out);
       }
-    });
+    }
     return out;
   }
 
