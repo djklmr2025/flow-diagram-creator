@@ -9678,7 +9678,10 @@
                     <input type="text" readonly value="${previewUrl}">
                     <div style="margin-top: 10px;"><strong>Deck (modo lámina):</strong></div>
                     <input type="text" readonly value="${deckUrl}">
-                    <div style="margin-top: 10px;"><strong>JSON:</strong></div>
+                    <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+                        <strong>JSON:</strong>
+                        <button class="btn small" style="padding: 2px 8px; font-size: 11px; margin: 0;" onclick="window.system.downloadJSONFromUrl('${data.jsonUrl}', '${name || 'sticker'}')">⬇️ Descargar JSON</button>
+                    </div>
                     <input type="text" readonly value="${data.jsonUrl}">
                     <div style="margin-top: 10px;">Tip: el link de preview se intentó copiar al portapapeles.</div>
                 `;
@@ -9789,7 +9792,10 @@
                     <input type="text" readonly value="${deckUrl}">
                     <div style="margin-top: 10px;"><strong>Editor (abre en modo edición):</strong></div>
                     <input type="text" readonly value="${editorUrl}">
-                    <div style="margin-top: 10px;"><strong>JSON:</strong></div>
+                    <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+                        <strong>JSON:</strong>
+                        <button class="btn small" style="padding: 2px 8px; font-size: 11px; margin: 0;" onclick="window.system.downloadJSONFromUrl('${data.jsonUrl}', '${name || 'proyecto'}')">⬇️ Descargar JSON</button>
+                    </div>
                     <input type="text" readonly value="${data.jsonUrl}">
                     <div style="margin-top: 10px;">Tip: el link de preview se intentó copiar al portapapeles.</div>
                 `;
@@ -10820,7 +10826,7 @@
                     }
                     const elem = this.findElementByIdRecursive(cp);
                     if (elem) {
-                        this.setActiveControlPoint(elem, { focus: false, updateUrl: false });
+                        this.setActiveControlPoint(elem, { focus: true, updateUrl: false });
                         return;
                     }
                 }
@@ -10832,7 +10838,7 @@
 
                 const cps = this.collectControlPoints();
                 if (cps.length > 0) {
-                    this.setActiveControlPoint(cps[0], { focus: false, updateUrl: true });
+                    this.setActiveControlPoint(cps[0], { focus: true, updateUrl: true });
                 } else {
                     this.updateDeckSlideUI(null);
                 }
@@ -11748,7 +11754,12 @@
 	                if (deckNav) deckNav.classList.remove('show');
 	                document.body.classList.remove('deck-mode', 'deck-horizontal', 'deck-vertical');
 
-                // Ocultar UI
+                // Ocultar UI de edición y Ribbon
+                const ribbon = document.getElementById('ribbon');
+                if (ribbon) ribbon.style.display = 'none';
+                const elemTabsPanel = document.getElementById('elem-tabs-panel');
+                if (elemTabsPanel) elemTabsPanel.style.display = 'none';
+
                 document.getElementById('toolbar').style.display = 'none';
                 document.getElementById('properties-panel').style.display = 'none';
                 document.getElementById('status-bar').style.display = 'none';
@@ -11794,7 +11805,12 @@
             applyDeckMode() {
                 this.setLayersPanelOpen(false, { persist: false });
 
-                // Ocultar UI de edición
+                // Ocultar UI de edición y Ribbon
+                const ribbon = document.getElementById('ribbon');
+                if (ribbon) ribbon.style.display = 'none';
+                const elemTabsPanel = document.getElementById('elem-tabs-panel');
+                if (elemTabsPanel) elemTabsPanel.style.display = 'none';
+
                 document.getElementById('toolbar').style.display = 'none';
                 document.getElementById('properties-panel').style.display = 'none';
                 document.getElementById('status-bar').style.display = 'none';
@@ -12417,6 +12433,7 @@
                 this.selectedElements = [];
                 this.saveHistory();
                 this.updateZoomIndicator();
+                this.resizeCanvas();
                 if (autoFit) {
                     this.maybeAutoFitViewerCamera();
                     this.ensureViewerCameraHasVisibleContent();
@@ -12693,6 +12710,23 @@
                     this.historyIndex = -1;
                     this.saveHistory();
                     this.updateZoomIndicator();
+                }
+            }
+
+            async downloadJSONFromUrl(url, name) {
+                try {
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const data = await resp.json();
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `${name || 'diagrama'}.json`;
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                } catch(e) {
+                    console.error('Error al descargar JSON:', e);
+                    alert('Error al descargar JSON: ' + e.message);
                 }
             }
             
