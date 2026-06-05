@@ -2822,6 +2822,9 @@
                 this.backgroundColor = '#1a1a2e'; // null => transparente
                 this.viewerMode = null; // null | 'sticker' | 'deck'
                 this.depthFx = false; // Sombra suave para dar "volumen" en modos visor
+                this._viewerInitialFitDone = false;
+                this._lastFitCw = 0;
+                this._lastFitCh = 0;
                 this.viewerShowLabels = true; // En visor: ocultar nombres por defecto (override: ?labels=1)
 
                 // Estado del "deck" (lámina informativa)
@@ -7523,6 +7526,42 @@
             // ==================== RENDERIZADO ====================
             
             render() {
+                if (this.isViewerLikeMode()) {
+                    const cw = this.canvas.width;
+                    const ch = this.canvas.height;
+                    if (cw > 0 && ch > 0) {
+                        const needsFit = !this._viewerInitialFitDone || this._lastFitCw !== cw || this._lastFitCh !== ch;
+                        if (needsFit) {
+                            this._viewerInitialFitDone = true;
+                            this._lastFitCw = cw;
+                            this._lastFitCh = ch;
+                            
+                            if (this.viewerMode === 'deck') {
+                                if (this.activeControlPointId) {
+                                    const elem = this.findElementByIdRecursive(this.activeControlPointId);
+                                    if (elem) {
+                                        this.focusCameraOnElement(elem);
+                                    }
+                                } else {
+                                    this.maybeAutoFitViewerCamera();
+                                    this.ensureViewerCameraHasVisibleContent();
+                                }
+                            } else {
+                                const urlParams = new URLSearchParams(window.location.search);
+                                const isLive = ['1', 'true', 'yes', 'on'].includes(String(urlParams.get('liveOnly') || urlParams.get('builderLive') || '').trim().toLowerCase());
+                                if (!isLive || !this.viewerHasVisiblePaintOnScreen()) {
+                                    this.maybeAutoFitViewerCamera();
+                                    this.ensureViewerCameraHasVisibleContent();
+                                    if (!this.viewerHasVisiblePaintOnScreen()) {
+                                        this.forceViewerSafeFit(112);
+                                        this.ensureViewerCameraHasVisibleContent();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Blindaje de estado de canvas/camara para evitar frames en blanco por estados corruptos.
                 if (!this.camera || typeof this.camera !== 'object') this.camera = { x: 0, y: 0, zoom: 1 };
                 if (!Number.isFinite(this.camera.zoom) || this.camera.zoom <= 0) this.camera.zoom = 1;
@@ -11787,6 +11826,7 @@
                 // Deshabilitar interacciones de edición (solo navegación)
                 this.viewerMode = 'sticker';
                 this.readOnly = true;
+                this._viewerInitialFitDone = false;
                 this.tool = 'select';
                 this.showGrid = false;
                 this.backgroundColor = null;
@@ -11830,6 +11870,7 @@
 
                 this.viewerMode = 'deck';
                 this.readOnly = true;
+                this._viewerInitialFitDone = false;
                 this.tool = 'select';
                 this.showGrid = false;
                 this.backgroundColor = null;
@@ -12431,6 +12472,7 @@
                 this.elements = project.elements || [];
                 this.camera = project.camera || { x: 0, y: 0, zoom: 1 };
                 this.selectedElements = [];
+                this._viewerInitialFitDone = false;
                 this.saveHistory();
                 this.updateZoomIndicator();
                 this.resizeCanvas();
@@ -13621,10 +13663,48 @@
             const session = String(params.get('liveSession') || '').trim();
             const storageKey = session ? `flow-builder-live-${session}` : '';
             let lastSignature = '';
+            let _firstPayloadReceived = false;
+
+            // Helper: fuerza recalibración de cámara en modo viewer diferido (multi-frame)
+            // para garantizar que el canvas ya tenga dimensiones válidas cuando se ejecute.
+            const scheduleDeferredFit = () => {
+                const doFit = () => {
+                    try {
+                        if (!system || !system.isViewerLikeMode || !system.isViewerLikeMode()) return;
+                        // Resetear flag para que el loop de render vuelva a disparar el fit inicial
+                        system._viewerInitialFitDone = false;
+                        system.resizeCanvas();
+                        if (system.maybeAutoFitViewerCamera) system.maybeAutoFitViewerCamera();
+                        if (system.ensureViewerCameraHasVisibleContent) system.ensureViewerCameraHasVisibleContent();
+                        if (!system.viewerHasVisiblePaintOnScreen || !system.viewerHasVisiblePaintOnScreen()) {
+                            if (system.forceViewerSafeFit) system.forceViewerSafeFit(112);
+                            if (system.ensureViewerCameraHasVisibleContent) system.ensureViewerCameraHasVisibleContent();
+                        }
+                        if (system.viewerMode === 'deck' && system.refreshDeckUI) system.refreshDeckUI();
+                    } catch { /* Ignorar */ }
+                };
+                // Frame 1: inmediato
+                requestAnimationFrame(() => {
+                    doFit();
+                    // Frame 2: 80ms después — canvas puede haber terminado de dimensionarse
+                    setTimeout(() => {
+                        requestAnimationFrame(doFit);
+                        // Frame 3: 300ms después — rescate final por si hubo resize tardío del panel
+                        setTimeout(() => { requestAnimationFrame(doFit); }, 300);
+                    }, 80);
+                });
+            };
 
             const applyLivePayload = (project) => {
                 if (!project) return;
                 try {
+                    const isFirst = !_firstPayloadReceived;
+                    if (isFirst) {
+                        _firstPayloadReceived = true;
+                        // En el primer payload resetear el flag de fit inicial para que la
+                        // cámara se recalibre una vez el canvas tenga dimensiones reales.
+                        system._viewerInitialFitDone = false;
+                    }
                     system.applyLoadedProject(project, {
                         source: 'builder-live',
                         isDeck: system.viewerMode === 'deck',
@@ -13632,17 +13712,22 @@
                         // En preview vivo respetar la cámara del builder para evitar "pantalla negra" por auto-fit inestable.
                         autoFit: false
                     });
-                    // Rescate por si llega snapshot con cámara inválida/default y deja canvas negro.
-                    try {
-                        if (system.isViewerLikeMode && system.isViewerLikeMode()) {
-                            const hasVisible = system.viewerHasVisiblePaintOnScreen ? system.viewerHasVisiblePaintOnScreen() : true;
-                            if (!hasVisible) {
-                                if (system.forceViewerSafeFit) system.forceViewerSafeFit(112);
-                                if (system.ensureViewerCameraHasVisibleContent) system.ensureViewerCameraHasVisibleContent();
+                    // En el primer payload, programar un fit diferido multi-frame para garantizar
+                    // que Normal y Lámina muestren contenido aunque el canvas aún esté
+                    // inicializándose al momento de recibir el snapshot.
+                    if (isFirst) {
+                        scheduleDeferredFit();
+                    } else {
+                        // Rescate rápido para payloads posteriores: si el contenido salió de pantalla.
+                        try {
+                            if (system.isViewerLikeMode && system.isViewerLikeMode()) {
+                                const hasVisible = system.viewerHasVisiblePaintOnScreen ? system.viewerHasVisiblePaintOnScreen() : true;
+                                if (!hasVisible) {
+                                    if (system.forceViewerSafeFit) system.forceViewerSafeFit(112);
+                                    if (system.ensureViewerCameraHasVisibleContent) system.ensureViewerCameraHasVisibleContent();
+                                }
                             }
-                        }
-                    } catch {
-                        // Ignorar
+                        } catch { /* Ignorar */ }
                     }
                     if (system.viewerMode === 'deck') {
                         system.refreshDeckUI();
