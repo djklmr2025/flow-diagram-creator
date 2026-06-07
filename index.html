@@ -2431,6 +2431,7 @@
             <div class="context-menu-item" id="ctx-export-vector"><span>📁</span> Guardar .vector</div>
             <div class="context-menu-separator"></div>
             <div class="context-menu-item" id="ctx-export-webp"><span>📱</span> Sticker WA (WebP)</div>
+            <div class="context-menu-item" id="ctx-export-html"><span>🌐</span> HTML standalone <em style="opacity:.5;font-size:10px;font-style:normal;margin-left:auto">visor offline</em></div>
             <div class="context-menu-item" id="ctx-export-video"><span>🎬</span> Exportar Video <em style="opacity:.5;font-size:10px;font-style:normal;margin-left:auto">WebM · duración auto</em></div>
         </div>
 
@@ -11805,6 +11806,8 @@
                 document.getElementById('zoom-indicator').style.display = 'none';
                 document.getElementById('context-menu').style.display = 'none';
                 document.getElementById('close-path-hint').style.display = 'none';
+                const ribbon = document.getElementById('ribbon');
+                if (ribbon) ribbon.style.display = 'none';
 
                 // Ajustar canvas al 100% de la pantalla
                 const container = document.getElementById('canvas-container');
@@ -11857,6 +11860,8 @@
                 document.getElementById('zoom-indicator').style.display = 'none';
                 document.getElementById('context-menu').style.display = 'none';
                 document.getElementById('close-path-hint').style.display = 'none';
+                const ribbon = document.getElementById('ribbon');
+                if (ribbon) ribbon.style.display = 'none';
 
 	                // Mostrar panel deck
 	                const deckPanel = document.getElementById('deck-panel');
