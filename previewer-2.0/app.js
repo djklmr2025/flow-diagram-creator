@@ -642,10 +642,16 @@
     const byId = new Map(flat.map((e) => [String(e.id || ''), e]));
 
     // Resolver ruta de cada mover una sola vez por render.
+    const routePointsCache = new Map();
     state.animation.moverNodes.forEach((m) => {
       const routeId = String(m?.elem?.routePathId || m?.elem?.followPathId || m?.elem?.routeId || '');
-      const routeElem = routeId ? byId.get(routeId) : null;
-      m.routePoints = getRoutePoints(routeElem);
+      let pts = routePointsCache.get(routeId);
+      if (!pts) {
+        const routeElem = routeId ? byId.get(routeId) : null;
+        pts = getRoutePoints(routeElem);
+        if (routeId) routePointsCache.set(routeId, pts);
+      }
+      m.routePoints = pts;
       m.routeSpeed = Math.max(0.03, Number(m?.elem?.speed || m?.elem?.velocity || 1) * 0.12);
     });
 
