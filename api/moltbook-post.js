@@ -55,7 +55,7 @@ function sanitizeTitle(input) {
   return t;
 }
 
-function sanitizeUrl(input) {
+export function sanitizeUrl(input) {
   const raw = String(input || '').trim();
   if (!raw) return '';
   try {
