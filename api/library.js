@@ -19,7 +19,7 @@ function getOrigin(req) {
   return `${proto}://${host}`;
 }
 
-function sanitizePrefix(input) {
+export function sanitizePrefix(input) {
   if (!input) return '';
   let prefix = String(input).trim();
   prefix = prefix.replace(/^\/+/, '');
