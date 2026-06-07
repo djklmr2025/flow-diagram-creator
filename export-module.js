@@ -463,10 +463,11 @@
 
     let selOnly = false;
 
-    modal.querySelectorAll("._arkScope").forEach(btn => {
+    const scopeButtons = modal.querySelectorAll("._arkScope");
+    scopeButtons.forEach(btn => {
       btn.onclick = () => {
         selOnly = btn.dataset.scope === "sel";
-        modal.querySelectorAll("._arkScope").forEach(b => b.classList.remove("active"));
+        scopeButtons.forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
       };
     });
