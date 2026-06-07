@@ -657,9 +657,11 @@
     filtered.forEach((el, i) => {
       const isSelected = selIds.has(el.id);
       const name = el.name || el.text || label(el.type || 'unknown') + ' #' + i;
+
+      const safeName = String(name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
       const div = document.createElement('div');
       div.className = 'et-item' + (isSelected ? ' selected' : '');
-      div.innerHTML = `<span>${icon(el.type || 'unknown')}</span><span class="et-name" title="${name}">${name}</span><span class="et-idx">#${i}</span>`;
+      div.innerHTML = `<span>${icon(el.type || 'unknown')}</span><span class="et-name" title="${safeName}">${safeName}</span><span class="et-idx">#${i}</span>`;
       div.addEventListener('click', e => {
         if (!s) return;
         if (e.shiftKey) {
