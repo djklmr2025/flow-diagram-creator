@@ -47,7 +47,7 @@ function sanitizeSubmolt(input) {
   return s;
 }
 
-function sanitizeTitle(input) {
+export function sanitizeTitle(input) {
   let t = String(input || '').trim();
   if (!t) t = 'Flow Diagram';
   // Evitar títulos enormes.
