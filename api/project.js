@@ -64,8 +64,11 @@ export default async function handler(req, res) {
 
   let exact;
   try {
-    exact = await resolveExactBlob(libraryPath);
-    if (!exact) exact = await resolveExactBlob(projectsPath);
+    const [libExact, projExact] = await Promise.all([
+      resolveExactBlob(libraryPath),
+      resolveExactBlob(projectsPath)
+    ]);
+    exact = libExact || projExact;
   } catch (error) {
     sendJson(res, 500, { ok: false, error: 'BlobListFailed', details: String(error) });
     return;
