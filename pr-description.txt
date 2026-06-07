@@ -1,0 +1,12 @@
+Title: "🧪 Improve testing for countElementsRecursive"
+
+Description:
+🎯 **What:** Added comprehensive unit tests for `countElementsRecursive` in `api/publish-project.js`. The function walks through elements and their nested `group` structures to determine the total number of elements.
+📊 **Coverage:** The tests cover the following scenarios:
+  - Null, undefined, or non-object inputs (should return 0)
+  - Empty arrays (should return 0)
+  - Arrays with basic elements (flat list)
+  - Arrays with nested groups
+  - Arrays with deeply nested groups
+  - Arrays containing invalid elements mixed with valid elements
+✨ **Result:** A significant improvement in test coverage for recursion and counting logic. Bugs involving invalid properties, flat mappings, or deeply nested edge cases will be easily caught by these unit tests.
