@@ -1,16 +1,13 @@
+import { setCors } from "./_utils.js";
+
+
 /**
  * /api/ai-assistant.js  — Vercel Serverless Function
  * Proxy hacia Arkaios Gateway / Gemini con contexto del canvas
  */
 
-function setCors(res) {
-  res.setHeader('access-control-allow-origin', '*');
-  res.setHeader('access-control-allow-methods', 'POST,OPTIONS');
-  res.setHeader('access-control-allow-headers', 'content-type,authorization');
-}
-
 export default async function handler(req, res) {
-  setCors(res);
+  setCors(res, true);
   if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return; }
   if (req.method !== 'POST')    { res.statusCode = 405; res.end('Method Not Allowed'); return; }
 

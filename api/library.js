@@ -1,23 +1,5 @@
 import { list } from '@vercel/blob';
-
-function setCors(res) {
-  res.setHeader('access-control-allow-origin', '*');
-  res.setHeader('access-control-allow-methods', 'GET,OPTIONS');
-  res.setHeader('access-control-allow-headers', 'content-type');
-}
-
-function sendJson(res, statusCode, data) {
-  setCors(res);
-  res.statusCode = statusCode;
-  res.setHeader('content-type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(data));
-}
-
-function getOrigin(req) {
-  const proto = req.headers['x-forwarded-proto'] || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
-  return `${proto}://${host}`;
-}
+import { setCors, sendJson, getOrigin } from './_utils.js';
 
 function sanitizePrefix(input) {
   if (!input) return '';

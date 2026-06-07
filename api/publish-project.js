@@ -1,5 +1,6 @@
 import { put } from '@vercel/blob';
 import { randomUUID } from 'node:crypto';
+import { setCors, sendJson, getOrigin } from './_utils.js';
 
 // Publica un "proyecto" (permite imagenes). Si el JSON trae imagenes embebidas
 // como data URLs (base64), las sube como assets a Blob y reemplaza imageSrc por
@@ -12,25 +13,6 @@ const MAX_ELEMENTS = 2_000;
 const MAX_IMAGES = 40;
 const MAX_IMAGE_BYTES = 2_000_000;
 const MAX_TOTAL_IMAGE_BYTES = 8_000_000;
-
-function setCors(res) {
-  res.setHeader('access-control-allow-origin', '*');
-  res.setHeader('access-control-allow-methods', 'GET,POST,OPTIONS');
-  res.setHeader('access-control-allow-headers', 'content-type,x-publish-key');
-}
-
-function sendJson(res, statusCode, data) {
-  setCors(res);
-  res.statusCode = statusCode;
-  res.setHeader('content-type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(data));
-}
-
-function getOrigin(req) {
-  const proto = req.headers['x-forwarded-proto'] || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
-  return `${proto}://${host}`;
-}
 
 async function readJsonBody(req, maxBytes) {
   const chunks = [];
