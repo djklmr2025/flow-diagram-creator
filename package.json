@@ -2,6 +2,9 @@
   "name": "flow-diagram-creator",
   "private": true,
   "type": "module",
+  "scripts": {
+    "test": "node --experimental-test-module-mocks --test api/tests/*.test.js"
+  },
   "dependencies": {
     "@vercel/blob": "*"
   }
