@@ -549,8 +549,8 @@
         vid.pause();
         vid.removeAttribute('src');
         vid.load();
-      } catch (_) {
-        // no-op
+      } catch (err) {
+        console.warn('Error handling video element:', err);
       }
       vid.hidden = true;
     }
@@ -1161,8 +1161,8 @@
     state.mediaUrls.forEach((url) => {
       try {
         URL.revokeObjectURL(url);
-      } catch (_) {
-        // no-op
+      } catch (err) {
+        console.warn('Error revoking object URL:', err);
       }
     });
     state.mediaUrls = [];
@@ -1279,14 +1279,14 @@
       els.mediaVideo.pause();
       els.mediaVideo.removeAttribute('src');
       els.mediaVideo.load();
-    } catch (_) {
-      // no-op
+    } catch (err) {
+      console.warn('Error pausing/resetting video element:', err);
     }
 
     try {
       els.mediaModelViewer.removeAttribute('src');
-    } catch (_) {
-      // no-op
+    } catch (err) {
+      console.warn('Error resetting model viewer:', err);
     }
 
     disposeThreeRuntime();
@@ -1471,8 +1471,8 @@
       els.mediaVideo.hidden = false;
       try {
         await els.mediaVideo.play();
-      } catch (_) {
-        // no-op
+      } catch (err) {
+        console.warn('Error playing video element:', err);
       }
       setStatus(`Media: ${item.name}`);
       return;
@@ -1748,8 +1748,8 @@
       state.isPanning = false;
       try {
         els.stage.releasePointerCapture(e.pointerId);
-      } catch (_) {
-        // no-op
+      } catch (err) {
+        console.warn('Error releasing pointer capture:', err);
       }
     });
 
