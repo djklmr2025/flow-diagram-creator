@@ -263,7 +263,7 @@ async function uploadProjectImagesInPlace(elements, assetPrefix) {
   }
 
   let totalBytes = 0;
-  let uploaded = 0;
+  const toUpload = [];
 
   for (let i = 0; i < imageElems.length; i++) {
     const elem = imageElems[i];
@@ -306,22 +306,27 @@ async function uploadProjectImagesInPlace(elements, assetPrefix) {
     const short = randomUUID().replace(/-/g, '').slice(0, 12);
     const pathname = `${assetPrefix}/assets/${i + 1}-${short}.${ext}`;
 
-    let blob;
-    try {
-      blob = await put(pathname, parsed.buffer, {
-        access: 'public',
-        addRandomSuffix: false,
-        contentType: parsed.mime,
-      });
-    } catch (error) {
-      return { ok: false, error: 'BlobWriteFailed', details: [String(error)] };
-    }
-
-    elem.imageSrc = blob.url;
-    uploaded++;
+    toUpload.push({ elem, parsed, pathname });
   }
 
-  return { ok: true, uploaded, totalBytes };
+  let blobs;
+  try {
+    blobs = await Promise.all(
+      toUpload.map(item => put(item.pathname, item.parsed.buffer, {
+        access: 'public',
+        addRandomSuffix: false,
+        contentType: item.parsed.mime,
+      }))
+    );
+  } catch (error) {
+    return { ok: false, error: 'BlobWriteFailed', details: [String(error)] };
+  }
+
+  for (let i = 0; i < toUpload.length; i++) {
+    toUpload[i].elem.imageSrc = blobs[i].url;
+  }
+
+  return { ok: true, uploaded: toUpload.length, totalBytes };
 }
 
 export default async function handler(req, res) {
