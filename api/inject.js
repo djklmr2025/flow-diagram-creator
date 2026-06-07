@@ -1,3 +1,4 @@
+import { readJsonBody } from './_utils.js';
 import { put, list } from '@vercel/blob';
 
 const MAX_PROJECT_BYTES = 200_000; // Anti-abuso: evita payloads enormes.
@@ -24,13 +25,6 @@ function getOrigin(req) {
   return `${proto}://${host}`;
 }
 
-async function readJsonBody(req) {
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  const text = Buffer.concat(chunks).toString('utf8');
-  if (!text) return null;
-  return JSON.parse(text);
-}
 
 function sanitizeSession(input) {
   if (!input) return '';

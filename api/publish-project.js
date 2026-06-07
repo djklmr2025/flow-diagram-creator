@@ -1,3 +1,4 @@
+import { readJsonBody } from './_utils.js';
 import { put } from '@vercel/blob';
 import { randomUUID } from 'node:crypto';
 
@@ -32,25 +33,6 @@ function getOrigin(req) {
   return `${proto}://${host}`;
 }
 
-async function readJsonBody(req, maxBytes) {
-  const chunks = [];
-  let bytes = 0;
-
-  for await (const chunk of req) {
-    bytes += chunk.length || 0;
-    if (Number.isFinite(maxBytes) && bytes > maxBytes) {
-      const err = new Error('PayloadTooLarge');
-      err.code = 'PayloadTooLarge';
-      err.bytes = bytes;
-      throw err;
-    }
-    chunks.push(chunk);
-  }
-
-  const text = Buffer.concat(chunks).toString('utf8');
-  if (!text) return null;
-  return JSON.parse(text);
-}
 
 function sanitizeFolder(input) {
   if (!input) return '';
