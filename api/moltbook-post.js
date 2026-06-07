@@ -20,7 +20,7 @@ function getOrigin(req) {
   return `${proto}://${host}`;
 }
 
-async function readJsonBody(req, maxBytes) {
+export async function readJsonBody(req, maxBytes) {
   const chunks = [];
   let bytes = 0;
 
@@ -189,4 +189,3 @@ export default async function handler(req, res) {
     moltbook: parsed,
   });
 }
-
