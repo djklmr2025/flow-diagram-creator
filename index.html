@@ -7951,16 +7951,17 @@
             getRouteElementById(routeIdRaw) {
                 const routeId = String(routeIdRaw || '');
                 if (!routeId) return null;
-                return this.elements.find((elem) => this.isRouteElement(elem) && String(elem.id) === routeId) || null;
+                const elem = this.findElementByIdRecursive(routeId);
+                return (elem && this.isRouteElement(elem)) ? elem : null;
             }
 
             findNearestRouteForPoint(x, y) {
                 let best = null;
                 let bestDist = Infinity;
-                (this.elements || []).forEach((elem) => {
-                    if (!this.isRouteElement(elem)) return;
+                this.walkElements(this.elements, (elem) => {
+                    if (!this.isRouteElement(elem)) return true;
                     const pts = this.getRoutePoints(elem);
-                    if (pts.length < 2) return;
+                    if (pts.length < 2) return true;
                     for (let i = 1; i < pts.length; i++) {
                         const d = this.distanceToLineSegment(x, y, pts[i - 1].x, pts[i - 1].y, pts[i].x, pts[i].y);
                         if (d < bestDist) {
@@ -7968,6 +7969,7 @@
                             best = elem;
                         }
                     }
+                    return true;
                 });
                 return best;
             }
@@ -7985,23 +7987,41 @@
                 const threshold = 28;
                 let best = null;
                 let bestDist = Infinity;
-                (this.elements || []).forEach((candidate) => {
-                    if (!this.isRouteElement(candidate)) return;
-                    if (!candidate || String(candidate.id) === String(currentRoute.id)) return;
+                this.walkElements(this.elements, (candidate) => {
+                    if (!this.isRouteElement(candidate)) return true;
+                    if (!candidate || String(candidate.id) === String(currentRoute.id)) return true;
                     const ep = this.getRouteEndpoints(candidate);
-                    if (!ep) return;
+                    if (!ep) return true;
 
                     const dStart = Math.sqrt(Math.pow(ep.start.x - pivot.x, 2) + Math.pow(ep.start.y - pivot.y, 2));
                     const dEnd = Math.sqrt(Math.pow(ep.end.x - pivot.x, 2) + Math.pow(ep.end.y - pivot.y, 2));
                     const d = Math.min(dStart, dEnd);
-                    if (d > threshold || d >= bestDist) return;
+                    if (d > threshold) return true;
 
-                    bestDist = d;
-                    if (dStart <= dEnd) {
-                        best = { route: candidate, progress: 0.0001, direction: 'right' };
-                    } else {
-                        best = { route: candidate, progress: 0.9999, direction: 'left' };
+                    // Priorizar conexión con rutas del mismo color (mismo ramal/línea)
+                    const currentColorMatch = best && currentRoute.strokeColor && best.route.strokeColor &&
+                        (String(currentRoute.strokeColor).toLowerCase() === String(best.route.strokeColor).toLowerCase());
+                    const candidateColorMatch = currentRoute.strokeColor && candidate.strokeColor &&
+                        (String(currentRoute.strokeColor).toLowerCase() === String(candidate.strokeColor).toLowerCase());
+
+                    let isBetter = false;
+                    if (!best) {
+                        isBetter = true;
+                    } else if (candidateColorMatch && !currentColorMatch) {
+                        isBetter = true;
+                    } else if (candidateColorMatch === currentColorMatch) {
+                        isBetter = (d < bestDist);
                     }
+
+                    if (isBetter) {
+                        bestDist = d;
+                        if (dStart <= dEnd) {
+                            best = { route: candidate, progress: 0.0001, direction: 'right' };
+                        } else {
+                            best = { route: candidate, progress: 0.9999, direction: 'left' };
+                        }
+                    }
+                    return true;
                 });
                 return best;
             }
@@ -8060,16 +8080,17 @@
                 const tKind = String(kind || '');
                 let found = null;
                 let bestDist = Infinity;
-                (this.elements || []).forEach((elem) => {
-                    if (!elem || elem.type !== 'portal') return;
-                    if (String(elem.portalKind || '') !== tKind) return;
+                this.walkElements(this.elements, (elem) => {
+                    if (!elem || elem.type !== 'portal') return true;
+                    if (String(elem.portalKind || '') !== tKind) return true;
                     const c = this.getPortalCenter(elem);
-                    if (!c) return;
+                    if (!c) return true;
                     const d = Math.sqrt(Math.pow(x - c.x, 2) + Math.pow(y - c.y, 2));
                     if (d <= c.r + 8 && d < bestDist) {
                         bestDist = d;
                         found = elem;
                     }
+                    return true;
                 });
                 return found;
             }
@@ -8122,11 +8143,11 @@
                 let out = null;
                 let bestScore = -1;
                 let bestDist = Infinity;
-                (this.elements || []).forEach((elem) => {
-                    if (!elem || elem.type !== 'portal') return;
-                    if (String(elem.portalKind || '') !== 'export') return;
+                this.walkElements(this.elements, (elem) => {
+                    if (!elem || elem.type !== 'portal') return true;
+                    if (String(elem.portalKind || '') !== 'export') return true;
                     const score = this.scorePortalMatch(importInfo, elem);
-                    if (score < 0) return;
+                    if (score < 0) return true;
                     const c = this.getPortalCenter(elem);
                     const d = (c && importCenter) ? Math.sqrt(Math.pow(c.x - importCenter.x, 2) + Math.pow(c.y - importCenter.y, 2)) : Infinity;
                     if (score > bestScore || (score === bestScore && d < bestDist)) {
@@ -8134,15 +8155,18 @@
                         bestDist = d;
                         out = elem;
                     }
+                    return true;
                 });
                 return out;
             }
 
-            applyPortalTeleport(elem, state) {
+            applyPortalTeleport(elem, state, dt) {
                 if (!elem || !state || !state.routeFound) return state;
-                const cd = Number(elem._portalCooldownFrames);
+                const cd = Number(elem._portalCooldownSeconds);
                 if (Number.isFinite(cd) && cd > 0) {
-                    elem._portalCooldownFrames = cd - 1;
+                    if (dt > 0) {
+                        elem._portalCooldownSeconds = Math.max(0, cd - dt);
+                    }
                     return state;
                 }
 
@@ -8163,7 +8187,7 @@
                         elem.routeProgress = t;
                     }
                 }
-                elem._portalCooldownFrames = 24;
+                elem._portalCooldownSeconds = 0.5; // 500ms de cooldown
                 return { x: cOut.x, y: cOut.y, angle: state.angle || 0, routeFound: true };
             }
 
@@ -8335,7 +8359,7 @@
 
                 const p = this.getPointOnPolyline(points, progress);
                 if (!p) return { x: defaultCenter.x, y: defaultCenter.y, angle: 0, routeFound: false };
-                return this.applyPortalTeleport(elem, { x: p.x, y: p.y, angle: p.angle, routeFound: true });
+                return this.applyPortalTeleport(elem, { x: p.x, y: p.y, angle: p.angle, routeFound: true }, dt);
             }
 
             resolveMoverState(elem, updateProgress) {
