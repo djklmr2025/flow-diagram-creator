@@ -8206,7 +8206,7 @@
                 }
             }
 
-            resolveElementRouteState(elem, updateProgress) {
+            resolveElementRouteState(elem, dt) {
                 if (!elem || typeof elem !== 'object') return { x: 0, y: 0, angle: 0, routeFound: false };
 
                 const isMover = elem.type === 'mover';
@@ -8218,6 +8218,7 @@
                 if (!enabled) {
                     return { x: defaultCenter.x, y: defaultCenter.y, angle: 0, routeFound: false };
                 }
+                const updateProgress = Number.isFinite(dt) && dt > 0;
 
                 let routeId = String(elem.routeId || '');
                 if (!routeId && autoConnect) {
@@ -8247,8 +8248,8 @@
                 if (updateProgress && elem.active !== false) {
                     const rawSpeed = Number(isMover ? elem.speed : (elem.routeSpeed || elem.speed));
                     const speed = Number.isFinite(rawSpeed) ? Math.max(1, Math.min(300, rawSpeed)) : 40;
-                    // Velocidad uniforme por distancia recorrida real (px/frame).
-                    let remainingDist = dir * (speed / 24);
+                    // Velocidad uniforme por tiempo real transcurrido (px/s).
+                    let remainingDist = dir * 2.5 * speed * dt;
                     let guard = 0;
                     while (Math.abs(remainingDist) > 1e-6 && guard < 16) {
                         guard += 1;
@@ -8338,16 +8339,18 @@
             }
 
             resolveMoverState(elem, updateProgress) {
-                return this.resolveElementRouteState(elem, updateProgress);
+                const dt = updateProgress ? (Number.isFinite(this._currentDt) ? this._currentDt : (1 / 60)) : 0;
+                return this.resolveElementRouteState(elem, dt);
             }
 
             updateRouteFollowersInPlace() {
+                const dt = Number.isFinite(this._currentDt) ? this._currentDt : (1 / 60);
                 this.walkElements(this.elements, (elem) => {
                     if (!elem || typeof elem !== 'object') return true;
                     if (elem.type === 'mover') return true; // mover se dibuja por estado dinámico
 
                     if (!elem.followRoute || !elem.routeId) return true;
-                    const state = this.resolveElementRouteState(elem, true);
+                    const state = this.resolveElementRouteState(elem, dt);
                     if (!state.routeFound) return true;
                     const center = this.getElementCenterPoint(elem);
                     const dx = state.x - center.x;
@@ -9149,11 +9152,16 @@
             // ==================== ANIMACIÓN ====================
             
             startAnimationLoop() {
-                const animate = () => {
+                this._lastAnimationTs = performance.now();
+                const animate = (ts) => {
+                    const elapsed = ts - this._lastAnimationTs;
+                    this._lastAnimationTs = ts;
+                    const dt = Math.max(0.001, Math.min(0.05, elapsed / 1000));
+                    this._currentDt = dt;
                     this.render();
                     requestAnimationFrame(animate);
                 };
-                animate();
+                requestAnimationFrame(animate);
             }
             
             // ==================== ACCIONES ====================
