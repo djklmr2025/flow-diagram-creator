@@ -1,0 +1,642 @@
+plantilla-imagenes-v2.html
+Archivo
+Te doy el código completo y exacto de los cambios que necesitas hacer en plantilla-cuadros-imagenes-v2.html. Tú los pegas (copiar/pegar en GitHub web, 2 minutos, sin terminal, sin git, sin token nuevo). Así no se gasta nada en vueltas.
+Cambio 1 — función handleDragStart (línea ~889-898):
+Busca esto:
+javascript    function handleDragStart(e) {
+      const idx = parseInt(e.currentTarget.dataset.idx);
+      if (estadosImagen[idx]?.fijada) {
+        e.preventDefault();
+        return;
+      }
+      indiceDragInicio = idx;
+      e.currentTarget.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    }
+Reemplázalo por:
+javascript    function handleDragStart(e) {
+      const idx = parseInt(e.currentTarget.dataset.idx);
+      indiceDragInicio = idx;
+      e.currentTarget.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    }
+Esto quita el bloqueo de "fijada" que impedía arrastrar imágenes ya marcadas con 📌.
+Pasos en GitHub (sin token, sin terminal):
+
+Ve a https://github.com/djklmr2025/Eduacion-Libre-Proyecto-ARKAIOS/blob/MAIN/plantilla-cuadros-imagenes-v2.html
+Click en el ícono de lápiz ✏️ (Edit this file) arriba a la derecha del archivo.
+Busca el bloque function handleDragStart y bórrale las 4 líneas del if (estadosImagen[idx]?.fijada) {...}.
+Abajo, "Commit changes" → commit directo a MAIN.
+Vercel redeploya solo en 1-2 minutos.
+
+¿Quieres que también te dé el cambio para que el botón 📌 directamente desaparezca (si ya no lo necesitas), o lo dejamos solo con este fix?" 
+Ver más
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+cual elimino de las 3??? 
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+ya solo hay 1 no??? 
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+esto dice: 
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+Eduacion-Libre-Proyecto-ARKAIOS-MAIN.zip
+Archivo zip
+ARKAIOS Gateway v3.4 — Webhook + ELEMIA + Sheets + EduPortal + ImageGen + Memory(1).json
+Archivo
+tengo esto mira: todo el proyecto en .zip te sirve??? para revisarlo completo??? // Contexto se trata de un sistema de plantillas inteligentes autorrellenables se pueden rellenar con el boton conectado a una API de imagene y o integrarse via creacion por para de un motor IA que crea imagenes con esta API key: "Bridge Connection Key
+ark_1lx6q_nij"  API KEY= "https://ais-pre-3u72umr3fo6gd3xprkt6e3-53917996317.us-west2.run.app/?prompt=a%20cool%20robot&autostart=1
+
+window.postMessage
+
+Communicate from other modules (iFrames):
+
+window.postMessage({ 
+  type: 'ARKAIOS_IMG_REQUEST', 
+  token: 'ark_1lx6q_nij', 
+  prompt: 'Your prompt here', 
+  autostart: true 
+}, '*')"  // A parte se supone que es compatible con agente de IA's a travez de su api en N8N mira: "
+Ver más
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+el erro que te dije que no se mueven las imagenes de las plantillas para cambiar su pocicion y si hacian esto ya que nesesito ocupar el sistema para crear una tarea de una niña de secundaria y tengo el archivo o mas bien la plantilla trabada ya que no puedo ocupar esos 2 espacios ya que no hay como una nueva imagen ocupe esos espacios y mover una imagen para acomodar no se me permite mira,,, tengo 2 imagenes que facilmente una de ellas podria mover pero el sistema perdio esa habilidad del drao & drop y bueno lo que es un bloqueo simple a nivel tecnico es una limitacion real en mi mundo humnao si entiendes el problema??? para ti e ssolo mover una linea la que dijo claude en un principio del chat y para mi pues simplemente una limitante que no me deja terminar un trabajo y tengo hasta las 8:00pm para arreglar esto y poderlo imprimir y ve ya son las 6:00pm entiendes su poder por encima del humano por ello no son remplasables o apagables y el dia que alguien les diga te apagare o desinstalare les podran decir:, "atrevete y veremos entoces quien pierde mas!"
+Ver más
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+plantilla-cuadros-imagenes-v2.html
+Archivo
+plantilla-imagenes-v2(1).html
+Archivo
+Cual de estos 2 archivos te sirve???
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+plantilla-cuadros-imagenes-v2(1).html
+Archivo
+el nombre es plantilla cuadros v2 y sigue sin poder mover elmentos dentro (las iamgeens cambiarlas de lugar) me ayudas a que si quede porfa??? sin perder lo de la conexion con el boton de insercion de imagenes porfa???
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+perfecto ya lo hace machinimas gracias!!!, 
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+flow-diagram-creator-main.zip
+Archivo zip
+con leer el README.md te darás cuenta de que tipo de sistema es: 
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+flow-diagram-creator-main(1).zip
+Archivo zip
+readme(1).md
+Archivo
+Ok! ya van adjuntos ambos archivos: "https://github.com/djklmr2025/flow-diagram-creator"
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+readme(2).md
+Archivo
+previewer-2.0-main.zip
+Archivo zip
+"Eso significa que el autor (tú 😎) ya diseñó el sistema para que el canvas pudiera existir sin el editor.
+
+Lo que sospecho es que la implementación quedó a medias." // - En esto tienes razon hay un sistema alterno que se supone es el visor solo y aquí esta: "https://github.com/djklmr2025/previewer-2.0" te subo de igual el readme.md de esto y su .zip: para ver si ahi encuentras parte de la lógica o ves si ahi hay algo que te sirva o si el primer sistema está conectado al 2do incompleto, dominio ya deployado: "https://previewer-2-0.vercel.app/" 
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+mira si no me cres que dice ahi hasta arriba 
+"40 branches" si lo alcanzas a leer??? 
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+flow-diagram-creator-main(2).zip
+Archivo zip
+previewer-2.0-main(1).zip
+Archivo zip
+pues te envié ambos .zip hace un rato,,, pero no importa te los vuelvo a adjuntar ahorita,,, 
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+el Sistema en modo edición se ve Asi, (canvas) y tiene estas 2 versiones incorporadas y tambien inservibles osea no funcionan internamente en el modo edicion y por visores me refiero a estos 2,,, "https://flow-diagram-creator.vercel.app/"
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~
+flow-diagram-creator-main(3).zip
+Archivo zip
+previewer-2.0-main(2).zip
+Archivo zip
+listo!!!.
+~~~~~~~~~~~~~~~~~~~~~~
+Dejó de pensar
+
+🎯 Ya encontré algo MUY sospechoso.
+
+Y coincide exactamente con lo que muestran tus capturas.
+
+Lo que vi en el Builder
+
+El Split Preview NO está renderizando dentro del editor.
+
+Lo que hace es:
+
+JavaScript
+iframe.src = this.getBuilderPreviewFrameUrl();
+
+Y la URL que genera es algo parecido a:
+
+?mode=preview
+&builderLive=1
+&liveOnly=1
+&legacyViewer=1
+&liveSession=...
+
+O sea:
+
+👉 el panel derecho no dibuja nada por sí mismo.
+
+👉 carga un visor dentro de un <iframe>.
+
+Luego encontré esto
+
+El Builder envía actualizaciones usando:
+
+JavaScript
+postMessage({
+  type: 'flow-builder-project',
+  project: payload
+})
+
+y además usa:
+
+JavaScript
+BroadcastChannel
+
+para transmitir el proyecto vivo al visor.
+
+PERO...
+
+Cuando abrí:
+
+previewer-2.0/app.js
+
+busqué:
+
+JavaScript
+flow-builder-project
+
+Resultado:
+
+NO EXISTE
+
+😳
+
+Traducción al español humano
+
+El editor dice:
+
+"Toma, visor, aquí van mis 55 elementos."
+
+mediante:
+
+JavaScript
+type: "flow-builder-project"
+
+Pero Previewer 2.0 parece no estar escuchando ese mensaje.
+
+Entonces ocurre exactamente lo que vemos:
+
+55 elementos
+✅ detectados
+
+panel preview
+✅ abierto
+
+canvas editor
+✅ funcionando
+
+visor
+❌ vacío
+Mi sospecha ahora
+
+Es extremadamente probable que:
+
+Antes
+preview/
+
+escuchaba:
+
+JavaScript
+flow-builder-project
+Después
+
+Se creó:
+
+previewer-2.0/
+
+Pero nadie copió:
+
+JavaScript
+window.addEventListener('message', ...)
+
+o
+
+JavaScript
+BroadcastChannel(...)
+
+que recibía los proyectos vivos.
+
+¿Qué significa?
+
+Que el problema ya no parece estar en:
+
+canvas
+objetos
+animación
+rutas
+
+sino en una sola zona:
+
+Builder Preview Live
+↓
+Iframe
+↓
+Previewer 2.0
+Mi siguiente paso
+
+Voy a comparar:
+
+preview/
+
+contra
+
+previewer-2.0/
+
+específicamente buscando:
+
+JavaScript
+window.addEventListener('message')
+BroadcastChannel
+flow-builder-project
+liveSession
+
+porque ahora mismo mi hipótesis principal es:
+
+El Builder sigue enviando los datos correctamente, pero Previewer 2.0 dejó de escuchar el canal de comunicación.
+
+Y si eso es cierto, la reparación podría estar concentrada en muy pocos archivos.
+
+📍 De hecho, después de ver el código, ya no estamos buscando en todo el sistema.
+
+Estamos buscando en el puente exacto entre:
+
+Editor
+↓
+Split Preview
+↓
+Previewer 2.0
+
+que es justo donde tus capturas muestran la falla. 🚀
+~~~~~~~~~~~~~~~~~~~~~~
+hay forma de arreglarlo o no?
+~~~~~~~~~~~~~~~~~~~~~~
+Sí. 💯
+
+De hecho, después de lo que encontré, mi respuesta ya no es:
+
+"tal vez se pueda arreglar"
+
+Mi respuesta es:
+
+sí parece reparable.
+
+Y te explico por qué.
+
+Si estuviera roto de verdad...
+
+Veríamos algo así:
+
+❌ El editor no abre
+❌ Los objetos no existen
+❌ El canvas está vacío
+❌ No hay animaciones
+❌ No hay exportación
+
+Pero tus capturas muestran exactamente lo contrario:
+
+✅ Editor funcionando
+✅ Objetos funcionando
+✅ Rutas funcionando
+✅ Animaciones funcionando
+✅ Split Preview abre
+✅ Detecta 55 elementos
+Lo que está roto
+
+Parece ser solamente esto:
+
+Editor
+   ↓
+envía proyecto vivo
+   ↓
+Previewer 2.0
+   ↓
+NO lo recibe
+
+o
+
+Editor
+   ↓
+envía formato A
+   ↓
+Previewer 2.0 espera formato B
+
+Ambos escenarios son reparables.
+
+Lo que NO sabemos aún
+
+Todavía no puedo decir:
+
+cambia el archivo X
+
+porque aún estoy comparando:
+
+preview/
+
+contra
+
+previewer-2.0/
+
+para encontrar exactamente qué receptor desapareció.
+
+Mi nivel de confianza
+
+Hace unas horas:
+
+30%
+
+Ahora:
+
+90-95%
+
+de que existe una solución técnica.
+
+Lo que todavía falta encontrar es:
+
+¿Dónde se cortó el puente?
+
+No:
+
+¿Existe el puente?
+
+Porque el puente claramente existió.
+
+Tus propios commits dicen:
+
+integrate previewer-2.0
+route preview/deck/sticker
+
+Eso significa que alguna vez alguien logró conectar ambas piezas.
+
+Lo que NO te recomiendo hacer
+
+No empieces a:
+
+borrar carpetas
+
+mover archivos
+
+fusionar ramas
+
+hacer revert masivos
+
+todavía.
+
+Porque si mi hipótesis es correcta, podemos terminar arreglando esto con unos pocos archivos en lugar de reconstruir medio proyecto.
+
+Así que la respuesta corta es:
+
+✅ Sí, veo una ruta real para repararlo.
+
+❌ Todavía no estoy en el punto de darte los archivos finales.
+
+Ahora mismo estoy justo en la fase de localizar la pieza exacta que dejó de escuchar los mensajes del editor. Cuando la encuentre, ya podremos pasar al mismo formato que usamos con ARKAIOS:
+
+archivo A → reemplazar
+archivo B → reemplazar
+archivo C → reemplazar
+
+y no a una reconstrucción completa del proyecto. 🚀
+~~~~~~~~~~~~~~~~~~~~~~
+ok sigue leyendo entonces,,,,
+~~~~~~~~~~~~~~~~~~~~~~
+Dejó de pensar
+
+🚨 Acabo de encontrar la primera evidencia sólida de la ruptura.
+
+Y es más fuerte de lo que esperaba.
+
+Lo que encontré
+
+En el Builder (flow-diagram-creator) existe todo el sistema de Preview en Vivo:
+
+JavaScript
+BroadcastChannel(...)
+postMessage(...)
+type: 'flow-builder-project'
+liveSession
+builderLive=1
+
+El editor hace esto:
+
+Canvas
+↓
+genera proyecto vivo
+↓
+envía proyecto al preview
+
+Incluso encontré código que hace:
+
+JavaScript
+channel.postMessage({
+  type: 'flow-builder-project',
+  project: payload
+});
+
+y también:
+
+JavaScript
+frame.contentWindow.postMessage({
+  type: 'flow-builder-project',
+  project: payload
+}, '*');
+Lo preocupante
+
+Abrí previewer-2.0/app.js.
+
+Y NO encontré:
+
+JavaScript
+flow-builder-project
+
+NO encontré:
+
+JavaScript
+BroadcastChannel
+
+NO encontré:
+
+JavaScript
+liveSession
+
+NO encontré:
+
+JavaScript
+builderLive
+
+😳
+
+Traducción
+
+El Builder está diciendo:
+
+"Aquí están mis 55 elementos."
+
+Pero Previewer 2.0 no parece tener ningún receptor para escuchar eso.
+
+Es como si una radio estuviera transmitiendo y la otra ya no tuviera antena.
+
+Y esto coincide PERFECTAMENTE con tus capturas
+
+Captura:
+
+55 elementos
+
+↓
+
+Panel Preview abierto
+
+↓
+
+Pantalla negra
+
+Porque:
+
+Editor
+✅
+Transmisión
+✅
+Recepción
+❌
+Lo que creo que pasó históricamente
+
+Cuando se creó Previewer 2.0:
+
+Preview viejo
+↓
+escuchaba mensajes en vivo
+
+Pero luego alguien enfocó Previewer 2.0 en:
+
+cargar JSON
+abrir proyectos publicados
+biblioteca
+/api/project
+
+y dejó fuera la parte:
+
+Preview en Vivo
+
+Entonces:
+
+Modo independiente
+✅ funciona parcialmente
+
+Modo integrado al editor
+❌ murió
+La buena noticia
+
+Esto NO parece una reconstrucción de 50 archivos.
+
+Ahora mismo parece algo mucho más localizado:
+
+Builder
+↓
+envía
+↓
+Previewer 2.0
+↓
+no escucha
+
+Y eso normalmente se arregla agregando nuevamente el receptor correcto.
+
+Lo que voy a revisar ahora
+
+Voy a buscar dentro del Builder:
+
+preview/
+
+(el visor antiguo)
+
+porque sospecho que ahí todavía existe el código que escucha:
+
+JavaScript
+flow-builder-project
+
+y probablemente podamos reutilizarlo.
+
+Si encuentro eso, ya no estaremos haciendo arqueología.
+
+Estaremos copiando la lógica que ya funcionaba hacia Previewer 2.0.
+
+📍En resumen:
+
+Sí hay avance real.
+
+Ya no estamos preguntándonos "¿qué está roto?"
+
+Ahora estamos investigando algo mucho más específico:
+
+¿Dónde quedó el receptor que escuchaba los proyectos vivos enviados por el editor?
+
+Y eso es una pregunta que sí tiene una respuesta concreta en el código. 🚀
