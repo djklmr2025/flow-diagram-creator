@@ -343,6 +343,9 @@
           if (newElem.routeProgress === undefined || Number.isFinite(oldElem.routeProgress)) {
             newElem.routeProgress = oldElem.routeProgress;
           }
+          if (oldElem.routeId) newElem.routeId = oldElem.routeId;
+          if (oldElem.flowDirection) newElem.flowDirection = oldElem.flowDirection;
+          if (oldElem.routeDirection) newElem.routeDirection = oldElem.routeDirection;
           newElem._portalCooldownSeconds = oldElem._portalCooldownSeconds;
         }
       }
@@ -471,6 +474,11 @@
         const newJSON = getHashable(newElem);
 
         if (oldJSON !== newJSON) {
+          if (animSet.has(id)) {
+            console.log("ANIM JUMP DETECTED ON", id);
+            console.log("OLD:", oldJSON);
+            console.log("NEW:", newJSON);
+          }
           // Elemento modificado → re-renderizar
           const oldNode = els.world.querySelector(`[data-id="${id}"]`);
           if (oldNode) {
