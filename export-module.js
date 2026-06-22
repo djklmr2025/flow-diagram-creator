@@ -301,7 +301,8 @@
   }
 
   function exportVideo(name, selOnly = false) {
-    const canvas = getCanvas();
+    const s = sys();
+    const canvas = s ? s.canvas : null;
     if (!canvas) return toast('Canvas no encontrado', 'error');
     if (!canvas.captureStream) return toast('Tu navegador no soporta captureStream. Usa Chrome/Edge.', 'warn');
 
