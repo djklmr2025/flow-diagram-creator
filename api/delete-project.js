@@ -46,15 +46,9 @@ export default async function handler(req, res) {
   }
 
   // Leer cuerpo
-  let body;
-  try {
-    const chunks = [];
-    for await (const chunk of req) chunks.push(chunk);
-    const text = Buffer.concat(chunks).toString('utf8');
-    body = text ? JSON.parse(text) : {};
-  } catch (e) {
-    sendJson(res, 400, { ok: false, error: 'InvalidJSONBody' });
-    return;
+  let body = req.body || {};
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch (e) {}
   }
 
   const urlToDelete = body.url || new URL(req.url, origin).searchParams.get('url');
