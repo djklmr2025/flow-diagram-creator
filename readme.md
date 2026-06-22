@@ -1,5 +1,3 @@
-![Logo de Flow Diagram Creator](https://github.com/djklmr2025/flow-diagram-creator/blob/main/FHLL.gif?raw=true)
-
 # Flow Diagram Creator 🚀
 
 Un editor gráfico interactivo diseñado para crear diagramas de flujo, planos animados y mapas interactivos con alta precisión y gestión de capas.
