@@ -1,0 +1,65 @@
+{
+  "schema_version": "v1",
+  "name": "Arkaios MCP",
+  "description": "Model Context Protocol server para el ecosistema Arkaios. Genera hojas de conceptos educativos con imágenes usando IA.",
+  "server_url": "https://flow-diagram-creator.vercel.app",
+  "tools": [
+    {
+      "name": "generatetopic",
+      "description": "Genera exactamente 20 conceptos clave relacionados con un tema dado. Retorna un array de 20 strings.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string",
+            "description": "El tema o materia para el cual se generan los 20 conceptos clave"
+          }
+        },
+        "required": ["topic"]
+      },
+      "endpoint": "/api/mpc-arkaios-sheet",
+      "method": "POST"
+    },
+    {
+      "name": "generatesheet",
+      "description": "Orchestrator completo: recibe un topic, genera 20 conceptos + 20 imágenes y retorna el payload completo de la hoja Arkaios.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string",
+            "description": "El tema para generar la hoja completa con conceptos e imágenes"
+          }
+        },
+        "required": ["topic"]
+      },
+      "endpoint": "/api/mpc-arkaios-fill-sheet",
+      "method": "POST"
+    },
+    {
+      "name": "generateimage",
+      "description": "Genera una imagen para un concepto dado usando el Arkaios Gateway. Retorna la URL de la imagen generada.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "concept": {
+            "type": "string",
+            "description": "El concepto o descripción para generar la imagen"
+          },
+          "style": {
+            "type": "string",
+            "description": "Estilo visual de la imagen (opcional). Ej: 'educativo', 'minimalista', 'realista'",
+            "default": "educativo"
+          }
+        },
+        "required": ["concept"]
+      },
+      "endpoint": "/api/mpc-arkaios-image",
+      "method": "POST"
+    }
+  ],
+  "contact": {
+    "name": "Arkaios Team",
+    "url": "https://flow-diagram-creator.vercel.app"
+  }
+}
