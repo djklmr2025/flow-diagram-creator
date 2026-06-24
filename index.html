@@ -5852,8 +5852,8 @@
                         img.onload = () => {
                             const canvas = document.createElement('canvas');
                             const ctx = canvas.getContext('2d');
-                            const MAX_WIDTH = 1200;
-                            const MAX_HEIGHT = 1200;
+                            const MAX_WIDTH = 2400;
+                            const MAX_HEIGHT = 2400;
                             let width = img.width;
                             let height = img.height;
                             if (width > height) {
@@ -5870,7 +5870,7 @@
                             canvas.width = width;
                             canvas.height = height;
                             ctx.drawImage(img, 0, 0, width, height);
-                            const newDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                            const newDataUrl = canvas.toDataURL('image/jpeg', 0.85);
                             const oldSize = Math.round(elem.imageSrc.length / 1024);
                             const newSize = Math.round(newDataUrl.length / 1024);
                             totalOldSize += oldSize;
