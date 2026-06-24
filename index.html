@@ -5963,6 +5963,8 @@
                 if (trimItem) trimItem.style.display = canImageOps ? 'block' : 'none';
                 const vectorizeItem = document.getElementById('ctx-vectorize-image');
                 if (vectorizeItem) vectorizeItem.style.display = canImageOps ? 'block' : 'none';
+                const optimizeItem = document.getElementById('ctx-optimize-image');
+                if (optimizeItem) optimizeItem.style.display = canImageOps ? 'block' : 'none';
                 const canTransform = Boolean(this.selectedElements && this.selectedElements.length > 0 && !this.readOnly);
                 const scaleUpItem = document.getElementById('ctx-scale-up');
                 if (scaleUpItem) scaleUpItem.style.display = canTransform ? 'block' : 'none';
