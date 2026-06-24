@@ -90,7 +90,8 @@ El editor tiene: rectángulos, círculos, líneas animadas, rutas, metros animad
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               system_instruction: { parts: [{ text: systemPrompt }] },
-              contents: [{ parts: [{ text: finalMessage }] }]
+              contents: [{ parts: [{ text: finalMessage }] }],
+              tools: [{ googleSearch: {} }]
             })
           }
         );
