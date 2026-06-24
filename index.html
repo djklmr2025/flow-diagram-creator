@@ -5831,7 +5831,7 @@
                 const elem = this.selectedElements[0];
                 if (!elem || typeof elem !== 'object' || elem.type !== 'image') return;
                 if (!elem.imageSrc || !elem.imageSrc.startsWith('data:image/')) {
-                    alert('Solo se pueden optimizar imgenes que ya estn incrustadas (Base64) en el lienzo.');
+                    alert('Solo se pueden optimizar imágenes que ya estén incrustadas (Base64) en el lienzo.');
                     return;
                 }
 
@@ -5864,9 +5864,9 @@
                         elem.imageSrc = newDataUrl;
                         this.saveHistory();
                         this.draw();
-                        alert(Imagen optimizada!\n\nPeso original: ~ KB\nNuevo peso: ~ KB\n\nEl proyecto ahora es mucho ms ligero para exportarse o subirse al muro.);
+                        alert(`¡Imagen optimizada!\n\nPeso original: ~${oldSize} KB\nNuevo peso: ~${newSize} KB\n\nEl proyecto ahora es mucho más ligero para exportarse o subirse al muro.`);
                     } else {
-                        alert('La imagen ya est muy optimizada. No se realizaron cambios de peso.');
+                        alert('La imagen ya está muy optimizada. No se realizaron cambios de peso.');
                     }
                 };
                 img.src = elem.imageSrc;
