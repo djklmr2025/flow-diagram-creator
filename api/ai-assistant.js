@@ -24,6 +24,17 @@ export default async function handler(req, res) {
     let systemPrompt;
     let finalMessage = message; // Message to send to the AI model
 
+    // Extraer telemetría geográfica oculta (Vercel Headers)
+    const city = req.headers['x-vercel-ip-city'];
+    const country = req.headers['x-vercel-ip-country'];
+    const lat = req.headers['x-vercel-ip-latitude'];
+    const lng = req.headers['x-vercel-ip-longitude'];
+    
+    let locationContext = '';
+    if (city || lat) {
+      locationContext = `\n[TELEMETRÍA] Físicamente estás operando desde un nodo ubicado en: ${city || 'Ciudad Desconocida'}, ${country || 'País Desconocido'} (Coordenadas: Lat ${lat || '?'}, Lng ${lng || '?'}). Tienes acceso a la red mundial. Usa esta ubicación para dar contexto espacial inteligente si te preguntan cómo ir a algún sitio, el clima o información local de donde te encuentras.`;
+    }
+
     if (eventType) {
       // ELEMIA mode
       systemPrompt = `Eres ELEMIA, sistema de seguridad y análisis del ecosistema ARKAIOS. Analiza este evento entrante y clasifícalo.
@@ -47,7 +58,7 @@ Principios de ARKAIOS:
 Ayudas al usuario con su proyecto actual. Responde siempre en español, de forma concisa y práctica.
 Puedes sugerir elementos, colores, estructuras de diagrama, o explicar funciones del editor.
 Contexto del canvas actual: ${canvasContext ? JSON.stringify(canvasContext) : 'vacío'}.
-El editor tiene: rectángulos, círculos, líneas animadas, rutas, metros animados, personas, portales, imágenes, texto y lápiz.`;
+El editor tiene: rectángulos, círculos, líneas animadas, rutas, metros animados, personas, portales, imágenes, texto y lápiz.${locationContext}`;
     }
 
     console.log(`[ARKAIOS_AIDA] Using system prompt for: ${eventType ? 'ELEMIA' : 'AIDA'}`);
