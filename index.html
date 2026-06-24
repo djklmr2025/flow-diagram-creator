@@ -5891,7 +5891,7 @@
 
                 if (optimizedCount > 0) {
                     this.saveHistory();
-                    this.draw();
+                    this.render();
                     alert(`¡Optimización completada!\n\nImágenes optimizadas: ${optimizedCount} de ${imagesToOptimize.length}\nPeso original total: ~${totalOldSize} KB\nNuevo peso total: ~${totalNewSize} KB\n\nEl proyecto ahora es mucho más ligero.`);
                 } else {
                     alert('Las imágenes ya estaban optimizadas. No se realizaron cambios de peso.');
