@@ -12895,51 +12895,124 @@
                 
                 const btn = document.getElementById('btn-record-webm');
                 if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-                    // Stop early
+                    this.recordingWebm = false;
                     this.mediaRecorder.stop();
                     return;
                 }
                 
-                try {
-                    const stream = canvas.captureStream(30);
-                    this.mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-                    this.recordedChunks = [];
-                    
-                    this.mediaRecorder.ondataavailable = (e) => {
-                        if (e.data && e.data.size > 0) {
-                            this.recordedChunks.push(e.data);
-                        }
-                    };
-                    
-                    this.mediaRecorder.onstop = () => {
-                        const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        const fileName = `flow_recording_${Date.now()}.webm`;
-                        a.download = fileName;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                        this.recordedChunks = [];
-                        
-                        if (btn) btn.innerHTML = '<span>🎥</span> Grabar Canvas';
-                        alert('✅ Grabación WebM guardada.\n\nPuedes subir el archivo .webm a tu Image Hub o Giphy y luego pegar el enlace en la portada de FlowNexus.');
-                    };
-                    
-                    this.mediaRecorder.start();
-                    if (btn) btn.innerHTML = '<span style="color:red">⏹️</span> Grabando...';
-                    
-                    // Auto-stop after 8 seconds max
-                    setTimeout(() => {
-                        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-                            this.mediaRecorder.stop();
-                        }
-                    }, 8000);
-                    
-                } catch(e) {
-                    console.error('Error al iniciar grabación:', e);
-                    alert('Tu navegador no soporta grabación de Canvas WebM.');
+                let bounds = null;
+                if (typeof this.getViewerSafeBounds === 'function') {
+                    bounds = this.getViewerSafeBounds();
                 }
+                
+                if (!bounds) {
+                    alert('No hay elementos para grabar.');
+                    return;
+                }
+                
+                // Zoom to fit the object perfectly on the main canvas
+                const pad = 40; // padding around the object
+                const bw = Math.max(10, bounds.maxX - bounds.minX);
+                const bh = Math.max(10, bounds.maxY - bounds.minY);
+                const cw = canvas.width;
+                const ch = canvas.height;
+                const zoom = Math.min(cw / (bw + pad * 2), ch / (bh + pad * 2));
+                const clampedZoom = Math.max(0.05, Math.min(5, zoom));
+                
+                const origCam = { x: this.camera.x, y: this.camera.y, zoom: this.camera.zoom };
+                
+                this.camera.zoom = clampedZoom;
+                this.camera.x = cw / 2 - ((bounds.minX + bounds.maxX) / 2) * clampedZoom;
+                this.camera.y = ch / 2 - ((bounds.minY + bounds.maxY) / 2) * clampedZoom;
+                if(this.updateZoomIndicator) this.updateZoomIndicator();
+                this.render(); // Force render immediately with new camera
+                
+                requestAnimationFrame(() => {
+                    try {
+                        const screenMinX = bounds.minX * this.camera.zoom + this.camera.x - pad * this.camera.zoom;
+                        const screenMinY = bounds.minY * this.camera.zoom + this.camera.y - pad * this.camera.zoom;
+                        const screenMaxX = bounds.maxX * this.camera.zoom + this.camera.x + pad * this.camera.zoom;
+                        const screenMaxY = bounds.maxY * this.camera.zoom + this.camera.y + pad * this.camera.zoom;
+                        
+                        let cropW = screenMaxX - screenMinX;
+                        let cropH = screenMaxY - screenMinY;
+                        
+                        let scaleCrop = 1;
+                        if (cropW > 1200 || cropH > 1200) {
+                            scaleCrop = 1200 / Math.max(cropW, cropH);
+                        }
+                        const finalW = Math.round(cropW * scaleCrop);
+                        const finalH = Math.round(cropH * scaleCrop);
+                        
+                        const offCanvas = document.createElement('canvas');
+                        offCanvas.width = finalW;
+                        offCanvas.height = finalH;
+                        const offCtx = offCanvas.getContext('2d');
+                        
+                        const bgColor = this.backgroundColor || '#0a0a0a';
+                        
+                        const stream = offCanvas.captureStream(30);
+                        this.mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+                        this.recordedChunks = [];
+                        this.recordingWebm = true;
+                        
+                        const recordLoop = () => {
+                            if (!this.recordingWebm) return;
+                            offCtx.fillStyle = bgColor;
+                            offCtx.fillRect(0, 0, finalW, finalH);
+                            offCtx.drawImage(
+                                canvas, 
+                                screenMinX, screenMinY, cropW, cropH, 
+                                0, 0, finalW, finalH
+                            );
+                            requestAnimationFrame(recordLoop);
+                        };
+                        
+                        this.mediaRecorder.ondataavailable = (e) => {
+                            if (e.data && e.data.size > 0) this.recordedChunks.push(e.data);
+                        };
+                        
+                        this.mediaRecorder.onstop = () => {
+                            this.recordingWebm = false;
+                            
+                            // Restore camera
+                            this.camera.x = origCam.x;
+                            this.camera.y = origCam.y;
+                            this.camera.zoom = origCam.zoom;
+                            if(this.updateZoomIndicator) this.updateZoomIndicator();
+                            this.render(); // Restore view
+                            
+                            const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `flow_recording_${Date.now()}.webm`;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                            this.recordedChunks = [];
+                            
+                            if (btn) btn.innerHTML = '<span>🎥</span> Grabar Canvas';
+                            alert('✅ Grabación WebM guardada. Se recortó exactamente al tamaño de tu diagrama.');
+                        };
+                        
+                        this.mediaRecorder.start();
+                        recordLoop();
+                        
+                        if (btn) btn.innerHTML = '<span style="color:red">⏹️</span> Grabando Objeto...';
+                        
+                        // Auto-stop after 8 seconds max
+                        setTimeout(() => {
+                            if (this.recordingWebm && this.mediaRecorder.state === 'recording') {
+                                this.mediaRecorder.stop();
+                            }
+                        }, 8000);
+                        
+                    } catch(e) {
+                        console.error('Error en grabación centrada:', e);
+                        alert('Error al grabar el objeto.');
+                        this.recordingWebm = false;
+                    }
+                });
             }
 
 	            exportProject() {
