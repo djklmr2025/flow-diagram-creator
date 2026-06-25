@@ -2045,6 +2045,9 @@
         <button class="btn" id="btn-export" title="Exportar JSON">
             <span>⬇️</span> Exportar
         </button>
+        <button class="btn" id="btn-record-webm" title="Grabar Canvas (WebM)">
+            <span>🎥</span> Grabar Canvas
+        </button>
         <button class="btn" id="btn-builder-preview" title="Split Preview en tiempo real">
             <span>🪟</span> Split Preview
         </button>
@@ -3049,6 +3052,10 @@
                 document.getElementById('btn-save').addEventListener('click', () => this.showSaveModal());
                 document.getElementById('btn-load').addEventListener('click', () => this.loadProject());
                 document.getElementById('btn-export').addEventListener('click', () => this.exportProject());
+                const btnRecordWebm = document.getElementById('btn-record-webm');
+                if (btnRecordWebm) {
+                    btnRecordWebm.addEventListener('click', () => this.recordCanvasWebm());
+                }
                 const btnBuilderPreview = document.getElementById('btn-builder-preview');
                 if (btnBuilderPreview) {
                     btnBuilderPreview.addEventListener('click', () => this.toggleBuilderPreview());
@@ -12882,6 +12889,59 @@
                 }
             }
             
+            recordCanvasWebm() {
+                const canvas = document.getElementById('flow-canvas');
+                if (!canvas) return;
+                
+                const btn = document.getElementById('btn-record-webm');
+                if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                    // Stop early
+                    this.mediaRecorder.stop();
+                    return;
+                }
+                
+                try {
+                    const stream = canvas.captureStream(30);
+                    this.mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+                    this.recordedChunks = [];
+                    
+                    this.mediaRecorder.ondataavailable = (e) => {
+                        if (e.data && e.data.size > 0) {
+                            this.recordedChunks.push(e.data);
+                        }
+                    };
+                    
+                    this.mediaRecorder.onstop = () => {
+                        const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        const fileName = `flow_recording_${Date.now()}.webm`;
+                        a.download = fileName;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        this.recordedChunks = [];
+                        
+                        if (btn) btn.innerHTML = '<span>🎥</span> Grabar Canvas';
+                        alert('✅ Grabación WebM guardada.\n\nPuedes subir el archivo .webm a tu Image Hub o Giphy y luego pegar el enlace en la portada de FlowNexus.');
+                    };
+                    
+                    this.mediaRecorder.start();
+                    if (btn) btn.innerHTML = '<span style="color:red">⏹️</span> Grabando...';
+                    
+                    // Auto-stop after 8 seconds max
+                    setTimeout(() => {
+                        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                            this.mediaRecorder.stop();
+                        }
+                    }, 8000);
+                    
+                } catch(e) {
+                    console.error('Error al iniciar grabación:', e);
+                    alert('Tu navegador no soporta grabación de Canvas WebM.');
+                }
+            }
+
 	            exportProject() {
 	                const projectData = this.buildProjectSnapshot('proyecto-exportado');
 	                
